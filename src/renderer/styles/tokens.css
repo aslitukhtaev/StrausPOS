@@ -1,0 +1,127 @@
+/*
+ * StrausPOS — dizayn tokenlari (yagona manba).
+ * Qorong'i premium sauna uslubi: to'q ko'k-grafit fon, issiq oltin aksent.
+ * Chrome 108 cheklovi: color-mix / oklch / :has / nesting YO'Q — faqat oddiy hex/rgba.
+ * Ekranlar ranglarni HECH QACHON qattiq yozmaydi — faqat shu o'zgaruvchilar.
+ */
+:root {
+  /* ── Fon va sirtlar (pastdan yuqoriga) ── */
+  --bg: #0b1019;              /* ilova foni */
+  --bg-elev: #0f1522;         /* chap panel / tepa panel */
+  --surface: #151c2b;         /* karta */
+  --surface-2: #1b2436;       /* karta ichidagi blok, input */
+  --surface-3: #232e44;       /* hover / bosilgan */
+  --surface-4: #2c3852;       /* faol segment */
+  --overlay: rgba(4, 7, 13, 0.72);
+
+  /* ── Chiziqlar ── */
+  --line: #253049;
+  --line-soft: #1d2639;
+  --line-strong: #36446a;
+
+  /* ── Matn ── */
+  --text: #eef1f7;
+  --text-2: #b4bdd0;          /* ikkilamchi */
+  --text-3: #8591aa;          /* izoh, yorliq */
+  --text-disabled: #5b6680;
+
+  /* ── Aksent: issiq oltin ── */
+  --accent: #e3b15a;
+  --accent-hover: #efc072;
+  --accent-press: #cf9d47;
+  --accent-ink: #1d1406;      /* oltin ustidagi matn */
+  --accent-soft: rgba(227, 177, 90, 0.14);
+  --accent-line: rgba(227, 177, 90, 0.42);
+  --accent-glow: 0 0 0 1px rgba(227, 177, 90, 0.35), 0 8px 28px rgba(227, 177, 90, 0.16);
+
+  /* ── Holat ranglari (xonalar) ── */
+  --free: #3ccf8e;            /* bo'sh */
+  --free-soft: rgba(60, 207, 142, 0.14);
+  --free-line: rgba(60, 207, 142, 0.45);
+  --busy: #f5a524;            /* band */
+  --busy-soft: rgba(245, 165, 36, 0.15);
+  --busy-line: rgba(245, 165, 36, 0.5);
+  --danger: #f2555f;          /* tugayapti / qarz / xato */
+  --danger-hover: #ff6a73;
+  --danger-press: #d9434d;
+  --danger-soft: rgba(242, 85, 95, 0.15);
+  --danger-line: rgba(242, 85, 95, 0.5);
+  --info: #5aa7ff;
+  --info-soft: rgba(90, 167, 255, 0.14);
+  --info-line: rgba(90, 167, 255, 0.45);
+  --paused: #9aa6c0;          /* pauzadagi mehmon */
+  --paused-soft: rgba(154, 166, 192, 0.14);
+
+  /* Semantik taxalluslar */
+  --success: var(--free);
+  --success-soft: var(--free-soft);
+  --warning: var(--busy);
+  --warning-soft: var(--busy-soft);
+
+  /* ── Shrift ── Windows 7 da ham bor: Segoe UI. Tashqi shrift YO'Q (offline). */
+  --font: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: "Segoe UI", system-ui, Roboto, Arial, sans-serif;
+
+  --fs-xs: 15px;   /* faqat yorliq/meta */
+  --fs-sm: 16px;   /* ikkilamchi matn */
+  --fs-md: 18px;   /* ASOSIY matn */
+  --fs-lg: 21px;
+  --fs-xl: 26px;
+  --fs-2xl: 32px;
+  --fs-3xl: 42px;
+  --fs-4xl: 56px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --lh-tight: 1.15;
+  --lh: 1.4;
+
+  /* ── O'lchamlar (sensorli ekran) ── */
+  --h-sm: 48px;
+  --h-md: 56px;   /* standart tugma / input */
+  --h-lg: 68px;
+  --h-xl: 84px;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-full: 999px;
+
+  /* ── Soyalar ── */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 6px 18px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --focus-ring: 0 0 0 3px rgba(227, 177, 90, 0.55);
+
+  /* ── Joylashuv ── */
+  --sidebar-w: 212px;
+  --topbar-h: 76px;
+  --page-pad: 24px;
+
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 140ms;
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --sidebar-w: 236px;
+    --topbar-h: 84px;
+    --page-pad: 32px;
+    --fs-md: 19px;
+  }
+}

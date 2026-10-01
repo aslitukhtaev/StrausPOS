@@ -1,0 +1,144 @@
+/* StrausPOS — ilova qobig'i (layout/AppShell). */
+
+.boot {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  color: var(--accent);
+  background: radial-gradient(ellipse at 50% 40%, rgba(227, 177, 90, 0.08), transparent 60%), var(--bg);
+}
+.boot__logo {
+  display: flex; align-items: center; justify-content: center;
+  width: 88px; height: 88px; border-radius: 26px;
+  background: var(--accent-soft); border: 1px solid var(--accent-line);
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas: 'side top' 'side main';
+  height: 100%;
+  background: var(--bg);
+}
+
+/* ── Chap navigatsiya ── */
+.shell__side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-elev);
+  border-right: 1px solid var(--line-soft);
+}
+.side__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--topbar-h);
+  padding: 0 16px;
+  flex: none;
+  border-bottom: 1px solid var(--line-soft);
+}
+.side__logo {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 44px; height: 44px; border-radius: 13px;
+  background: linear-gradient(160deg, #f1c878, #c8913c);
+  color: #2a1a04;
+  box-shadow: 0 6px 16px rgba(227, 177, 90, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.side__brandtext { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-semibold); letter-spacing: 0.01em; color: var(--text); }
+.side__brandtext b { color: var(--accent); font-weight: var(--fw-bold); }
+
+.side__nav {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+.side__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 64px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  text-align: left;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+  touch-action: manipulation;
+}
+.side__item:hover { background: var(--surface); color: var(--text); }
+.side__item:active { background: var(--surface-2); }
+.side__item.is-active {
+  background: linear-gradient(90deg, rgba(227, 177, 90, 0.16), rgba(227, 177, 90, 0.04));
+  border-color: rgba(227, 177, 90, 0.22);
+  color: var(--text);
+}
+.side__item.is-active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 14px;
+  bottom: 14px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+}
+.side__item.is-active .ui-icon { color: var(--accent); }
+.side__foot {
+  flex: none;
+  padding: 14px 20px 18px;
+  color: var(--text-disabled);
+  font-size: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (min-height: 900px) {
+  .side__item { height: 72px; }
+}
+
+/* ── Tepa panel ── */
+.shell__top {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 var(--page-pad);
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
+}
+.topbar__biz { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.topbar__bizname { font-size: var(--fs-xl); font-weight: var(--fw-bold); line-height: 1.15; letter-spacing: -0.005em; }
+.topbar__crumb { font-size: var(--fs-sm); color: var(--text-3); }
+.topbar__clock { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.topbar__time { font-size: var(--fs-xl); font-weight: var(--fw-bold); }
+.topbar__date { font-size: var(--fs-sm); color: var(--text-3); }
+.topbar__sep { width: 1px; height: 40px; background: var(--line); flex: none; }
+.topbar__user { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 260px; }
+.topbar__usertext { min-width: 0; line-height: 1.2; }
+.topbar__username { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.topbar__role { font-size: var(--fs-sm); color: var(--accent); }
+.topbar__lock { flex: none; }
+
+/* ── Asosiy maydon ── */
+.shell__main {
+  grid-area: main;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--page-pad);
+  animation: ui-fade-in 160ms ease-out;
+}

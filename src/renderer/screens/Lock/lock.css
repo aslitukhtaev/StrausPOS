@@ -1,0 +1,213 @@
+/* Qulf va Setup ekranlari (auth). */
+.auth {
+  display: grid;
+  grid-template-columns: minmax(380px, 40%) minmax(0, 1fr);
+  height: 100%;
+  background: var(--bg);
+}
+
+/* ── Brend paneli ── */
+.brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 40px 48px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 60% at 20% 110%, rgba(227, 140, 60, 0.22), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 90% -10%, rgba(90, 120, 200, 0.14), transparent 60%),
+    linear-gradient(170deg, #121a2b 0%, #0d1320 55%, #120f14 100%);
+  border-right: 1px solid var(--line-soft);
+}
+.brand__glow {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  bottom: -40%;
+  height: 70%;
+  background: radial-gradient(ellipse at center, rgba(227, 177, 90, 0.16), transparent 60%);
+  pointer-events: none;
+}
+.brand__top { position: relative; display: flex; align-items: center; gap: 14px; }
+.brand__logo {
+  display: flex; align-items: center; justify-content: center;
+  width: 60px; height: 60px; border-radius: 18px;
+  background: linear-gradient(160deg, #f1c878, #c8913c);
+  color: #2a1a04;
+  box-shadow: 0 10px 30px rgba(227, 177, 90, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.brand__product { font-size: var(--fs-xl); font-weight: var(--fw-semibold); letter-spacing: 0.01em; }
+.brand__product b { color: var(--accent); }
+.brand__center { position: relative; }
+.brand__time {
+  font-size: 112px;
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+.brand__date { margin-top: 14px; font-size: var(--fs-xl); color: var(--text-2); }
+.brand__bottom { position: relative; }
+.brand__biz {
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  color: var(--accent);
+  line-height: 1.15;
+  margin-bottom: 10px;
+  overflow-wrap: anywhere;
+}
+.brand__foot { font-size: var(--fs-sm); color: var(--text-3); }
+
+/* ── O'ng panel ── */
+.auth__panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 48px;
+  overflow: auto;
+  min-width: 0;
+}
+.auth__center { display: flex; align-items: center; justify-content: center; color: var(--accent); }
+.auth__head { margin-bottom: 28px; }
+.auth__head h1 { font-size: var(--fs-3xl); letter-spacing: -0.015em; }
+.auth__head--center { text-align: center; margin-bottom: 20px; }
+.auth__head--center h1 { font-size: var(--fs-2xl); }
+.auth__lead { margin-top: 8px; font-size: var(--fs-lg); color: var(--text-2); }
+
+/* Xodim tanlash */
+.lock-pick { width: 100%; max-width: 940px; animation: ui-fade-in 180ms ease-out; }
+.lock-pick { text-align: center; }
+.lock-pick__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 210px);
+  justify-content: center;
+  gap: 16px;
+}
+.lock-pick__grid.is-dense { grid-template-columns: repeat(auto-fit, 176px); gap: 12px; }
+.lock-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 16px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-1), var(--inset-hi);
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease), transform 80ms var(--ease), box-shadow var(--dur) var(--ease);
+  touch-action: manipulation;
+  min-width: 0;
+}
+.lock-pick__grid.is-dense .lock-tile { padding: 18px 12px 16px; }
+.lock-tile:hover { border-color: var(--accent-line); background: var(--surface-2); box-shadow: var(--shadow-2); }
+.lock-tile:active { transform: scale(0.98); }
+.lock-tile .ui-avatar { margin-bottom: 4px; }
+.lock-tile__name {
+  max-width: 100%;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.lock-tile__role { font-size: var(--fs-sm); color: var(--text-3); }
+.lock-tile__role.role--owner { color: var(--accent); }
+
+/* PIN */
+.lock-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 460px;
+  animation: ui-fade-in 180ms ease-out;
+}
+.lock-pin__who {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 18px 14px 14px;
+  margin-bottom: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+}
+.lock-pin__back {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 56px; height: 56px;
+  border: 0; border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--text-2);
+}
+.lock-pin__back:hover { background: var(--surface-3); color: var(--text); }
+.lock-pin__whotext { min-width: 0; }
+.lock-pin__name { font-size: 24px; font-weight: var(--fw-bold); line-height: 1.15; overflow-wrap: anywhere; }
+.lock-pin__role { font-size: var(--fs-sm); color: var(--accent); margin-top: 2px; }
+.lock-pin__prompt { font-size: var(--fs-lg); color: var(--text-2); margin-bottom: 18px; }
+.lock-pin__dots { margin-bottom: 6px; }
+.lock-pin__dots.is-shake { animation: ui-shake 360ms ease-in-out; }
+.lock-pin__error {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 30px;
+  margin: 8px 0 14px;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: #ff7b83;
+  opacity: 0;
+  transition: opacity var(--dur) ease;
+}
+.lock-pin__error.is-on { opacity: 1; }
+.lock-pin__pad { margin-bottom: 12px; }
+.lock-pin__switch { margin-top: 4px; }
+
+/* Setup */
+.setup { width: 100%; max-width: 560px; }
+.setup__steps {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  margin: 0 0 36px;
+  padding: 0;
+}
+.setup__step {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid var(--line);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.setup__step.is-active { border-color: var(--accent); color: var(--text); }
+.setup__step.is-done { border-color: rgba(227, 177, 90, 0.5); color: var(--text-2); }
+.setup__stepnum {
+  display: flex; align-items: center; justify-content: center; flex: none;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--surface-2); border: 1px solid var(--line);
+  font-size: var(--fs-sm); font-weight: var(--fw-bold);
+}
+.setup__step.is-active .setup__stepnum { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.setup__step.is-done .setup__stepnum { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.setup__body { display: flex; flex-direction: column; gap: 22px; animation: ui-fade-in 180ms ease-out; }
+.setup__body .ui-btn--xl { margin-top: 10px; }
+.setup__body--pin { align-items: center; gap: 0; }
+.setup__body--pin .auth__head { margin-bottom: 26px; }
+
+@media (max-height: 800px) {
+  .brand { padding: 32px 40px; }
+  .brand__time { font-size: 92px; }
+  .auth__panel { padding: 20px 40px; }
+  .auth__head { margin-bottom: 20px; }
+  .auth__head h1 { font-size: var(--fs-2xl); }
+  .ui-numpad--lg { --k: 70px; gap: 12px; }
+  .lock-pin__who { margin-bottom: 16px; padding: 10px 14px 10px 10px; }
+  .lock-pin__prompt { margin-bottom: 12px; }
+  .lock-pin__error { margin: 4px 0 10px; }
+  .setup__steps { margin-bottom: 24px; }
+  .setup__body--pin .auth__head { margin-bottom: 16px; }
+}
