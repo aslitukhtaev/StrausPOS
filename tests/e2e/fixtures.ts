@@ -16,7 +16,12 @@ export const MIN = 60_000
 
 /** Konsolda kutiladigan (biznes xatolari) xabarlar. Dev-server PosError ni HTTP 400 bilan qaytaradi —
  * Chromium buni "Failed to load resource ... 400" deb yozadi. Bu dizayn bo'yicha (UI toast ko'rsatadi). */
-const ALWAYS_OK: RegExp[] = [/Failed to load resource: the server responded with a status of 400/]
+const ALWAYS_OK: RegExp[] = [
+  /Failed to load resource: the server responded with a status of 400/,
+  // Playwright `page.clock` init-skripti chek namunasining sandbox iframe'iga (skriptsiz, ataylab) kiritilmoqchi bo'ladi —
+  // bu test vositasining artefakti, ilovaniki emas (receipt.ts da <script> yo'q).
+  /Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed/
+]
 
 export interface Pos {
   backend: Backend
