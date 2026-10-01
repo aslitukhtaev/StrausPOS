@@ -1,0 +1,35 @@
+.debts { display: flex; flex-direction: column; min-height: 100%; }
+.debts__loading { display: flex; justify-content: center; padding: var(--sp-12); }
+.debts-total {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-6);
+  padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-5); border-radius: var(--r-lg);
+  background: var(--surface); border: 1px solid var(--line-soft); box-shadow: var(--shadow-1);
+}
+.debts-total__label { color: var(--text-3); font-size: var(--fs-md); margin-bottom: 4px; }
+.debts-total__meta { text-align: right; }
+.debts-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-5); margin-bottom: var(--sp-4); flex-wrap: wrap; }
+.debts-bar .ui-tabs { flex: none; }
+.debts-bar__search { flex: 0 1 420px; min-width: 260px; padding-bottom: 4px; }
+.debts-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+.debts-row {
+  display: grid; grid-template-columns: minmax(200px, 1.6fr) 110px 110px 110px 140px 250px; align-items: center; gap: var(--sp-3);
+  min-height: 76px; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line-soft);
+}
+.debts-row--head { min-height: 0; padding-top: 0; padding-bottom: 0; background: none; border: 0; color: var(--text-3); font-size: var(--fs-sm); }
+.debts-row.is-closed { opacity: .65; }
+.debts-row .r { text-align: right; }
+.debts-cust { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+.debts-cust__txt { min-width: 0; }
+.debts-cust__name { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.debts-cust__phone { color: var(--text-3); font-size: var(--fs-sm); }
+.debts-row__tools { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+.debts-pay { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--sp-6); align-items: start; }
+.debts-pay__left { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
+.debts-pay__rest { padding: var(--sp-4); border-radius: var(--r-md); background: var(--danger-soft); border: 1px solid var(--danger-line); }
+.debts-pay__amount { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); background: var(--surface-2); border: 1px solid var(--line); min-height: 96px; }
+.debts-pay__quick { display: flex; gap: var(--sp-2); }
+.debts-hist { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 220px; overflow: auto; }
+.debts-hist__row { display: grid; grid-template-columns: 1fr auto 110px; gap: var(--sp-2); white-space: nowrap; align-items: center; padding: var(--sp-2) var(--sp-3); background: var(--surface-2); border-radius: var(--r-sm); }
+.debts-hist__row > :last-child { text-align: right; }
+.debts-hist__empty { padding: var(--sp-3); }
+.debts-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-4); padding: var(--sp-4); background: var(--surface-2); border-radius: var(--r-md); }
