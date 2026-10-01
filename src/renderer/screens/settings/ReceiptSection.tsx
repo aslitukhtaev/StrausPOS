@@ -2,9 +2,9 @@
 import { Component, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import type { ReceiptData, ReceiptSettings } from '@shared/types'
 import { api } from '@/api'
-import { Button, Field, Input, Segmented, Select, Spinner, TextArea, toast } from '@/ui'
+import { Button, Field, Input, Segmented, Select, Spinner, Switch, TextArea, toast } from '@/ui'
 import { useStaff } from '@/store/auth'
-import { FieldBox, Note, SaveBar, SectionHead, SwitchRow, jsonEqual, useReportDirty, type SectionProps } from './common'
+import { Note, SaveBar, SectionHead, jsonEqual, useReportDirty, type SectionProps } from './common'
 
 // ── Jonli namuna: checkout moduli (boshqa agent) bo'lsa — uning ReceiptPreview komponenti, aks holda iframe ──
 type CheckoutModule = {
@@ -202,7 +202,7 @@ export function ReceiptSection({ settings, save, onDirty }: SectionProps) {
 
           <div className="set-group">
             <div className="set-group__title">Ko'rinish</div>
-            <FieldBox label="Qog'oz kengligi">
+            <Field as="div" label="Qog'oz kengligi">
               <Segmented
                 block
                 value={draft.paperWidth}
@@ -212,22 +212,22 @@ export function ReceiptSection({ settings, save, onDirty }: SectionProps) {
                   { value: 80, label: '80 mm' }
                 ]}
               />
-            </FieldBox>
+            </Field>
             <div className="set-switches">
               {SHOW_OPTIONS.map((o) => (
-                <SwitchRow key={o.key} checked={draft[o.key]} onChange={(v) => patch({ [o.key]: v })} title={o.title} description={o.desc} />
+                <Switch key={o.key} checked={draft[o.key]} onChange={(v) => patch({ [o.key]: v })} label={o.title} description={o.desc} />
               ))}
             </div>
           </div>
 
           <div className="set-group">
             <div className="set-group__title">Chop etish</div>
-            <SwitchRow
+            <Switch
               checked={draft.autoPrintOnPay}
               onChange={(v) => patch({ autoPrintOnPay: v })}
-              title="To'lovdan keyin avtomatik chop etish"
+              label="To'lovdan keyin avtomatik chop etish"
               description="Hisob yopilishi bilan chek o'zi chiqadi"
-              testId="rc-autoprint"
+              data-testid="rc-autoprint"
             />
             <Field
               label="Printer"

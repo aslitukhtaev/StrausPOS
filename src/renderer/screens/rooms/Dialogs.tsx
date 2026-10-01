@@ -112,7 +112,7 @@ export function ReturnLineDialog({ line, guestLabel, onClose, onDone }: { line: 
           <Money value={line.amount} size="lg" />
         </div>
         {line.activeQty > 1 && (
-          <Field label="Nechta qaytariladi?">
+          <Field as="div" label="Nechta qaytariladi?">
             <div className="rooms-ret__qty">
               <Stepper value={qty} onChange={setQty} min={1} max={line.activeQty} size="lg" suffix="dona" />
               <Button variant="ghost" size="sm" onClick={() => setQty(line.activeQty)} disabled={qty === line.activeQty}>
@@ -121,7 +121,7 @@ export function ReturnLineDialog({ line, guestLabel, onClose, onDone }: { line: 
             </div>
           </Field>
         )}
-        <Field label="Sabab (ixtiyoriy)">
+        <Field as="div" label="Sabab (ixtiyoriy)">
           <div className="rooms-ret__chips">
             {REASONS.map((r) => (
               <button key={r} type="button" className={cx('rooms-chip', reason === r && 'is-active')} onClick={() => setReason(reason === r ? '' : r)}>
@@ -129,7 +129,7 @@ export function ReturnLineDialog({ line, guestLabel, onClose, onDone }: { line: 
               </button>
             ))}
           </div>
-          <Input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="Yoki o'zingiz yozing…" />
+          <Input aria-label="Sabab" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="Yoki o'zingiz yozing…" />
         </Field>
       </div>
     </Modal>

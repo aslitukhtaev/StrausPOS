@@ -12,6 +12,8 @@
  *   size: 'md' 56px (standart) | 'lg' 68px ;  icon — chapdagi ikon ;  invalid — qizil chegara.
  * MoneyInput — raqam (so'm) qiymati, ko'rinishda "1 250 000" probellar bilan; `suffix` standart "so'm".
  * Field: label, hint, error (error bo'lsa hint o'rniga qizil matn), required (yulduzcha), inline (yorliq chapda).
+ *   as="div" — <label> o'ramaydi (role="group"): ichida tugmalar bo'lsa (Segmented, Stepper, chiplar) shuni ishlating,
+ *   aks holda yorliqni bosish birinchi tugmani "bosib" yuboradi.
  */
 import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { cx } from './cx'
@@ -24,22 +26,37 @@ export interface FieldProps {
   error?: ReactNode
   required?: boolean
   inline?: boolean
+  /** 'label' (standart) — input/select uchun; 'div' — tugmalar guruhi (Segmented, Stepper, chiplar) uchun */
+  as?: 'label' | 'div'
   className?: string
   /** Yorliqni bog'lash uchun id (bermasangiz ichki element bilan avtomatik bog'lanmaydi — label baribir o'rab oladi) */
   children: ReactNode
 }
 
-export function Field({ label, hint, error, required, inline, className, children }: FieldProps) {
+export function Field({ label, hint, error, required, inline, as = 'label', className, children }: FieldProps) {
+  const labelId = useId()
+  const cls = cx('ui-field', inline && 'ui-field--inline', error ? 'is-invalid' : undefined, className)
+  const head = label && (
+    <span className="ui-field__label" id={as === 'div' ? labelId : undefined}>
+      {label}
+      {required && <span className="ui-field__req">*</span>}
+    </span>
+  )
+  const foot = error ? <span className="ui-field__error">{error}</span> : hint ? <span className="ui-field__hint">{hint}</span> : null
+  if (as === 'div') {
+    return (
+      <div className={cls} role="group" aria-labelledby={label ? labelId : undefined}>
+        {head}
+        <div className="ui-field__control">{children}</div>
+        {foot}
+      </div>
+    )
+  }
   return (
-    <label className={cx('ui-field', inline && 'ui-field--inline', error ? 'is-invalid' : undefined, className)}>
-      {label && (
-        <span className="ui-field__label">
-          {label}
-          {required && <span className="ui-field__req">*</span>}
-        </span>
-      )}
+    <label className={cls}>
+      {head}
       <span className="ui-field__control">{children}</span>
-      {error ? <span className="ui-field__error">{error}</span> : hint ? <span className="ui-field__hint">{hint}</span> : null}
+      {foot}
     </label>
   )
 }

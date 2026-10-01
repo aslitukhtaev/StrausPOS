@@ -7,7 +7,7 @@ import { ROLE_LABELS, ROLE_PERMISSIONS } from '@shared/permissions'
 import { api } from '../../api'
 import { useAuth, useCan } from '../../store/auth'
 import {
-  Avatar, Badge, Button, Card, EmptyState, Field, Icon, Input, Modal, Numpad, PageHeader, PinDots, Segmented, Spinner,
+  Switch, Avatar, Badge, Button, Card, EmptyState, Field, Icon, Input, Modal, Numpad, PageHeader, PinDots, Segmented, Spinner,
   Tabs, confirmDialog, toast, cx
 } from '../../ui'
 import './staff.css'
@@ -235,27 +235,6 @@ function PermissionsTable() {
 }
 
 /* ───────────── Qo'shish / tahrirlash ───────────── */
-function ToggleRow({ checked, onChange, title, hint, disabled }: {
-  checked: boolean; onChange: (v: boolean) => void; title: string; hint?: string; disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      className={cx('staff-toggle', checked && 'is-on')}
-      onClick={() => onChange(!checked)}
-    >
-      <span className="staff-toggle__text">
-        <span className="staff-toggle__title">{title}</span>
-        {hint && <span className="staff-toggle__hint">{hint}</span>}
-      </span>
-      <span className="staff-toggle__track"><span className="staff-toggle__thumb" /></span>
-    </button>
-  )
-}
-
 function EditDialog({ target, isMe, onClose, onSaved }: {
   target: EditTarget; isMe: boolean; onClose: () => void; onSaved: () => void
 }) {
@@ -312,7 +291,7 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
               onKeyDown={(e) => { if (e.key === 'Enter') save() }}
             />
           </Field>
-          <Field label="Lavozim" hint={ROLE_HINT[role]}>
+          <Field as="div" label="Lavozim" hint={ROLE_HINT[role]}>
             <Segmented
               block
               value={role}
@@ -321,18 +300,18 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
             />
           </Field>
           {isMe && <div className="subtle">O'z lavozimingizni o'zgartira olmaysiz.</div>}
-          <ToggleRow
+          <Switch
             checked={isProvider}
             onChange={setIsProvider}
-            title="Xizmat ko'rsatuvchi"
-            hint="Massaj kabi xizmatlarda xodim sifatida tanlanadi"
+            label="Xizmat ko'rsatuvchi"
+            description="Massaj kabi xizmatlarda xodim sifatida tanlanadi"
           />
-          <ToggleRow
+          <Switch
             checked={active}
             onChange={setActive}
             disabled={isMe}
-            title="Faol"
-            hint={isMe ? "O'zingizni nofaol qila olmaysiz" : 'Nofaol xodim tizimga kira olmaydi'}
+            label="Faol"
+            description={isMe ? "O'zingizni nofaol qila olmaysiz" : 'Nofaol xodim tizimga kira olmaydi'}
           />
           {cur && <div className="subtle">PIN-kodni o'zgartirish uchun kartadagi «PIN» tugmasini bosing.</div>}
         </div>

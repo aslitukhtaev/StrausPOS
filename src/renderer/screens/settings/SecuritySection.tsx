@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/api'
-import { Button, Field, Input, Segmented, toast } from '@/ui'
+import { Button, Field, Input, Segmented, Switch, toast } from '@/ui'
 import { useStaff } from '@/store/auth'
 import { ROLE_LABELS } from '@shared/permissions'
-import { FieldBox, Note, SaveBar, SectionHead, SwitchRow, useReportDirty, type SectionProps } from './common'
+import { Note, SaveBar, SectionHead, useReportDirty, type SectionProps } from './common'
 
 const AUTO_LOCK = [0, 1, 2, 5, 10, 30]
 
@@ -58,14 +58,14 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
       <div className="set-section__body">
         <div className="set-group">
           <div className="set-group__title">Qulf ekrani</div>
-          <SwitchRow
+          <Switch
             checked={lockEnabled}
             onChange={setLockEnabled}
-            title="Qulf ekrani yoqilgan"
+            label="Qulf ekrani yoqilgan"
             description="Xodim PIN bilan kiradi; yuqoridagi qulf tugmasi bilan ekranni yopish mumkin"
-            testId="sec-lock"
+            data-testid="sec-lock"
           />
-          <FieldBox
+          <Field as="div"
             label="Avtomatik qulflash"
             hint={
               !lockEnabled
@@ -82,7 +82,7 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
               onChange={setAutoLock}
               options={AUTO_LOCK.map((m) => ({ value: m, label: m === 0 ? 'Hech qachon' : `${m} daq`, disabled: !lockEnabled }))}
             />
-          </FieldBox>
+          </Field>
         </div>
 
         <div className="set-group">

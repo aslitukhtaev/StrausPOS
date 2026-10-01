@@ -266,16 +266,18 @@
 /* ───────────── Toast ───────────── */
 .ui-toasts {
   position: fixed;
+  top: calc(var(--topbar-h) + 12px);
   right: 24px;
-  bottom: 24px;
-  z-index: 200;
+  z-index: 300; /* modal (100) va tasdiq oynasidan yuqori */
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 440px;
+  gap: 10px;
+  width: 420px;
   max-width: calc(100vw - 48px);
   pointer-events: none;
 }
+/* Modal ochiq: tepa-markaz — modal tugmalari (pastki qator va ×) yopilmaydi */
+.ui-toasts.is-modal { top: 12px; right: auto; left: 50%; transform: translateX(-50%); width: 480px; }
 .ui-toast {
   --t-c: var(--info);
   display: flex;
@@ -286,10 +288,10 @@
   border: 1px solid var(--line);
   border-left: 5px solid var(--t-c);
   border-radius: var(--r-md);
-  box-shadow: var(--shadow-3);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), var(--shadow-3);
   pointer-events: auto;
   cursor: pointer;
-  animation: ui-slide-in 180ms var(--ease);
+  animation: ui-toast-in 160ms var(--ease);
 }
 .ui-toast--success { --t-c: var(--free); }
 .ui-toast--error { --t-c: var(--danger); }
@@ -582,3 +584,110 @@
 .ui-pagehead__title { font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: 1.1; }
 .ui-pagehead__subtitle { margin-top: 4px; color: var(--text-3); font-size: var(--fs-md); }
 .ui-pagehead__actions { display: flex; align-items: center; gap: var(--sp-3); flex: none; }
+
+@keyframes ui-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+/* ───────────── Switch ───────────── */
+.ui-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  width: 100%;
+  min-height: var(--h-md);
+  padding: 10px 14px 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  touch-action: manipulation;
+}
+.ui-switch--lg { min-height: var(--h-lg); }
+.ui-switch.is-bare { width: auto; min-height: 0; padding: 4px; border: 0; background: transparent; }
+.ui-switch:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-3); }
+.ui-switch.is-bare:hover:not(:disabled) { background: transparent; }
+.ui-switch:disabled { opacity: 0.5; cursor: not-allowed; }
+.ui-switch.is-on { border-color: var(--accent-line); }
+.ui-switch__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ui-switch__label { font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 1.3; }
+.ui-switch__desc { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.35; }
+.ui-switch__state { flex: none; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-3); min-width: 72px; text-align: right; }
+.ui-switch.is-on .ui-switch__state { color: var(--accent); }
+.ui-switch.is-bare .ui-switch__state { display: none; }
+.ui-switch__track {
+  flex: none;
+  position: relative;
+  width: 64px;
+  height: 36px;
+  border-radius: 18px;
+  background: var(--surface-4);
+  border: 1px solid var(--line-strong);
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.ui-switch__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--text-2);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.ui-switch.is-on .ui-switch__track { background: var(--accent); border-color: var(--accent); }
+.ui-switch.is-on .ui-switch__thumb { transform: translateX(28px); background: var(--accent-ink); }
+
+/* ───────────── DataTable (div-grid) va .ui-table (<table>) — bir xil ko'rinish ───────────── */
+.ui-dt {
+  --dt-cols: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.ui-dt__row {
+  display: grid;
+  grid-template-columns: var(--dt-cols);
+  align-items: center;
+  gap: var(--sp-4);
+  min-height: 76px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-md);
+  transition: background-color var(--dur) var(--ease);
+}
+.ui-dt__row:first-child { border-top: 0; }
+.ui-dt__row:not(.ui-dt__head):hover { background: rgba(255, 255, 255, 0.025); }
+.ui-dt__head,
+.ui-table thead th {
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.01em;
+}
+.ui-dt__head { min-height: 50px; padding-top: 0; padding-bottom: 0; border-bottom: 1px solid var(--line); }
+.ui-dt__head + .ui-dt__row { border-top: 0; }
+.ui-dt__th { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-dt__row.is-muted > * { opacity: 0.6; }
+.ui-dt__row.is-muted > .ui-dt__tools { opacity: 1; }
+.ui-dt__row.is-danger { background: linear-gradient(90deg, rgba(242, 85, 95, 0.12), rgba(242, 85, 95, 0.02) 60%); box-shadow: inset 4px 0 0 var(--danger); }
+.ui-dt__row.is-warning { box-shadow: inset 4px 0 0 var(--busy); }
+.ui-dt__row.is-success { box-shadow: inset 4px 0 0 var(--free); }
+.ui-dt .r, .ui-table .r { text-align: right; justify-self: end; }
+.ui-dt .c, .ui-table .c { text-align: center; justify-self: center; }
+.ui-dt__tools { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-2); }
+
+.ui-table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+.ui-table th, .ui-table td { padding: 14px 20px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line-soft); }
+.ui-table thead th { border-bottom-color: var(--line); white-space: nowrap; }
+.ui-table tbody tr { transition: background-color var(--dur) var(--ease); }
+.ui-table tbody tr:hover td { background: rgba(255, 255, 255, 0.025); }
+.ui-table tbody tr:last-child td { border-bottom: 0; }
+.ui-table td.num, .ui-table .num { font-variant-numeric: tabular-nums; }

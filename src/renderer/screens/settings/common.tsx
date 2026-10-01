@@ -1,6 +1,6 @@
 /**
  * Sozlamalar ekrani uchun lokal yordamchi komponentlar.
- * UI TAKLIFI: `Switch` (katta yoqish/o'chirish tugmasi) ui/ ga ko'chirilsa boshqa ekranlarga ham kerak bo'ladi.
+ * Yoqish/o'chirish: `Switch` (@/ui); tugmalar guruhi yorlig'i: `<Field as="div">` (@/ui).
  */
 import { useEffect, type ReactNode } from 'react'
 import type { AppSettings } from '@shared/types'
@@ -78,52 +78,11 @@ export function SaveBar({ dirty, saving, onSave, onReset, label = 'Saqlash' }: {
   )
 }
 
-/** Katta yoqish/o'chirish tugmasi (sarlavha + izoh bilan qator). */
-export function SwitchRow({ checked, onChange, title, description, disabled, testId }: {
-  checked: boolean
-  onChange: (v: boolean) => void
-  title: ReactNode
-  description?: ReactNode
-  disabled?: boolean
-  testId?: string
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      className={cx('set-switch', checked && 'is-on')}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      data-testid={testId}
-    >
-      <span className="set-switch__text">
-        <span className="set-switch__title">{title}</span>
-        {description && <span className="set-switch__desc">{description}</span>}
-      </span>
-      <span className="set-switch__track" aria-hidden="true">
-        <span className="set-switch__thumb" />
-      </span>
-    </button>
-  )
-}
-
 export function Note({ tone = 'info', icon = 'info', children }: { tone?: 'info' | 'warning' | 'danger'; icon?: IconName; children: ReactNode }) {
   return (
     <div className={cx('set-note', 'set-note--' + tone)}>
       <Icon name={icon} size={22} className="set-note__icon" />
       <div>{children}</div>
-    </div>
-  )
-}
-
-/** Field kabi, lekin <label> emas — ichida tugmalar (Segmented, Stepper) bo'lganda ishlatiladi. */
-export function FieldBox({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="ui-field" role="group" aria-label={typeof label === 'string' ? label : undefined}>
-      <span className="ui-field__label">{label}</span>
-      <div className="ui-field__control">{children}</div>
-      {hint ? <span className="ui-field__hint">{hint}</span> : null}
     </div>
   )
 }

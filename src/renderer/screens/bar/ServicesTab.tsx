@@ -117,7 +117,7 @@ function ServiceDialog({ svc, onClose, onSaved }: { svc: Partial<ServiceItem>; o
             <Input inputMode="numeric" value={dur} placeholder="—" suffix="daqiqa" onChange={(e) => setDur(e.target.value.replace(/\D/g, '').slice(0, 4))} />
           </Field>
         </div>
-        <Field label="Holati">
+        <Field as="div" label="Holati">
           <Segmented size="lg" block value={active ? 'y' : 'n'} onChange={(v) => setActive(v === 'y')} options={[{ value: 'y', label: 'Faol', icon: 'check' }, { value: 'n', label: 'Nofaol', icon: 'lock' }]} />
         </Field>
       </div>

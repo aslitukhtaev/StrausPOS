@@ -1,10 +1,12 @@
 /**
  * ToastViewport — bildirishnomalar ko'rsatgichi (App.tsx da bir marta o'rnatilgan).
  * Chaqirish: `toast.success("...")`, `toast.error(e)`, `toast.info`, `toast.warning` (`@/ui` dan import).
- * O'ng-past burchakda, avtomatik yopiladi; bosilsa darhol yopiladi.
+ * O'ng-tepada (tepa panel ostida) — tugmalarni yopmaydi; modal ochiq bo'lsa tepa-markazda (modal sarlavhasi ustida,
+ * pastki tugmalar va yopish × tugmasi ochiq qoladi). Avtomatik yopiladi; bosilsa darhol yopiladi.
  */
 import { useToastStore, type ToastKind } from '../store/toast'
 import { Icon, type IconName } from './Icon'
+import { isAnyModalOpen } from './Modal'
 
 const ICON: Record<ToastKind, IconName> = { success: 'checkCircle', error: 'xCircle', info: 'info', warning: 'alert' }
 
@@ -12,7 +14,7 @@ export function ToastViewport() {
   const items = useToastStore((s) => s.items)
   const dismiss = useToastStore((s) => s.dismiss)
   return (
-    <div className="ui-toasts" aria-live="polite">
+    <div className={'ui-toasts' + (items.length && isAnyModalOpen() ? ' is-modal' : '')} aria-live="polite">
       {items.map((t) => (
         <div key={t.id} className={'ui-toast ui-toast--' + t.kind} role={t.kind === 'error' ? 'alert' : 'status'} onClick={() => dismiss(t.id)}>
           <Icon name={ICON[t.kind]} size={28} className="ui-toast__icon" />

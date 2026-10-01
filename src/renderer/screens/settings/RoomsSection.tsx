@@ -3,9 +3,9 @@ import type { Id, Room } from '@shared/types'
 import { api } from '@/api'
 import {
   Badge, Button, EmptyState, Field, IconButton, Input, Modal, Money, MoneyInput, Spinner, Stepper,
-  confirmDialog, toast
+  confirmDialog, toast, Switch
 } from '@/ui'
-import { FieldBox, Note, SectionHead, SwitchRow, jsonEqual } from './common'
+import { Note, SectionHead, jsonEqual } from './common'
 
 interface Draft {
   id?: Id
@@ -200,17 +200,17 @@ export function RoomsSection() {
               </Note>
             )}
             <div className="set-form__row">
-              <FieldBox label="Maksimal odam soni">
+              <Field as="div" label="Maksimal odam soni">
                 <Stepper value={edit.draft.capacity} onChange={(v) => patch({ capacity: v })} min={1} max={100} size="lg" suffix="kishi" />
-              </FieldBox>
-              <FieldBox label="Tartib raqami" hint="Kichik raqam — oldinda">
+              </Field>
+              <Field as="div" label="Tartib raqami" hint="Kichik raqam — oldinda">
                 <Stepper value={edit.draft.sortOrder} onChange={(v) => patch({ sortOrder: v })} min={0} max={999} size="lg" />
-              </FieldBox>
+              </Field>
             </div>
-            <SwitchRow
+            <Switch
               checked={edit.draft.active}
               onChange={(v) => patch({ active: v })}
-              title="Xona faol"
+              label="Xona faol"
               description="O'chiq xona bosh ekranda ko'rinmaydi va ochib bo'lmaydi"
             />
           </form>

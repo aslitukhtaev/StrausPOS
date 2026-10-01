@@ -65,7 +65,7 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
             <MoneyInput value={price} onChange={setPrice} />
           </Field>
         </div>
-        <Field label="Ombor qoldig'ini kuzatish">
+        <Field as="div" label="Ombor qoldig'ini kuzatish">
           <Segmented size="lg" block value={trackStock ? 'y' : 'n'} onChange={(v) => setTrackStock(v === 'y')} options={[{ value: 'y', label: 'Ha, kuzatish', icon: 'box' }, { value: 'n', label: "Yo'q", icon: 'x' }]} />
         </Field>
         {trackStock && (
@@ -80,7 +80,7 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
             </Field>
           </div>
         )}
-        <Field label="Holati">
+        <Field as="div" label="Holati">
           <Segmented size="lg" block value={active ? 'y' : 'n'} onChange={(v) => setActive(v === 'y')} options={[{ value: 'y', label: 'Faol', icon: 'check' }, { value: 'n', label: 'Nofaol', icon: 'lock' }]} />
         </Field>
       </div>
