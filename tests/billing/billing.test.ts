@@ -138,14 +138,13 @@ describe('guestTimeRaw', () => {
     // 70k guruh: 41 daq (20:30 + 20:30), 90k guruh: 10 daq
     expect(guestTimeRaw(ivs, m(100))).toBeCloseTo((41 * 70000) / 60 + (10 * 90000) / 60, 6)
   })
-  it('BILLING NOTE: tarif almashganda har tarif guruhi alohida pastga yaxlitlanadi (30:30@70k + 30:30@90k = 60 daq, 61 emas)', () => {
+  it('tarif almashganda minut yo\'qolmaydi: 30:30@70k + 30:30@90k = jami 61 daq', () => {
     const ivs: TimeInterval[] = [
       { roomId: 1, rate: 70000, start: 0, end: m(30) + s(30) },
       { roomId: 2, rate: 90000, start: m(31), end: m(61) + s(30) }
     ]
-    // Haqiqiy 61 daq, lekin hisob 30*70000/60 + 30*90000/60 = 80000. Butun-mehmon floor bo'lsa ham
-    // mehmon yo'qotadi (1 daq), qaror noaniq: hujjatlashtirilgan xatti-harakat shu.
-    expect(guestTimeRaw(ivs, m(100))).toBe(80000)
+    // Jami 61 daq butun minutga kesiladi, har interval o'z tarifi bilan: 30.5*70000/60 + 30.5*90000/60
+    expect(guestTimeRaw(ivs, m(100))).toBeCloseTo((30.5 * 70000) / 60 + (30.5 * 90000) / 60, 6)
   })
   it('qayta ishlatilgan intervallar massivi o\'zgarmaydi (toza funksiya)', () => {
     const ivs = [iv(70000, 0, null)]
@@ -222,7 +221,7 @@ describe('lineAmount / qaytarish', () => {
   it('to\'liq qaytarish = 0', () => {
     expect(lineAmount({ qty: 2, returnedQty: 2, unitPrice: 50000 })).toBe(0)
   })
-  it.fails('BILLING XATO: returnedQty > qty bo\'lsa manfiy summa chiqadi (0 ga cheklanmagan)', () => {
+  it('BILLING XATO (tuzatildi): returnedQty > qty bo\'lsa manfiy summa chiqadi (0 ga cheklanmagan)', () => {
     // Reproduksiya: lineAmount({qty:1, returnedQty:3, unitPrice:10000}) === -20000, kutilgan: 0
     expect(lineAmount({ qty: 1, returnedQty: 3, unitPrice: 10000 })).toBeGreaterThanOrEqual(0)
   })
@@ -304,11 +303,11 @@ describe('computeTotals', () => {
   it('bo\'sh hisob', () => {
     expect(computeTotals([], [], 5000)).toEqual({ timeTotal: 0, linesTotal: 0, discount: 0, total: 0 })
   })
-  it.fails('BILLING XATO: NaN chegirma total ni NaN qiladi', () => {
+  it('BILLING XATO (tuzatildi): NaN chegirma total ni NaN qiladi', () => {
     // Reproduksiya: computeTotals([gv(10000)], [], NaN).total -> NaN (kutilgan: 10000 yoki xato)
     expect(Number.isFinite(computeTotals([gv(10000)], [], NaN).total)).toBe(true)
   })
-  it.fails('BILLING XATO: manfiy qator yig\'indisi (qaytarish > qty) bo\'lsa discount manfiy bo\'ladi', () => {
+  it('BILLING XATO (tuzatildi): manfiy qator yig\'indisi (qaytarish > qty) bo\'lsa discount manfiy bo\'ladi', () => {
     // linesTotal=-5000, time=0, discount=0 -> d = min(0, -5000) = -5000, total = 0 (jami -5000 "yo'qoladi")
     const t = computeTotals([], [lv(-5000)], 0)
     expect(t.discount).toBeGreaterThanOrEqual(0)
@@ -353,7 +352,7 @@ describe('formatDuration', () => {
     expect(formatDuration(25 * 3_600_000 + m(1) + s(1))).toBe('25:01:01')
     expect(formatDuration(100 * 3_600_000 + s(1))).toBe('100:00:01')
   })
-  it.fails('BILLING XATO: manfiy davomiylik "-1:-1:-1" kabi buzuq satr beradi', () => {
+  it('BILLING XATO (tuzatildi): manfiy davomiylik "-1:-1:-1" kabi buzuq satr beradi', () => {
     // Reproduksiya: formatDuration(-1000) === "-1:-1:-1"; kutilgan "00:00:00"
     expect(formatDuration(-1000)).toMatch(/^\d{2,}:\d{2}:\d{2}$/)
   })
@@ -444,14 +443,14 @@ describe('Real senariylar (qo\'lda hisoblangan)', () => {
       expect(vb.runningRate).toBe(0)
       expect(vb.timeAmount).toBe(52500) // 45 * 70000/60
     })
-    it('almashtirish chegarasida soniyalar: 60:40@70k + 29:20@90k -> 60 va 29 daq (1 daq yo\'qoladi) — noaniq qaror', () => {
+    it('almashtirish chegarasida soniyalar: 60:40@70k + 29:20@90k -> minut yo\'qolmaydi', () => {
       const g = [
         { roomId: 1, rate: 70000, start: 0, end: m(60) + s(40) },
         { roomId: 2, rate: 90000, start: m(60) + s(40), end: m(90) }
       ] as TimeInterval[]
       expect(guestElapsedMs(g, m(90))).toBe(m(90))
-      // 60*70000/60 + 29*90000/60 = 70000 + 43500; haqiqiy 90 daq bo'lsa ham 1 daq (≈1500 so'm) yo'qoladi
-      expect(guestTimeRaw(g, m(90))).toBe(113500)
+      // 90 daq to'liq hisoblanadi: (60+40/60)*70000/60 + (29+20/60)*90000/60
+      expect(guestTimeRaw(g, m(90))).toBeCloseTo(((60 + 40 / 60) * 70000) / 60 + ((29 + 20 / 60) * 90000) / 60, 6)
     })
   })
 })

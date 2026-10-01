@@ -127,6 +127,8 @@ export interface PosApi {
     restore(): Promise<boolean>
     /** Serverdagi hozirgi vaqt (UI soatini sinxronlash uchun) */
     now(): Promise<number>
+    /** Tizimdagi printerlar (Electron). Brauzerda bo'sh ro'yxat. */
+    listPrinters(): Promise<{ name: string; displayName: string; isDefault: boolean }[]>
   }
 }
 

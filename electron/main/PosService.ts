@@ -23,6 +23,8 @@ import { renderReceiptHtml } from './receipt'
 export interface PosHost {
   /** Chekni chop etish. Xato bo'lsa tushunarli Error tashlaydi. */
   printReceipt?(html: string, settings: ReceiptSettings): Promise<void>
+  /** Tizim printerlari ro'yxati */
+  listPrinters?(): Promise<{ name: string; displayName: string; isDefault: boolean }[]>
   /** Zaxira baytlarini saqlash (masalan fayl dialogi). Bekor qilinsa null. */
   saveBackup?(bytes: Uint8Array, suggestedName: string): Promise<string | null>
   /** Tiklash uchun zaxira faylni tanlash. Bekor qilinsa null. */
@@ -1241,6 +1243,11 @@ export class PosService implements PosApi {
       if (!data || typeof data !== 'object' || !data.settings) fail("Chek ma'lumotlari noto'g'ri")
       if (!this.host.printReceipt) return
       await this.host.printReceipt(renderReceiptHtml(data), data.settings)
+    },
+
+    listPrinters: async () => {
+      this.requireLogin()
+      return this.host.listPrinters ? this.host.listPrinters() : []
     },
 
     receiptHtml: async (data) => {

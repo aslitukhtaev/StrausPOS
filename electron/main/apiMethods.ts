@@ -24,7 +24,7 @@ const MAP: MethodMap = {
   staff: { list: true, save: true, changePin: true },
   settings: { get: true, save: true },
   reports: { sales: true, returns: true },
-  system: { printReceipt: true, receiptHtml: true, backup: true, restore: true, now: true }
+  system: { printReceipt: true, receiptHtml: true, backup: true, restore: true, now: true, listPrinters: true }
 }
 
 export const API_METHODS: { group: keyof PosApi; method: string }[] = (Object.keys(MAP) as (keyof PosApi)[]).flatMap(

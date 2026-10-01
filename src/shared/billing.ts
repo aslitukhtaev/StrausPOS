@@ -23,14 +23,22 @@ export function guestElapsedMs(intervals: TimeInterval[], now: number): number {
   return intervals.reduce((s, iv) => s + intervalMs(iv, now), 0)
 }
 
-/** Vaqt summasi (yaxlitlashdan oldin). Butun minutlar bo'yicha, interval darajasida emas — mehmon darajasida. */
+/**
+ * Vaqt summasi (yaxlitlashdan oldin).
+ * Mehmonning jami vaqti butun minutga PASTGA kesiladi (oxirgi to'liq bo'lmagan minut hisoblanmaydi),
+ * summa esa intervallar bo'yicha xronologik tarzda, har intervalning o'z tarifi bilan yig'iladi.
+ * Shunday qilib tarif almashganda (xona almashtirish) minut yo'qolmaydi va eski narx eski vaqtda qoladi.
+ */
 export function guestTimeRaw(intervals: TimeInterval[], now: number): number {
-  // Tarif bo'yicha guruhlab, har bir tarif uchun butun minut hisoblaymiz (interval chegaralarida yo'qotish bo'lmasligi uchun
-  // umumiy ms ni tarif bo'yicha yig'amiz, so'ng pastga yaxlitlaymiz).
-  const msByRate = new Map<number, number>()
-  for (const iv of intervals) msByRate.set(iv.rate, (msByRate.get(iv.rate) ?? 0) + intervalMs(iv, now))
+  const sorted = [...intervals].sort((a, b) => a.start - b.start)
+  let budgetMin = Math.floor(guestElapsedMs(sorted, now) / MS_MIN)
   let sum = 0
-  for (const [rate, ms] of msByRate) sum += (Math.floor(ms / MS_MIN) * rate) / 60
+  for (const iv of sorted) {
+    if (budgetMin <= 0) break
+    const take = Math.min(intervalMs(iv, now) / MS_MIN, budgetMin)
+    sum += (take * iv.rate) / 60
+    budgetMin -= take
+  }
   return sum
 }
 
@@ -44,7 +52,7 @@ export function guestTimeAmount(intervals: TimeInterval[], now: number, roundTo:
 }
 
 export function lineActiveQty(l: Pick<OrderLine, 'qty' | 'returnedQty'>): number {
-  return l.qty - l.returnedQty
+  return Math.max(0, l.qty - l.returnedQty)
 }
 
 export function lineAmount(l: Pick<OrderLine, 'qty' | 'returnedQty' | 'unitPrice'>): number {
@@ -75,8 +83,9 @@ export interface Totals {
 
 export function computeTotals(guests: GuestView[], lines: LineView[], discount: number): Totals {
   const timeTotal = guests.reduce((s, g) => s + g.timeAmount, 0)
-  const linesTotal = lines.reduce((s, l) => s + l.amount, 0)
-  const d = Math.min(Math.max(0, discount), timeTotal + linesTotal)
+  const linesTotal = lines.reduce((s, l) => s + Math.max(0, l.amount), 0)
+  const gross = timeTotal + linesTotal
+  const d = Number.isFinite(discount) ? Math.min(Math.max(0, discount), gross) : 0
   return { timeTotal, linesTotal, discount: d, total: timeTotal + linesTotal - d }
 }
 
@@ -87,7 +96,7 @@ export function formatMoney(n: number): string {
 }
 
 export function formatDuration(ms: number): string {
-  const total = Math.floor(ms / 1000)
+  const total = Math.max(0, Math.floor(ms / 1000))
   const h = Math.floor(total / 3600)
   const m = Math.floor((total % 3600) / 60)
   const s = total % 60

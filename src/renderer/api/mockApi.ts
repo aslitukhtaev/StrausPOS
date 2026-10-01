@@ -113,7 +113,8 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
       }
     },
     system: {
-      now: () => delay(Date.now(), 20)
+      now: () => delay(Date.now(), 20),
+      listPrinters: () => delay([], 20)
     },
     rooms: {
       list: () => delay(clone(rooms)),

@@ -8,7 +8,7 @@ import path from 'path'
 import { PosService } from './PosService'
 import type { PosHost } from './PosService'
 import { registerIpc } from './ipc'
-import { printHtml } from './print'
+import { listPrinters, printHtml } from './print'
 import { writeFileAtomic } from './db'
 
 let mainWindow: BrowserWindow | null = null
@@ -41,6 +41,7 @@ function isAppUrl(url: string): boolean {
 function createHost(): PosHost {
   return {
     printReceipt: (html, settings) => printHtml(html, settings),
+    listPrinters: () => listPrinters(),
 
     saveBackup: async (bytes, suggestedName) => {
       const opts = {
