@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "e2e": "playwright test",
-    "dist": "electron-vite build && electron-builder --win"
+    "dist": "electron-vite build && electron-builder --win",
+    "check:compat": "electron-vite build && node scripts/check-compat.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -23,11 +24,13 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^5.2.0",
+    "acorn": "^8.18.0",
     "electron": "22.3.27",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
