@@ -1,4 +1,4 @@
-# StrausPOS — arxitektura (barcha agentlar uchun majburiy)
+# Delfin Sauna — arxitektura (barcha agentlar uchun majburiy)
 
 Sauna/shunga o'xshash bizneslar uchun **offline desktop POS**. Til: o'zbekcha (lotin). Pul: butun so'm.
 
@@ -29,19 +29,28 @@ faqat ko'rsatadi va API chaqiradi. Soat: UI har soniya `computedAt` + `billing.t
 `src/shared/types.ts`, `src/shared/api.ts`, `src/shared/permissions.ts`, `src/shared/billing.ts`.
 Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAKLIFI: ..." deb yozing.
 
-## Hisob-kitob qoidalari
-- Har bir mehmon vaqti alohida (intervallar). Pauza = interval yopiladi. Davom = yangi interval (joriy xona narxi).
-- Xona almashtirish: ishlayotgan mehmonlar intervali yopiladi, yangi xona narxi bilan yangisi ochiladi. Eski narx eski vaqtda qoladi.
-- Vaqt: butun minutlar × tarif/60, `roundTo` ga yaxlitlanadi (standart 1000).
-- Qator qaytarish (X): `returnedQty` oshadi, mahsulot omborga qaytadi, `ReturnRecord` yoziladi. Hisob = (qty − returnedQty) × narx.
-- To'lov: naqd/karta/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy, `Debt` yaratiladi.
-- Xizmat: qat'iy narx, xodim (provider) yoziladi, ulush YO'Q.
+## Hisob-kitob qoidalari ("qattiq" tizim)
+- Xona ochilganda har mehmonga vaqt OLINADI: 1/2/3... soat (`Guest.paidMinutes`). Taymer ORQAGA sanaydi.
+- Mehmon 5 daqiqa o'tirsa ham olingan vaqt to'liq to'lanadi. Oshib ketsa `graceMinutes` dan keyin har boshlangan
+  `blockMinutes` (standart 60) to'liq qo'shiladi. "+1 soat" bilan oldindan uzaytirish mumkin (`extendGuest/extendAll`).
+- Har bir mehmon vaqti alohida (intervallar). Pauza = taymer to'xtaydi. Tugatish = mehmon chiqdi (olingan vaqt baribir to'lanadi).
+- Xona almashtirish: eski narx eski vaqtda qoladi; qolgan (oldindan olingan) daqiqalar yangi xona narxida.
+- `warnBeforeMinutes` qolganda xona kartasi va mehmon taymeri qizaradi, ovozli/vizual ogohlantirish.
+- Qator qaytarish (X): `returnedQty` oshadi, mahsulot omborga qaytadi, `ReturnRecord` yoziladi.
+- To'lov: naqd/karta/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy.
+- Xizmat (massaj): qat'iy narx, provider yoziladi, ulush YO'Q.
+- **Ofitsiant**: xona ochilganda biriktiriladi (biriktirilmasa ogohlantirish). Haqi = biriktirilgan sessiyadagi
+  BAR MAHSULOTLARI (kind='product', qaytarishlar ayirilgan; xizmatlar va vaqt KIRMAYDI) × `waiterPct`%.
+  Foiz biriktirish paytida sessiyada muzlatiladi, to'lov paytida haq sessiyaga yoziladi. Oylik hisob: `waiters.monthly`,
+  berilgan pullar `waiters.payout`.
 - Guruh uchun bitta chek.
 
 ## Dizayn tamoyillari
-Qorong'i, premium sauna uslubi: to'q ko'k-grafit fon, issiq oltin aksent, katta aniq yozuvlar. Xona holati rangda:
-bo'sh=yashil, band=amber, tugayapti/qarz=qizil. Interfeys juda sodda: bosh ekranda hamma narsa 1–2 bosishda.
-Dizayn tokenlari: `src/renderer/styles/tokens.css`. Komponentlar: `src/renderer/ui/`.
+Brend: **Delfin Sauna**, logotip — delfin. Ranglar rasmdagi suvdan: yorqin moviy-feruza (aqua/cyan), oq ko'pik,
+chuqur dengiz ko'ki. **Ikki rejim**: kunduzgi (yorug', oq-moviy) va tungi (chuqur dengiz). `data-theme` = light|dark,
+`AppSettings.theme` (auto = tizimga qarab), tepa panelda tezkor almashtirgich. Barcha ranglar FAQAT tokenlar orqali
+(`var(--...)`), ekran CSS'larida qattiq rang yozilmaydi. Katta aniq yozuvlar. Xona holati: bo'sh=yashil,
+band=moviy/feruza, vaqt tugayapti/oshdi=qizil. Tokenlar: `src/renderer/styles/tokens.css`. Komponentlar: `src/renderer/ui/`.
 
 ## Fayl egaligi (agentlar bir-birining fayliga tegmaydi)
 - backend-engineer: `electron/**`, `scripts/**`, `tests/service/**`

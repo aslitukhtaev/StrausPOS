@@ -7,7 +7,8 @@
  */
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
-  ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff
+  ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow
 } from './types'
 import type { Permission } from './types'
 
@@ -16,6 +17,9 @@ export interface StaffInput {
   role: Role
   pin: string
   isProvider: boolean
+  isWaiter: boolean
+  /** 0..100 */
+  commissionPct: number
   active: boolean
 }
 
@@ -42,10 +46,19 @@ export interface PosApi {
   }
 
   sessions: {
-    /** Xonani ochish: mehmonlar soni (1..sig'im) */
-    open(roomId: Id, guestCount: number): Promise<SessionView>
+    /**
+     * Xonani ochish: mehmonlar soni (1..sig'im), har bir mehmon uchun olingan vaqt (daqiqa, masalan 60/120),
+     * ofitsiant (null = keyin biriktiriladi; UI ogohlantiradi).
+     */
+    open(roomId: Id, guestCount: number, paidMinutes: number, waiterId: Id | null): Promise<SessionView>
     get(sessionId: Id): Promise<SessionView>
-    addGuest(sessionId: Id): Promise<SessionView>
+    addGuest(sessionId: Id, paidMinutes: number): Promise<SessionView>
+    /** Mehmonga vaqt qo'shish (+1 soat va h.k.). minutes > 0 */
+    extendGuest(guestId: Id, minutes: number): Promise<SessionView>
+    /** Sessiyadagi barcha tugamagan mehmonlarga vaqt qo'shish */
+    extendAll(sessionId: Id, minutes: number): Promise<SessionView>
+    /** Ofitsiant biriktirish/almashtirish (null = olib tashlash). Foiz shu paytda muzlatiladi. */
+    setWaiter(sessionId: Id, waiterId: Id | null): Promise<SessionView>
     /** Mehmon vaqtini boshqarish */
     guestPause(guestId: Id): Promise<SessionView>
     guestResume(guestId: Id): Promise<SessionView>
@@ -106,6 +119,19 @@ export interface PosApi {
     save(input: Partial<Staff> & StaffInput): Promise<Staff>
     /** PIN o'zgartirish (faqat ega yoki o'z PINi) */
     changePin(staffId: Id, newPin: string): Promise<void>
+  }
+
+  // ── Ofitsiantlar oylik hisob-kitobi ──
+  waiters: {
+    /** Faol ofitsiantlar (xonaga biriktirish uchun; session.open ruxsati yetarli) */
+    list(): Promise<Staff[]>
+    /** Oylik hisob: month = 'YYYY-MM' (mahalliy vaqt). Ruxsat: reports.view */
+    monthly(month: string): Promise<WaiterMonthRow[]>
+    /** Ofitsiantning shu oydagi sessiyalari (tafsilot). Ruxsat: reports.view */
+    sessions(staffId: Id, month: string): Promise<WaiterSessionRow[]>
+    /** Ofitsiantga pul berildi (oylik hisob-kitob). Ruxsat: staff.manage */
+    payout(staffId: Id, month: string, amount: number, note: string): Promise<WaiterPayout>
+    payouts(staffId: Id, month: string): Promise<WaiterPayout[]>
   }
 
   // ── Sozlamalar / hisobot / zaxira ──

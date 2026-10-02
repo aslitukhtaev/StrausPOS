@@ -1,12 +1,12 @@
 /**
- * StrausPOS — domen turlari (SHARTNOMA). Bu fayl main va renderer uchun umumiy.
+ * Delfin Sauna — domen turlari (SHARTNOMA). Bu fayl main va renderer uchun umumiy.
  * Pul: butun son, so'm (UZS). Vaqt: epoch millisekund (number).
  */
 
 export type Id = number
 
 // ───────────── Xodimlar va ruxsatlar ─────────────
-export type Role = 'owner' | 'admin' | 'cashier'
+export type Role = 'owner' | 'admin' | 'cashier' | 'waiter'
 
 export interface Staff {
   id: Id
@@ -16,6 +16,10 @@ export interface Staff {
   active: boolean
   /** Xizmat ko'rsatuvchi (masalan masseuse) — xizmat qo'shishda tanlanadi. */
   isProvider: boolean
+  /** Ofitsiant — xonaga biriktiriladi va shu xonadagi BAR mahsulotlaridan foiz oladi (xizmatlardan emas). */
+  isWaiter: boolean
+  /** Ofitsiant foizi, 0..100 (masalan 10). Biriktirilgan paytdagi qiymat sessiyada muzlatiladi. */
+  commissionPct: number
 }
 
 export type Permission =
@@ -84,6 +88,10 @@ export interface Session {
   /** Hisob umumiy chegirmasi, so'm (0 = yo'q) */
   discount: number
   note: string
+  /** Biriktirilgan ofitsiant (null = biriktirilmagan — UI ogohlantiradi) */
+  waiterId: Id | null
+  /** Biriktirilgan paytdagi ofitsiant foizi (muzlatilgan) */
+  waiterPct: number
 }
 
 /** Mehmonning bitta uzluksiz "ishlayotgan" oralig'i. Tarif shu paytdagi xona narxi. */
@@ -104,6 +112,11 @@ export interface Guest {
   label: string // "Mehmon 1"
   state: GuestState
   intervals: TimeInterval[]
+  /**
+   * Oldindan olingan (to'lanadigan) vaqt, daqiqa. Xona ochilganda 1/2/3... soat tanlanadi.
+   * Mehmon kamroq o'tirsa ham shu vaqt to'liq to'lanadi; oshsa — keyingi bloklar (AppSettings.blockMinutes) qo'shiladi.
+   */
+  paidMinutes: number
 }
 
 // ───────────── Buyurtma qatorlari ─────────────
@@ -200,6 +213,16 @@ export interface AppSettings {
   receipt: ReceiptSettings
   /** Vaqt summasi shu songa yaxlitlanadi (masalan 1000). 1 = yaxlitlamaslik */
   roundTo: number
+  /** Xona ochilganda standart tanlanadigan soat (1, 2, ...) */
+  defaultHours: number
+  /** Olingan vaqtdan oshib ketsa, shu daqiqalik bloklar bilan qo'shiladi (standart 60 = har boshlangan soat) */
+  blockMinutes: number
+  /** Oshib ketganda keyingi blok hisoblanishidan oldingi imtiyozli daqiqalar (0 = qattiq) */
+  graceMinutes: number
+  /** Vaqt tugashiga necha daqiqa qolganda ogohlantirilsin */
+  warnBeforeMinutes: number
+  /** Interfeys rejimi: kunduzgi / tungi / tizimga qarab */
+  theme: 'light' | 'dark' | 'auto'
   /** Qulf ekrani yoqilganmi */
   lockEnabled: boolean
   /** Hech narsa bosilmasa necha daqiqada qulflansin (0 = hech qachon) */
@@ -213,6 +236,10 @@ export interface GuestView extends Guest {
   elapsedMs: number
   /** Vaqt uchun summa (yaxlitlangan) */
   timeAmount: number
+  /** Qolgan vaqt (ms): paidMinutes − o'tgan vaqt. Manfiy = oshib ketgan (overtime) */
+  remainingMs: number
+  /** Hisoblanadigan daqiqalar (olingan vaqt + oshgan bloklar) */
+  billedMinutes: number
   /** Hozirgi ishlayotgan oraliq tarifi (running bo'lsa), aks holda 0 */
   runningRate: number
   /** Ushbu mehmonga tegishli (guestId) qatorlar summasi */
@@ -228,6 +255,8 @@ export interface LineView extends OrderLine {
 export interface SessionView {
   session: Session
   room: Room
+  /** Biriktirilgan ofitsiant ismi (null = yo'q) */
+  waiterName: string | null
   guests: GuestView[]
   lines: LineView[]
   /** Hisoblangan `now` (server vaqti) — UI shu bilan har soniya o'zi yangilaydi */
@@ -293,4 +322,44 @@ export interface SalesReport {
   byProduct: { name: string; qty: number; amount: number }[]
   byProvider: { staffId: Id; name: string; count: number; amount: number }[]
   byStaff: { staffId: Id; name: string; sessions: number; total: number }[]
+  /** Ofitsiantlar: bar savdosi va hisoblangan haq */
+  byWaiter: { staffId: Id; name: string; sessions: number; productSales: number; commission: number }[]
+}
+
+// ───────────── Ofitsiantlar hisob-kitobi ─────────────
+export interface WaiterMonthRow {
+  staffId: Id
+  name: string
+  /** Hozirgi foiz (ma'lumot uchun; hisob sessiyalardagi muzlatilgan foiz bilan) */
+  commissionPct: number
+  /** Shu oyda yopilgan, ofitsiant biriktirilgan sessiyalar soni */
+  sessions: number
+  /** Shu sessiyalardagi bar mahsulotlari savdosi (qaytarishlar ayirilgan, xizmatlar kirmaydi) */
+  productSales: number
+  /** Hisoblangan haq */
+  commission: number
+  /** Shu oy uchun berilgan to'lovlar */
+  paid: number
+  /** commission − paid */
+  balance: number
+}
+
+export interface WaiterPayout {
+  id: Id
+  staffId: Id
+  /** 'YYYY-MM' */
+  month: string
+  amount: number
+  note: string
+  at: number
+  by: Id
+}
+
+export interface WaiterSessionRow {
+  sessionId: Id
+  closedAt: number
+  roomName: string
+  productSales: number
+  pct: number
+  commission: number
 }
