@@ -88,3 +88,21 @@ test('Avtomatik qulf: 1 daqiqa harakatsizlik → Lock; harakat bo\'lsa qulflanma
   expect(await pos.backend.rpc('auth.current')).toBeNull()
   await pos.login('owner')
 })
+
+test('PIN uzunligi: Sozlamalarda o\'rnatilgan PIN bilan qulf ekranidan kirish mumkin (qulf ekrani ≤ 6 raqam)', async ({ pos, page }) => {
+  // Xato (tuzatildi): Sozlamalar → Xavfsizlik 8 xonali PIN qabul qilardi, qulf ekrani esa ko'pi bilan 6 raqam
+  // kiritadi → ega o'z dasturiga kira olmay qolardi.
+  await pos.open()
+  await pos.login('owner')
+  await pos.nav('Sozlamalar')
+  await page.locator('.set-nav').getByText('Xavfsizlik').click()
+  await page.getByTestId('pin1').fill('12345678')
+  await page.getByTestId('pin2').fill('12345678')
+  await expect(page.getByTestId('pin1')).toHaveValue('123456')
+  await page.getByTestId('pin-save').click()
+  await expect(pos.toast("PIN o'zgartirildi")).toBeVisible()
+  await pos.lock()
+  await page.locator('.lock-tile', { has: page.locator('.lock-tile__name', { hasText: /^Ega$/ }) }).click()
+  await pos.typeDigits('12345678') // 7-8 raqamlar e'tiborsiz, 6-raqamda avtomatik kirish
+  await expect(page.locator('.topbar__username')).toHaveText('Ega')
+})

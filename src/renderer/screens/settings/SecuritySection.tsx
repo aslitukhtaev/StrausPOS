@@ -32,8 +32,8 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
     setSaving(false)
   }
 
-  const digits = (v: string) => v.replace(/\D/g, '').slice(0, 8)
-  const pin1Err = pin1 && pin1.length < 4 ? "PIN 4–8 ta raqamdan iborat bo'lsin" : null
+  const digits = (v: string) => v.replace(/\D/g, '').slice(0, 6)
+  const pin1Err = pin1 && pin1.length < 4 ? "PIN 4–6 ta raqamdan iborat bo'lsin" : null
   const pin2Err = pin2 && pin1 !== pin2 && pin2.length >= pin1.length ? 'PINlar bir xil emas' : null
   const pinOk = pin1.length >= 4 && pin1 === pin2
 
@@ -97,7 +97,7 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
               void changePin()
             }}
           >
-            <Field label="Yangi PIN" error={pin1Err} hint="4–8 ta raqam">
+            <Field label="Yangi PIN" error={pin1Err} hint="4–6 ta raqam">
               <Input
                 size="lg"
                 type="password"
