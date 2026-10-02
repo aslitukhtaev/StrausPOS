@@ -95,7 +95,7 @@ export const test = base.extend<{ pos: Pos }, { backend: Backend }>({
         await expect(page.locator('.boot')).toHaveCount(0)
       },
       async login(who) {
-        const tile = page.locator('.lock-tile', { hasText: NAMES[who] }).first()
+        const tile = page.locator('.lock-tile', { has: page.locator('.lock-tile__name', { hasText: new RegExp('^' + NAMES[who] + '$') }) })
         await tile.click()
         await expect(page.locator('.lock-pin__name')).toHaveText(NAMES[who])
         await pos.typeDigits(PINS[who])

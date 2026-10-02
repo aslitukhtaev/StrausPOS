@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Id, Room } from '@shared/types'
 import { api } from '@/api'
 import {
-  Badge, Button, EmptyState, Field, IconButton, Input, Modal, Money, MoneyInput, Spinner, Stepper,
+  Badge, Button, DataRow, DataTable, EmptyState, Field, IconButton, Input, Modal, Money, MoneyInput, Spinner, Stepper,
   confirmDialog, toast, Switch
 } from '@/ui'
 import { Note, SectionHead, jsonEqual } from './common'
@@ -118,23 +118,19 @@ export function RoomsSection() {
             action={<Button variant="primary" icon="plus" onClick={openNew}>Xona qo'shish</Button>}
           />
         ) : (
-          <div className="set-rooms" data-testid="room-list">
-            <div className="set-rooms__head">
-              <span>№</span>
-              <span>Xona</span>
-              <span className="set-r">1 kishi / 1 soat</span>
-              <span className="set-c">Sig'im</span>
-              <span>Holat</span>
-              <span />
-            </div>
+          <DataTable
+            className="set-rooms"
+            data-testid="room-list"
+            header={['№', 'Xona', <span key="p" className="r">1 kishi / 1 soat</span>, <span key="c" className="c">Sig'im</span>, 'Holat', '']}
+          >
             {sorted.map((r) => (
-              <div key={r.id} className={'set-rooms__row' + (r.active ? '' : ' is-off')}>
+              <DataRow key={r.id} className={'set-rooms__row' + (r.active ? '' : ' is-off')} muted={!r.active}>
                 <span className="set-rooms__order num">{r.sortOrder}</span>
                 <button type="button" className="set-rooms__name" onClick={() => openEdit(r)}>
                   {r.name}
                 </button>
-                <span className="set-r"><Money value={r.pricePerHour} size="md" /></span>
-                <span className="set-c num">{r.capacity} kishi</span>
+                <span className="r"><Money value={r.pricePerHour} size="lg" /></span>
+                <span className="c num">{r.capacity} kishi</span>
                 <span className="set-rooms__badges">
                   {busy.has(r.id) ? (
                     <Badge tone="warning">Band</Badge>
@@ -144,13 +140,13 @@ export function RoomsSection() {
                     <Badge tone="neutral">O'chiq</Badge>
                   )}
                 </span>
-                <span className="set-rooms__acts">
+                <span className="ui-dt__tools set-rooms__acts">
                   <IconButton icon="edit" label="Tahrirlash" onClick={() => openEdit(r)} />
                   <IconButton icon="trash" label="O'chirish" variant="danger" onClick={() => void remove(r)} />
                 </span>
-              </div>
+              </DataRow>
             ))}
-          </div>
+          </DataTable>
         )}
       </div>
 

@@ -65,8 +65,7 @@ export function GuestCard({ guest: g, t, canManage, busy, onRename, onPause, onR
           )}
           {g.state === 'paused' && (
             <Button size="md" variant="success" icon="play" title="Davom ettirish" onClick={onResume} loading={k('resume')} disabled={anyBusy && !k('resume')}>
-              <span className="rooms-long">Davom ettirish</span>
-              <span className="rooms-short">Davom</span>
+              Davom ettirish
             </Button>
           )}
           {g.state !== 'finished' ? (

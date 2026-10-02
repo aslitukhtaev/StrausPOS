@@ -28,12 +28,16 @@
 .rooms-tile--busy .rooms-tile__bar { background: var(--busy); }
 .rooms-tile--alert .rooms-tile__bar { background: var(--danger); }
 .rooms-tile__inner { flex: 1 1 auto; display: flex; flex-direction: column; padding: 18px 22px 20px; gap: 10px; }
-.rooms-tile__top { display: flex; align-items: center; gap: 12px; }
+.rooms-tile__top { display: flex; align-items: flex-start; gap: 12px; }
+.rooms-tile__top .ui-badge { margin-top: 2px; }
 .rooms-tile__num {
   flex: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
   background: var(--surface-2); color: var(--text-3); font-size: var(--fs-sm); font-weight: var(--fw-bold);
 }
-.rooms-tile__name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: 1.1; letter-spacing: -0.01em; }
+.rooms-tile__name {
+  flex: 1 1 auto; min-width: 0; font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: 1.15; letter-spacing: -0.01em;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
+}
 .rooms-tile__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--text-2); font-size: var(--fs-md); }
 .rooms-tile__meta b { color: var(--text); font-weight: var(--fw-semibold); }
 .rooms-tile__meta span { display: inline-flex; align-items: center; gap: 6px; }
@@ -199,14 +203,15 @@
 .rooms-bill__foot { border-top: 1px solid var(--line); padding: 12px 16px 16px; background: var(--bg-elev); display: flex; flex-direction: column; gap: 12px; }
 .rooms-bill__sums { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: var(--fs-sm); color: var(--text-2); }
 .rooms-bill__sums .ui-money { text-align: right; justify-self: end; font-size: var(--fs-md); }
-.rooms-bill__btns { display: flex; gap: 10px; }
-.rooms-bill__pay.ui-btn--lg { flex: 1 1 auto; height: 76px; justify-content: flex-start; padding: 0 22px; }
+.rooms-bill__tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; }
+.rooms-bill__tools .ui-btn { padding: 0 14px; }
+.rooms-bill__disc.is-set { border-color: var(--free-line); color: var(--free); }
+.rooms-bill__pay.ui-btn--lg { height: 76px; justify-content: flex-start; padding: 0 22px; gap: 14px; }
 .rooms-bill__pay .ui-btn__label { flex: 1 1 auto; }
-.rooms-bill__paytext { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; gap: 2px; }
-.rooms-bill__paylabel { font-size: var(--fs-sm); font-weight: var(--fw-semibold); opacity: 0.9; }
+.rooms-bill__paytext { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; line-height: 1.1; min-width: 0; }
+.rooms-bill__paylabel { font-size: var(--fs-md); font-weight: var(--fw-bold); white-space: normal; text-align: left; }
 .rooms-bill__payamount.ui-money--xl { font-size: 28px; font-weight: var(--fw-bold); color: inherit; }
 .rooms-bill__payamount .ui-money__cur { color: inherit; opacity: 0.75; font-size: var(--fs-md); }
-.rooms-bill__btns .ui-iconbtn.ui-btn--lg { height: 76px; }
 
 /* ───────────── Umumiy chip ───────────── */
 .rooms-chip {
@@ -275,6 +280,7 @@
 .rooms-ret__chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 
 .rooms-disc { display: flex; flex-direction: column; align-items: stretch; gap: 14px; }
+.rooms-disc .ui-numpad { max-width: none; }
 .rooms-disc__value {
   display: flex; align-items: center; justify-content: center; min-height: 76px; border-radius: var(--r-md);
   background: var(--surface-2); border: 1.5px solid var(--line);
@@ -314,29 +320,57 @@
 }
 .rooms-note svg { flex: none; color: var(--info); margin-top: 1px; }
 
-/* ───────────── Kichik ekran (1366×768) ───────────── */
+/* ───────────── Kichik ekran (1366×768) ─────────────
+ * Mehmonlar bitta ustunda, har karta 2 qatorli: [ism · holat · summa] / [taymer · to'liq yozuvli tugmalar].
+ * Qisqartirilgan yozuvlar ("Davom", "%") YO'Q — hamma tugma to'liq va aniq. */
 @media (max-width: 1440px) {
+  .rooms-ws { gap: 12px; }
   .rooms-ws__head { gap: 14px; padding: 10px 18px 10px 10px; }
   .rooms-ws__room { font-size: var(--fs-2xl); }
   .rooms-ws__stats { gap: 16px; }
   .rooms-ws__totalnum.ui-money--3xl { font-size: 40px; }
   .rooms-ws__total { padding-left: 16px; }
-  .rooms-ws__body { grid-template-columns: minmax(0, 1fr) 380px; }
-  .rooms-ws__guestgrid { grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
+  .rooms-ws__body { grid-template-columns: minmax(0, 1fr) 400px; gap: 14px; }
+  .rooms-ws__guests { gap: 10px; }
+  .rooms-sec__title { font-size: var(--fs-lg); }
   .rooms-sec__muted { display: none; }
-  .rooms-guest { padding: 12px 14px 14px; }
-  .rooms-guest__timer.ui-timer--xl { font-size: 34px; }
-  .rooms-bill__pay.ui-btn--lg { padding: 0 16px; }
-  .rooms-line { grid-template-columns: 34px minmax(0, 1fr) auto 48px; gap: 8px; }
-  .rooms-line__icon { width: 34px; height: 34px; }
   .rooms-sec__actions .ui-btn { padding: 0 16px; }
+
+  .rooms-ws__guestgrid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .rooms-guest {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'head money' 'timer actions';
+    align-items: center; gap: 6px 16px; padding: 10px 14px 12px 16px;
+  }
+  .rooms-guest__head { grid-area: head; min-width: 0; }
+  .rooms-guest__name { height: 40px; }
+  .rooms-guest__timerrow { grid-area: timer; justify-content: flex-start; gap: 14px; }
+  .rooms-guest__timer.ui-timer--xl { font-size: 34px; margin-top: 0; }
+  .rooms-guest__money { grid-area: money; justify-content: flex-end; gap: 14px; }
+  .rooms-guest__meta { align-items: flex-end; text-align: right; }
+  .rooms-guest__actions { grid-area: actions; display: flex; margin-top: 0; justify-content: flex-end; }
+  .rooms-guest__actions .ui-btn { padding: 0 18px; }
+  .rooms-guest__back { justify-self: auto; }
+
+  .rooms-bill__pay.ui-btn--lg { padding: 0 16px; }
+  .rooms-line { grid-template-columns: minmax(0, 1fr) auto 48px; gap: 10px; padding-left: 12px; }
+  .rooms-line__icon { display: none; }
 }
 @media (max-width: 1300px) {
   .rooms-ws__stats { display: none; }
 }
 
-.rooms-short { display: none; }
-@media (max-width: 1440px) {
-  .rooms-long { display: none; }
-  .rooms-short { display: inline; }
+/* Past ekran (768): 6 ta xona (2 qator) skrollsiz sig'sin */
+@media (max-height: 820px) {
+  .rooms-board { gap: var(--sp-4); }
+  .rooms-board .ui-pagehead { margin-bottom: 0; }
+  .rooms-grid { gap: var(--sp-4); }
+  .rooms-tile { min-height: 0; }
+  .rooms-tile__inner { padding: 14px 20px 16px; gap: 8px; }
+  .rooms-tile__name { font-size: 28px; }
+  .rooms-tile__live { margin-top: 0; }
+  .rooms-tile__timer .ui-timer--xl { font-size: 34px; }
+  .rooms-tile__total { padding-top: 10px; }
+  .rooms-tile--busy .ui-money--3xl, .rooms-tile--alert .ui-money--3xl { font-size: 34px; }
+  .rooms-tile__free { padding: 12px 16px; }
+  .rooms-tile__play { width: 52px; height: 52px; }
 }

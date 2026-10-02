@@ -18,14 +18,10 @@
 
 /* ruxsatlar jadvali */
 .staff-perms__scroll { overflow-x: auto; }
-.staff-table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
-.staff-table th, .staff-table td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: middle; }
-.staff-table thead th { background: var(--surface-2); vertical-align: top; }
+.staff-table thead th { vertical-align: top; white-space: normal; }
 .staff-table__perm { min-width: 300px; }
 .staff-table__role, .staff-table__cell { text-align: center !important; width: 190px; }
 .staff-table__rolehint { margin-top: var(--sp-2); font-size: var(--fs-xs); font-weight: var(--fw-regular); color: var(--text-3); white-space: normal; }
-.staff-table tbody tr:last-child td { border-bottom: 0; }
-.staff-table tbody tr:hover td { background: var(--surface-2); }
 .staff-yes { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 50%; background: var(--free-soft); color: var(--free); }
 .staff-no { color: var(--text-disabled); font-size: var(--fs-lg); }
 .staff-perms__note { padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--line-soft); }

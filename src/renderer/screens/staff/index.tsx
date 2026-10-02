@@ -193,7 +193,7 @@ function PermissionsTable() {
   return (
     <Card padding="none" className="staff-perms">
       <div className="staff-perms__scroll">
-        <table className="staff-table">
+        <table className="ui-table staff-table">
           <thead>
             <tr>
               <th className="staff-table__perm">Amal</th>

@@ -200,7 +200,7 @@ export default function ReportsScreen() {
             </Card>
             <TableCard title="Eng ko'p sotilgan mahsulotlar" subtitle="Qaytarilganlar chiqarilgan">
               {s.byProduct.length === 0 ? <div className="rep-pad"><Mute>Mahsulot sotilmagan</Mute></div> : (
-                <table className="rep-table">
+                <table className="ui-table rep-table">
                   <thead><tr><th>#</th><th>Mahsulot</th><th className="r">Soni</th><th className="r">Summa</th></tr></thead>
                   <tbody>
                     {s.byProduct.slice(0, 10).map((p, i) => (
@@ -220,7 +220,7 @@ export default function ReportsScreen() {
           <div className="rep-row">
             <TableCard title="Xizmat ko'rsatuvchilar" subtitle="Ko'rsatilgan xizmatlar summasi (ulush emas)">
               {s.byProvider.length === 0 ? <div className="rep-pad"><Mute>Xizmat ko'rsatilmagan</Mute></div> : (
-                <table className="rep-table">
+                <table className="ui-table rep-table">
                   <thead><tr><th>Xodim</th><th className="r">Xizmatlar</th><th className="r">Summa</th></tr></thead>
                   <tbody>
                     {s.byProvider.map((p) => (
@@ -236,7 +236,7 @@ export default function ReportsScreen() {
             </TableCard>
             <TableCard title="Kassirlar bo'yicha" subtitle="Hisobni yopgan xodim">
               {s.byStaff.length === 0 ? <div className="rep-pad"><Mute>Ma'lumot yo'q</Mute></div> : (
-                <table className="rep-table">
+                <table className="ui-table rep-table">
                   <thead><tr><th>Xodim</th><th className="r">Sessiyalar</th><th className="r">Tushum</th></tr></thead>
                   <tbody>
                     {s.byStaff.map((p) => (
@@ -259,7 +259,7 @@ export default function ReportsScreen() {
             {data!.returns.length === 0 ? (
               <div className="rep-pad"><Mute>Bu davrda qaytarish bo'lmagan</Mute></div>
             ) : (
-              <table className="rep-table">
+              <table className="ui-table rep-table">
                 <thead>
                   <tr><th>Vaqt</th><th>Mahsulot</th><th className="r">Soni</th><th className="r">Summa</th><th>Sabab</th><th>Kim</th><th>Xona</th></tr>
                 </thead>

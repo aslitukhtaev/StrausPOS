@@ -182,7 +182,7 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
       <div className="rooms-tile__bar" />
       <div className="rooms-tile__inner">
         <div className="rooms-tile__top">
-          <div className="rooms-tile__name ellipsis">{room.name}</div>
+          <div className="rooms-tile__name" title={room.name}>{room.name}</div>
           {tone === 'free' && <StatusPill status="free" size="lg" />}
           {tone === 'busy' && <StatusPill status="busy" size="lg" />}
           {tone === 'alert' && live && <StatusPill status="ending" size="lg">{alertLabel(live)}</StatusPill>}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Product, ProductCategory, ServiceItem } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
-import { Badge, Button, EmptyState, Icon, IconButton, Input, Money, PageHeader, Spinner, Tabs, cx, confirmDialog, toast } from '@/ui'
+import { Badge, Button, DataRow, DataTable, EmptyState, Icon, IconButton, Input, Money, PageHeader, Spinner, Tabs, cx, confirmDialog, toast } from '@/ui'
 import { ProductDialog } from './ProductDialog'
 import { StockDialog } from './StockDialog'
 import { CategoryDialog } from './CategoryDialog'
@@ -14,6 +14,10 @@ type Tab = 'products' | 'services'
 export function isLow(p: Product): boolean {
   return p.trackStock && p.stock <= p.lowStockAt
 }
+
+
+/** Nomi | Narxi | Qoldiq | amallar */
+const BAR_COLS = 'minmax(0, 1fr) 130px 250px 184px'
 
 export default function BarScreen() {
   const canEdit = useCan('stock.manage')
@@ -196,17 +200,11 @@ export default function BarScreen() {
                 }
               />
             ) : (
-              <div className="bar-list">
-                <div className="bar-row bar-row--head">
-                  <span>Nomi</span>
-                  <span>Narxi</span>
-                  <span className="bar-c">Qoldiq</span>
-                  <span />
-                </div>
+              <DataTable className="bar-list" columns={BAR_COLS} header={['Nomi', <span key="p" className="r">Narxi</span>, <span key="q" className="c">Qoldiq</span>, '']}>
                 {shown.map((p) => {
                   const low = p.active && isLow(p)
                   return (
-                    <div key={p.id} className={cx('bar-row', !p.active && 'is-off', low && 'is-low')}>
+                    <DataRow key={p.id} className={cx('bar-row', !p.active && 'is-off', low && 'is-low')} muted={!p.active} tone={low ? 'danger' : undefined}>
                       <div className="bar-row__name">
                         <div className="bar-row__title ellipsis">{p.name}</div>
                         <div className="bar-row__sub ellipsis">
@@ -214,7 +212,7 @@ export default function BarScreen() {
                           {!p.active && <Badge tone="neutral" size="sm">Nofaol</Badge>}
                         </div>
                       </div>
-                      <Money value={p.price} size="md" />
+                      <Money value={p.price} size="lg" className="r" />
                       <div className="bar-stock">
                         {p.trackStock ? (
                           <>
@@ -237,7 +235,7 @@ export default function BarScreen() {
                           <span className="subtle">Kuzatilmaydi</span>
                         )}
                       </div>
-                      <div className="bar-row__tools">
+                      <div className="ui-dt__tools bar-row__tools">
                         {canEdit && (
                           <>
                             <IconButton icon="edit" label="Tahrirlash" variant="secondary" onClick={() => setProdDlg(p)} />
@@ -246,10 +244,10 @@ export default function BarScreen() {
                           </>
                         )}
                       </div>
-                    </div>
+                    </DataRow>
                   )
                 })}
-              </div>
+              </DataTable>
             )}
           </section>
         </div>

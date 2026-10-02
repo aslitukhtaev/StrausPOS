@@ -17,13 +17,14 @@ import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
 import { cx } from './cx'
 
 export interface DataTableProps extends HTMLAttributes<HTMLDivElement> {
-  columns: string
+  /** grid-template-columns. Bermasangiz CSS da `.sizning-klass { --dt-cols: ... }` (media query bilan moslash uchun) */
+  columns?: string
   header?: ReactNode[]
   children: ReactNode
 }
 
 export function DataTable({ columns, header, children, className, style, ...rest }: DataTableProps) {
-  const st = { ...(style || {}), ['--dt-cols' as string]: columns } as CSSProperties
+  const st = (columns ? { ...(style || {}), ['--dt-cols' as string]: columns } : style) as CSSProperties | undefined
   return (
     <div className={cx('ui-dt', className)} style={st} role="table" {...rest}>
       {header && (

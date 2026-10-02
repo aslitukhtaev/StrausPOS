@@ -325,32 +325,33 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
                 )}
               </div>
             )}
-            <div className="rooms-bill__btns">
-              {canDiscount && (
-                <IconButton
-                  icon="percent"
-                  label="Chegirma"
-                  size="lg"
-                  onClick={() => setDialog({ kind: 'discount' })}
-                  disabled={live.timeTotal + live.linesTotal === 0}
-                  badge={live.discount > 0 ? '✓' : undefined}
-                />
-              )}
-              {canCancel && (
-                <IconButton icon="xCircle" label="Sessiyani bekor qilish" size="lg" variant="danger" onClick={() => void cancelSession()} loading={busy === 'cancel'} />
-              )}
-              {canPay && (
-                <Button variant="success" size="lg" icon="receipt" block onClick={() => void startCheckout()} loading={busy === 'pay'} className="rooms-bill__pay">
-                  <span className="rooms-bill__paytext">
-                    <span className="rooms-bill__paylabel">
-                      <span className="rooms-long">Hisobni yopish / To'lov</span>
-                      <span className="rooms-short">Hisobni yopish</span>
-                    </span>
-                    <Money value={live.due} size="xl" className="rooms-bill__payamount" />
-                  </span>
-                </Button>
-              )}
-            </div>
+            {(canDiscount || canCancel) && (
+              <div className="rooms-bill__tools">
+                {canDiscount && (
+                  <Button
+                    icon="percent"
+                    onClick={() => setDialog({ kind: 'discount' })}
+                    disabled={live.timeTotal + live.linesTotal === 0}
+                    className={cx('rooms-bill__disc', live.discount > 0 && 'is-set')}
+                  >
+                    Chegirma
+                  </Button>
+                )}
+                {canCancel && (
+                  <Button variant="danger" icon="xCircle" onClick={() => void cancelSession()} loading={busy === 'cancel'} aria-label="Sessiyani bekor qilish">
+                    Bekor qilish
+                  </Button>
+                )}
+              </div>
+            )}
+            {canPay && (
+              <Button variant="success" size="lg" icon="receipt" block onClick={() => void startCheckout()} loading={busy === 'pay'} className="rooms-bill__pay">
+                <span className="rooms-bill__paytext">
+                  <span className="rooms-bill__paylabel">Hisobni yopish va to'lash</span>
+                  <Money value={live.due} size="xl" className="rooms-bill__payamount" />
+                </span>
+              </Button>
+            )}
           </div>
         </section>
       </div>

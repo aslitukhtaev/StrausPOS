@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Debt } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
-import { Avatar, Badge, Button, EmptyState, Input, Money, PageHeader, Spinner, Tabs, cx, formatDateShort, formatPhone, toast } from '@/ui'
+import { Avatar, Badge, Button, DataRow, DataTable, EmptyState, Input, Money, PageHeader, Spinner, Tabs, cx, formatDateShort, formatPhone, toast } from '@/ui'
 import { PayDialog } from './PayDialog'
 import { HistoryDialog } from './HistoryDialog'
 import './debts.css'
 
 type Tab = 'open' | 'all'
 export const remaining = (d: Debt) => Math.max(0, d.amount - d.paid)
+
+
+/** Mijoz | Sana | Summa | To'langan | Qolgan | amallar */
+const DEBT_COLS = 'minmax(0, 1.6fr) 112px 116px 116px 136px 280px'
 
 export default function DebtsScreen() {
   const canManage = useCan('debt.manage')
@@ -80,19 +84,15 @@ export default function DebtsScreen() {
           description={q ? "Boshqa ism yoki raqam kiriting." : tab === 'open' ? "Hamma mijoz hisob-kitobni to'liq qilgan." : "To'lovda «Qarz» tanlansa, shu yerda paydo bo'ladi."}
         />
       ) : (
-        <div className="debts-list">
-          <div className="debts-row debts-row--head">
-            <span>Mijoz</span>
-            <span>Sana</span>
-            <span className="r">Summa</span>
-            <span className="r">To'langan</span>
-            <span className="r">Qolgan</span>
-            <span />
-          </div>
+        <DataTable
+          className="debts-list"
+          columns={DEBT_COLS}
+          header={['Mijoz', 'Sana', <span key="a" className="r">Summa</span>, <span key="p" className="r">To'langan</span>, <span key="q" className="r">Qolgan</span>, '']}
+        >
           {shown.map((d) => {
             const rest = remaining(d)
             return (
-              <div key={d.id} className={cx('debts-row', rest === 0 && 'is-closed')}>
+              <DataRow key={d.id} className={cx('debts-row', rest === 0 && 'is-closed')} muted={rest === 0}>
                 <div className="debts-cust">
                   <Avatar name={d.customerName} size={44} />
                   <div className="debts-cust__txt">
@@ -104,14 +104,14 @@ export default function DebtsScreen() {
                 <span className="r"><Money value={d.amount} size="md" currency={false} /></span>
                 <span className="r"><Money value={d.paid} size="md" currency={false} tone={d.paid ? 'success' : 'muted'} /></span>
                 <span className="r">{rest > 0 ? <Money value={rest} size="lg" tone="danger" currency={false} /> : <Badge tone="success" icon="check">To'langan</Badge>}</span>
-                <div className="debts-row__tools">
-                  <Button variant="secondary" size="sm" icon="clock" onClick={() => setHistDebt(d)}>Tarix</Button>
-                  {canManage && rest > 0 && <Button variant="primary" size="sm" icon="cash" onClick={() => setPayDebt(d)}>To'lash</Button>}
+                <div className="ui-dt__tools debts-row__tools">
+                  <Button variant="secondary" icon="clock" onClick={() => setHistDebt(d)}>Tarix</Button>
+                  {canManage && rest > 0 && <Button variant="success" icon="cash" onClick={() => setPayDebt(d)}>To'lash</Button>}
                 </div>
-              </div>
+              </DataRow>
             )
           })}
-        </div>
+        </DataTable>
       )}
 
       {payDebt && <PayDialog debt={payDebt} onClose={() => setPayDebt(null)} onPaid={refreshed} />}

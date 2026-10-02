@@ -59,11 +59,6 @@
 .rep-bars__fill { height: 100%; border-radius: var(--r-full); background: var(--accent); }
 
 /* jadvallar */
-.rep-table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
-.rep-table th { text-align: left; padding: var(--sp-3) var(--sp-4); font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-3); background: var(--surface-2); border-bottom: 1px solid var(--line-soft); }
-.rep-table td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--line-soft); }
-.rep-table tbody tr:last-child td { border-bottom: 0; }
-.rep-table .r { text-align: right; }
 .rep-table .nowrap { white-space: nowrap; }
 .rep-table__n { width: 44px; color: var(--text-3); }
 .rep-table__reason { max-width: 260px; color: var(--text-2); }

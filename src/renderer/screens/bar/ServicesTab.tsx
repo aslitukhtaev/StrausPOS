@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ServiceItem } from '@shared/types'
 import { api } from '@/api'
-import { Badge, Button, EmptyState, Field, IconButton, Input, Modal, Money, MoneyInput, Segmented, cx, confirmDialog, formatMinutes, toast } from '@/ui'
+import { Badge, Button, DataRow, DataTable, EmptyState, Field, IconButton, Input, Modal, Money, MoneyInput, Segmented, cx, confirmDialog, formatMinutes, toast } from '@/ui'
 
 interface Props {
   services: ServiceItem[]
@@ -10,6 +10,10 @@ interface Props {
   setDlg: (s: Partial<ServiceItem> | null) => void
   reload: () => void | Promise<void>
 }
+
+
+/** Nomi | Narxi | Davomiyligi | amallar */
+const SVC_COLS = 'minmax(0, 1fr) 150px 180px 184px'
 
 export function ServicesTab({ services, canEdit, dlg, setDlg, reload }: Props) {
   const remove = async (s: ServiceItem) => {
@@ -41,22 +45,16 @@ export function ServicesTab({ services, canEdit, dlg, setDlg, reload }: Props) {
           action={canEdit ? <Button variant="primary" icon="plus" onClick={() => setDlg({})}>Xizmat qo'shish</Button> : undefined}
         />
       ) : (
-        <div className="bar-list">
-          <div className="bar-row bar-row--svc bar-row--head">
-            <span>Nomi</span>
-            <span>Narxi</span>
-            <span>Davomiyligi</span>
-            <span />
-          </div>
+        <DataTable className="bar-list" columns={SVC_COLS} header={['Nomi', <span key="p" className="r">Narxi</span>, 'Davomiyligi', '']}>
           {services.map((s) => (
-            <div key={s.id} className={cx('bar-row bar-row--svc', !s.active && 'is-off')}>
+            <DataRow key={s.id} className={cx('bar-row bar-row--svc', !s.active && 'is-off')} muted={!s.active}>
               <div className="bar-row__name">
                 <div className="bar-row__title ellipsis">{s.name}</div>
                 {!s.active && <div className="bar-row__sub"><Badge tone="neutral" size="sm">Nofaol</Badge></div>}
               </div>
-              <Money value={s.price} size="md" />
+              <Money value={s.price} size="lg" className="r" />
               <span className={s.durationMin ? '' : 'subtle'}>{s.durationMin ? formatMinutes(s.durationMin) : '—'}</span>
-              <div className="bar-row__tools">
+              <div className="ui-dt__tools bar-row__tools">
                 {canEdit && (
                   <>
                     <IconButton icon="edit" label="Tahrirlash" variant="secondary" onClick={() => setDlg(s)} />
@@ -65,9 +63,9 @@ export function ServicesTab({ services, canEdit, dlg, setDlg, reload }: Props) {
                   </>
                 )}
               </div>
-            </div>
+            </DataRow>
           ))}
-        </div>
+        </DataTable>
       )}
       {dlg && <ServiceDialog svc={dlg} onClose={() => setDlg(null)} onSaved={reload} />}
     </div>

@@ -15,12 +15,12 @@
 .checkout-sum__inner { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; }
 .checkout-sum__list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px 20px 8px; }
 .checkout-sum__h {
-  margin: 10px 0 4px;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.06em;
+  margin: 12px 0 4px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-3);
+  color: var(--text-2);
 }
 .checkout-sum__h:first-child { margin-top: 0; }
 .checkout-sum__row {
@@ -76,10 +76,9 @@
 .checkout-amount__ph { color: var(--text-3); font-weight: var(--fw-semibold); font-size: var(--fs-2xl); }
 .checkout-amount.is-danger .checkout-amount__val { color: #ff7b83; }
 
-.checkout-quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.checkout-quick .ui-btn { min-width: 0; padding-left: 8px; padding-right: 8px; font-variant-numeric: tabular-nums; }
-.checkout-quick--2 { grid-template-columns: 1fr 1fr; }
-.checkout-quick--2 .ui-btn:last-child { grid-column: 1 / -1; }
+.checkout-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.checkout-quick .ui-btn { min-width: 0; height: var(--h-md); padding-left: 10px; padding-right: 10px; font-size: var(--fs-md); border-radius: var(--r-md); font-variant-numeric: tabular-nums; }
+.checkout-quick--2 { grid-template-columns: 1fr; }
 
 /* Qaytim / qolgan */
 .checkout-change {

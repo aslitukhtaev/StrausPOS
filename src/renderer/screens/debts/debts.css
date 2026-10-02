@@ -10,19 +10,10 @@
 .debts-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-5); margin-bottom: var(--sp-4); flex-wrap: wrap; }
 .debts-bar .ui-tabs { flex: none; }
 .debts-bar__search { flex: 0 1 420px; min-width: 260px; padding-bottom: 4px; }
-.debts-list { display: flex; flex-direction: column; gap: var(--sp-2); }
-.debts-row {
-  display: grid; grid-template-columns: minmax(200px, 1.6fr) 110px 110px 110px 140px 250px; align-items: center; gap: var(--sp-3);
-  min-height: 76px; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--line-soft);
-}
-.debts-row--head { min-height: 0; padding-top: 0; padding-bottom: 0; background: none; border: 0; color: var(--text-3); font-size: var(--fs-sm); }
-.debts-row.is-closed { opacity: .65; }
-.debts-row .r { text-align: right; }
 .debts-cust { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .debts-cust__txt { min-width: 0; }
 .debts-cust__name { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
-.debts-cust__phone { color: var(--text-3); font-size: var(--fs-sm); }
-.debts-row__tools { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+.debts-cust__phone { color: var(--text-2); font-size: var(--fs-sm); }
 .debts-pay { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--sp-6); align-items: start; }
 .debts-pay__left { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
 .debts-pay__rest { padding: var(--sp-4); border-radius: var(--r-md); background: var(--danger-soft); border: 1px solid var(--danger-line); }
