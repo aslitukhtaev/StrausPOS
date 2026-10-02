@@ -26,9 +26,10 @@
 .rooms-tile { position: relative; overflow: hidden; min-height: 268px; display: flex; flex-direction: column; border-width: 1.5px; }
 .rooms-tile__bar { height: 6px; flex: none; background: var(--free-fill); }
 .rooms-tile--busy .rooms-tile__bar { background: var(--busy-fill); }
-.rooms-tile--alert .rooms-tile__bar { background: var(--danger); }
+.rooms-tile--alert .rooms-tile__bar, .rooms-tile--over .rooms-tile__bar { background: var(--danger); }
+.rooms-tile--warn .rooms-tile__bar { background: var(--warning-fill); }
 .rooms-tile__inner { flex: 1 1 auto; display: flex; flex-direction: column; padding: 18px 22px 20px; gap: 10px; }
-.rooms-tile__top { display: flex; align-items: flex-start; gap: 12px; }
+.rooms-tile__top { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 6px 12px; }
 .rooms-tile__top .ui-badge { margin-top: 2px; }
 .rooms-tile__num {
   flex: none; width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
@@ -36,7 +37,7 @@
 }
 .rooms-tile__name {
   flex: 1 1 auto; min-width: 0; font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: 1.15; letter-spacing: -0.01em;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; word-break: normal;
 }
 .rooms-tile__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--text-2); font-size: var(--fs-md); }
 .rooms-tile__meta b { color: var(--text); font-weight: var(--fw-semibold); }
@@ -58,20 +59,24 @@
 
 .rooms-tile__live { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 4px; }
 .rooms-tile__timer { display: flex; flex-direction: column; gap: 2px; }
-.rooms-tile__timer .ui-timer--xl { font-size: 38px; letter-spacing: 0.01em; }
-.rooms-tile__since { font-size: var(--fs-xs); color: var(--text-3); }
-.rooms-tile__people {
-  display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--r-md);
-  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-xl); font-weight: var(--fw-bold);
+.rooms-tile__since { font-size: var(--fs-sm); color: var(--text-2); font-weight: var(--fw-semibold); }
+.rooms-tile__countdown { font-family: var(--font-num); font-size: 44px; line-height: 1.02; font-weight: var(--fw-bold); color: var(--busy); white-space: nowrap; }
+.rooms-tile__countdown.is-paused { color: var(--text-3); }
+.rooms-tile--warn .rooms-tile__countdown, .rooms-tile--warn .rooms-tile__since { color: var(--warning); }
+.rooms-tile--over .rooms-tile__countdown, .rooms-tile--over .rooms-tile__since { color: var(--danger-text); }
+.rooms-tile--warn .rooms-tile__countdown, .rooms-tile--over .rooms-tile__countdown { animation: rooms-pulse 1.6s ease-in-out infinite; }
+.rooms-tile__waiter {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); font-weight: var(--fw-semibold);
 }
-.rooms-tile__people .num { color: var(--text); }
-.rooms-tile__people small { font-size: var(--fs-sm); color: var(--text-3); font-weight: var(--fw-semibold); }
+.rooms-tile__waiter.is-missing { color: var(--warning); }
+.rooms-tile__info { display: flex; align-items: center; gap: 14px; min-width: 0; max-width: 100%; }
+.rooms-tile__people { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--text-2); flex: none; }
 .rooms-tile__total {
   margin-top: auto; white-space: nowrap; display: flex; flex-direction: column; align-items: flex-start; gap: 0;
   padding-top: 14px; border-top: 1px solid var(--line-soft);
 }
 .rooms-tile__totallabel { font-size: var(--fs-sm); color: var(--text-2); }
-.rooms-tile--busy .ui-money--3xl, .rooms-tile--alert .ui-money--3xl { font-size: 38px; }
+.rooms-tile .rooms-tile__total .ui-money--3xl { font-size: 38px; }
 
 /* ───────────── Ochish oynasi ───────────── */
 .rooms-open { display: flex; flex-direction: column; gap: 18px; }
@@ -88,9 +93,71 @@
 .rooms-open__n.is-active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-ink); box-shadow: var(--accent-glow); }
 .rooms-open__stepper { display: flex; justify-content: center; }
 .rooms-open__hint { font-size: var(--fs-sm); color: var(--text-3); }
+.rooms-openmodal .rooms-open { gap: 14px; }
+.rooms-open__sec { display: flex; flex-direction: column; gap: 8px; }
+.rooms-open__label { display: flex; align-items: center; gap: 10px; }
+.rooms-open__labelhint { font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-3); }
+.rooms-openmodal .rooms-open__n { height: 64px; font-size: var(--fs-2xl); }
+.rooms-open__need {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: var(--r-full);
+  background: var(--warning-soft); color: var(--warning); font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+}
+.rooms-open__need.is-strong { background: var(--danger-soft); color: var(--danger-text); }
+.rooms-open__price {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 12px 18px; border-radius: var(--r-lg);
+  background: var(--accent-soft); border: 1.5px solid var(--accent-line);
+}
+.rooms-open__formula { font-size: var(--fs-lg); color: var(--text-2); font-weight: var(--fw-semibold); }
+.rooms-open__eq { font-size: var(--fs-lg); color: var(--text-3); }
+.rooms-open__total { font-size: var(--fs-2xl); font-weight: var(--fw-bold); color: var(--accent); margin-left: auto; }
+.rooms-open__total small { font-size: var(--fs-md); opacity: 0.75; }
+
+/* Vaqt tanlash */
+.rooms-time { display: flex; flex-direction: column; gap: 10px; }
+.rooms-time__quick { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.rooms-time__btn {
+  height: 68px; border-radius: var(--r-lg); border: 1.5px solid var(--line); background: var(--surface-2); color: var(--text);
+  display: flex; align-items: baseline; justify-content: center; gap: 6px; cursor: pointer; font: inherit;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.rooms-time__btn--other { align-items: center; }
+.rooms-time__btn:hover { background: var(--surface-3); border-color: var(--line-strong); }
+.rooms-time__btn:active { transform: scale(0.97); }
+.rooms-time__btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.rooms-time__btn.is-active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-ink); box-shadow: var(--accent-glow); }
+.rooms-time__n { font-size: var(--fs-3xl); font-weight: var(--fw-bold); line-height: 1; align-self: center; }
+.rooms-time__u { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.rooms-time__custom { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+
+/* Ofitsiant plitalari */
+.rooms-waiters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; border-radius: var(--r-lg); }
+.rooms-waiters.is-highlight { box-shadow: 0 0 0 3px var(--warning-line); padding: 6px; margin: -6px; }
+.rooms-waiter {
+  position: relative; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 14px; text-align: left;
+  border-radius: var(--r-lg); border: 1.5px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.rooms-waiter:hover { background: var(--surface-3); border-color: var(--line-strong); }
+.rooms-waiter:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.rooms-waiter.is-active { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.rooms-waiter__text { display: flex; flex-direction: column; min-width: 0; }
+.rooms-waiter__name { font-size: var(--fs-lg); font-weight: var(--fw-bold); }
+.rooms-waiter__pct { font-size: var(--fs-sm); color: var(--text-2); }
+.rooms-waiter__check {
+  margin-left: auto; flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--accent-fill); color: var(--accent-ink);
+}
+.rooms-waiters__empty {
+  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 14px; border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-md);
+}
+
+/* "Ofitsiant biriktirilmadi!" ogohlantirishi */
+.rooms-nowaiter__icon { background: var(--warning-soft); color: var(--warning); }
+.rooms-nowaiter__actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }
 
 /* ───────────── Sessiya ish oynasi ───────────── */
-.rooms-ws { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 16px; }
+.rooms-ws { height: 100%; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 12px; }
 .rooms-ws--loading { grid-template-rows: auto 1fr; }
 .rooms-ws__backrow { display: flex; }
 
@@ -100,7 +167,11 @@
   background: linear-gradient(90deg, var(--busy-soft), transparent 55%), var(--surface);
   border: 1.5px solid var(--busy-line); box-shadow: var(--shadow-1);
 }
-.rooms-ws--alert .rooms-ws__head {
+.rooms-ws--warn .rooms-ws__head {
+  background: linear-gradient(90deg, var(--warning-soft), transparent 55%), var(--surface);
+  border-color: var(--warning-line);
+}
+.rooms-ws--alert .rooms-ws__head, .rooms-ws--over .rooms-ws__head {
   background: linear-gradient(90deg, var(--danger-soft), transparent 55%), var(--surface);
   border-color: var(--danger-line);
 }
@@ -136,13 +207,15 @@
 
 /* Mehmon kartasi */
 .rooms-guest {
-  display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 16px 14px;
   border-radius: var(--r-lg); background: var(--surface); border: 1.5px solid var(--line-soft); box-shadow: var(--inset-hi);
-  border-left: 5px solid var(--free-fill);
+  border-left: 5px solid var(--busy-fill);
 }
-.rooms-guest--paused { border-left-color: var(--warning-fill); background: var(--surface); }
+.rooms-guest--paused { border-left-color: var(--warning-fill); }
 .rooms-guest--finished { border-left-color: var(--line-strong); background: var(--bg-elev); }
-.rooms-guest__head { display: flex; align-items: center; gap: 10px; }
+.rooms-guest--warn { border-color: var(--warning-line); border-left-color: var(--warning-fill); background: linear-gradient(90deg, var(--warning-soft), transparent 60%), var(--surface); }
+.rooms-guest--over { border-color: var(--danger-line); border-left-color: var(--danger); background: linear-gradient(90deg, var(--danger-soft), transparent 60%), var(--surface); }
+.rooms-guest__head { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .rooms-guest__name {
   flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 10px; margin-left: -4px;
   border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text); font: inherit;
@@ -153,17 +226,61 @@
 .rooms-guest__name:hover:not(:disabled) svg { opacity: 1; color: var(--accent); }
 .rooms-guest__name:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .rooms-guest__name:disabled { cursor: default; }
-.rooms-guest__timerrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.rooms-guest__timer.ui-timer--xl { font-size: 38px; line-height: 1.05; margin-top: 2px; }
-.rooms-guest--running .rooms-guest__timer { color: var(--text); }
-.rooms-guest--finished .rooms-guest__timer { color: var(--text-3); }
+.rooms-guest__paid {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--r-full);
+  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-xs); font-weight: var(--fw-semibold); white-space: nowrap;
+}
+.rooms-guest__timerrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.rooms-guest__state { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-3); white-space: nowrap; }
+.rooms-guest__countdown {
+  font-family: var(--font-num); font-size: 40px; line-height: 1.05; font-weight: var(--fw-bold); color: var(--text); white-space: nowrap;
+}
+.rooms-guest__countdown small { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.rooms-guest--paused .rooms-guest__countdown, .rooms-guest--finished .rooms-guest__countdown { color: var(--text-3); }
+.rooms-guest--warn .rooms-guest__countdown, .rooms-guest--warn .rooms-guest__state { color: var(--warning); }
+.rooms-guest--over .rooms-guest__countdown, .rooms-guest--over .rooms-guest__state { color: var(--danger-text); }
+.rooms-guest--running.rooms-guest--warn .rooms-guest__countdown,
+.rooms-guest--running.rooms-guest--over .rooms-guest__state { animation: rooms-pulse 1.6s ease-in-out infinite; }
+@keyframes rooms-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+.rooms-guest__progress { height: 8px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.rooms-guest__progress span { display: block; height: 100%; border-radius: inherit; background: var(--busy-fill); transition: width 0.4s linear; }
+.rooms-guest--paused .rooms-guest__progress span { background: var(--warning-fill); }
+.rooms-guest--finished .rooms-guest__progress span { background: var(--line-strong); }
+.rooms-guest--warn .rooms-guest__progress span { background: var(--warning-fill); }
+.rooms-guest--over .rooms-guest__progress span { background: var(--danger); }
+.rooms-guest__overnote {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 3px 10px; border-radius: var(--r-full);
+  background: var(--danger-soft); color: var(--danger-text); font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+}
 .rooms-guest__money { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .rooms-guest__money .ui-money { white-space: nowrap; flex: none; }
-.rooms-guest__meta { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); color: var(--text-3); min-width: 0; }
+.rooms-guest__meta { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); color: var(--text-3); min-width: 0; }
 .rooms-guest__extra b { color: var(--text-2); }
-.rooms-guest__actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 4px; }
-.rooms-guest__actions .ui-btn { padding: 0 16px; }
-.rooms-guest__back { grid-column: 1 / -1; justify-self: start; }
+.rooms-guest__actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 2px; }
+.rooms-guest__actions .ui-btn { padding: 0 12px; }
+.rooms-guest__actions--one { display: flex; }
+
+/* Ofitsiant chizig'i (sessiya oynasi tepasida) */
+.rooms-wstrip {
+  display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px 8px 14px; border-radius: var(--r-lg);
+  background: var(--surface); border: 1.5px solid var(--line-soft);
+}
+.rooms-wstrip.is-missing {
+  background: linear-gradient(90deg, var(--warning-soft), transparent 70%), var(--surface); border-color: var(--warning-line);
+}
+.rooms-wstrip__warnicon {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--warning-fill); color: var(--accent-ink);
+}
+.rooms-wstrip__text { display: flex; flex-direction: column; min-width: 0; }
+.rooms-wstrip__label { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+.rooms-wstrip__name { font-size: var(--fs-lg); font-weight: var(--fw-bold); white-space: nowrap; }
+.rooms-wstrip.is-missing .rooms-wstrip__name { color: var(--warning); }
+.rooms-wstrip__pct { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-2); }
+.rooms-wstrip__btn.ui-btn { border-color: var(--warning-line); }
+.rooms-wstrip__left { display: flex; flex-direction: column; align-items: flex-end; padding: 0 6px; }
+.rooms-wstrip__time { font-family: var(--font-num); font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: 1.05; }
+.rooms-wstrip__left.is-over .rooms-wstrip__time, .rooms-wstrip__left.is-over .rooms-wstrip__label { color: var(--danger-text); }
 
 /* ───────────── Hisob paneli ───────────── */
 .rooms-bill {
@@ -338,18 +455,23 @@
 
   .rooms-ws__guestgrid { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .rooms-guest {
-    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'head money' 'timer actions';
-    align-items: center; gap: 6px 16px; padding: 10px 14px 12px 16px;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'head money' 'timer actions' 'bar bar' 'note note';
+    align-items: center; gap: 4px 16px; padding: 8px 14px 10px 16px;
   }
-  .rooms-guest__head { grid-area: head; min-width: 0; }
-  .rooms-guest__name { height: 40px; }
-  .rooms-guest__timerrow { grid-area: timer; justify-content: flex-start; gap: 14px; }
-  .rooms-guest__timer.ui-timer--xl { font-size: 34px; margin-top: 0; }
+  .rooms-guest__head { grid-area: head; }
+  .rooms-guest__name { height: 40px; flex: 0 1 auto; min-width: 96px; }
+  .rooms-guest__timerrow { grid-area: timer; justify-content: flex-start; gap: 12px; min-width: 0; }
+  .rooms-guest__countdown { order: -1; }
+  .rooms-guest__paid { display: none; }
+  .rooms-guest__state { display: none; }
+  .rooms-guest--finished .rooms-guest__state { display: inline; }
+  .rooms-guest__countdown { font-size: 36px; }
+  .rooms-guest__progress { grid-area: bar; height: 6px; }
+  .rooms-guest__overnote { grid-area: note; }
   .rooms-guest__money { grid-area: money; justify-content: flex-end; gap: 14px; }
   .rooms-guest__meta { align-items: flex-end; text-align: right; }
   .rooms-guest__actions { grid-area: actions; display: flex; margin-top: 0; justify-content: flex-end; }
-  .rooms-guest__actions .ui-btn { padding: 0 18px; }
-  .rooms-guest__back { justify-self: auto; }
+  .rooms-guest__actions .ui-btn { padding: 0 16px; }
 
   .rooms-bill__pay.ui-btn--lg { padding: 0 16px; }
   .rooms-line { grid-template-columns: minmax(0, 1fr) auto 48px; gap: 10px; padding-left: 12px; }
@@ -368,9 +490,9 @@
   .rooms-tile__inner { padding: 14px 20px 16px; gap: 8px; }
   .rooms-tile__name { font-size: 28px; }
   .rooms-tile__live { margin-top: 0; }
-  .rooms-tile__timer .ui-timer--xl { font-size: 34px; }
+  .rooms-tile__countdown { font-size: 40px; }
   .rooms-tile__total { padding-top: 10px; }
-  .rooms-tile--busy .ui-money--3xl, .rooms-tile--alert .ui-money--3xl { font-size: 34px; }
+  .rooms-tile .rooms-tile__total .ui-money--3xl { font-size: 32px; }
   .rooms-tile__free { padding: 12px 16px; }
   .rooms-tile__play { width: 52px; height: 52px; }
 }

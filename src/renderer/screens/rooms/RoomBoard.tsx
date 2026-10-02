@@ -202,18 +202,17 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
                   {left == null ? '—' : formatCountdown(left)}
                 </span>
               </div>
-              <div className="rooms-tile__people" title="Xonadagi mehmonlar">
-                <Icon name="users" size={26} />
-                <span className="num">
-                  {people}
-                  <small>/{room.capacity}</small>
-                </span>
-              </div>
             </div>
             <div className="rooms-tile__total">
-              <span className={cx('rooms-tile__waiter', !waiter && 'is-missing')} title={waiter ? 'Ofitsiant' : 'Ofitsiant biriktirilmagan'}>
-                <Icon name={waiter ? 'user' : 'alert'} size={16} />
-                <span className="ellipsis">{waiter || 'Ofitsiant yo‘q'}</span>
+              <span className="rooms-tile__info">
+                <span className="rooms-tile__people" title="Xonadagi mehmonlar">
+                  <Icon name="users" size={16} />
+                  <span className="num">{people}/{room.capacity}</span>
+                </span>
+                <span className={cx('rooms-tile__waiter', !waiter && 'is-missing')} title={waiter ? 'Ofitsiant' : 'Ofitsiant biriktirilmagan'}>
+                  <Icon name={waiter ? 'user' : 'alert'} size={16} />
+                  <span className="ellipsis">{waiter || 'Ofitsiant yo‘q'}</span>
+                </span>
               </span>
               <Money value={live.due} size="3xl" tone={tone === 'alert' || tone === 'over' ? 'danger' : 'accent'} />
             </div>

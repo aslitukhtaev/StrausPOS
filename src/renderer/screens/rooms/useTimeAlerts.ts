@@ -77,7 +77,7 @@ export function useTimeAlerts(): void {
           })
           sound = 'over'
         } else {
-          toast.warning(`${name}: ${Math.max(1, Math.ceil(g.remainingMs / 60_000))} daqiqa qoldi`, {
+          toast.warning(`${name} — ${Math.max(1, Math.ceil(g.remainingMs / 60_000))} daqiqa qoldi`, {
             description: `Olingan ${formatHours(g.paidMinutes)} tugayapti.`,
             duration: 10_000
           })

@@ -68,7 +68,7 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
       <div className="rooms-guest__money">
         <div className="rooms-guest__meta">
           <span className="num">
-            {formatHours(g.billedMinutes)} × {formatMoney(g.runningRate || lastRate(g))}
+            {formatHours(g.paidMinutes)} olingan{extra > 0 ? ` + ${formatHours(extra)}` : ''} × {formatMoney(g.runningRate || lastRate(g))}
           </span>
           {g.linesAmount > 0 && (
             <span className="rooms-guest__extra ellipsis">
