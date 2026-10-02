@@ -40,16 +40,16 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
     let busy = 0
     let guests = 0
     let total = 0
-    if (data)
-      for (const c of data.cards) {
+    if (cards)
+      for (const c of cards) {
         const l = lives.get(c.room.id)
         if (!l) continue
         busy++
         guests += l.running + l.paused
         total += l.due
       }
-    return { busy, guests, total, rooms: data ? data.cards.length : 0 }
-  }, [data, lives])  // eslint-disable-line
+    return { busy, guests, total, rooms: cards ? cards.length : 0 }
+  }, [cards, lives])
 
   const onCardClick = (c: RoomCard) => {
     if (c.session) {

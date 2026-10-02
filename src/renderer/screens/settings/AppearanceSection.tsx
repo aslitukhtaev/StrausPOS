@@ -20,7 +20,9 @@ export function AppearanceSection({ settings, save }: SectionProps) {
   const choose = async (v: ThemePref) => {
     if (busy || v === settings.theme) return
     setBusy(v)
-    await save({ ...settings, theme: v }, 'Rejim saqlandi: ' + OPTIONS.find((o) => o.value === v)!.label)
+    const ok = await save({ ...settings, theme: v }, 'Rejim saqlandi: ' + OPTIONS.find((o) => o.value === v)!.label)
+    // save() store'ga setSettings(saved) qiladi; rejimni aniq qo'llash uchun:
+    if (ok) useApp.getState().setThemePref(v)
     setBusy(null)
   }
 
