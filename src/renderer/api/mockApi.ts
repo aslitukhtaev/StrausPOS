@@ -2,10 +2,11 @@
  * mockApi — xotiradagi soxta PosApi (faqat UI ni backendsiz ko'rish uchun!). Biznes mantiq bu yerda YO'Q.
  *
  * Ishga tushirish: `npm run dev:web` → http://localhost:5173/?mock=1
- *   ?mock=1      — tayyor ma'lumot: Aziz (Ega, PIN 1234), Dilnoza (Admin, 1111), Jasur (Kassir, 0000), Malika (Kassir/masseuse, 2222)
+ *   ?mock=1      — tayyor ma'lumot: Aziz (Ega, PIN 1234), Dilnoza (Admin, 1111), Jasur (Kassir, 0000), Malika (Kassir/masseuse, 2222),
+ *                Bekzod (Ofitsiant 10%, 3333)
  *   ?mock=empty  — birinchi ishga tushirish (Setup ekrani)
  *
- * Qo'llab-quvvatlanadi: auth.*, settings.*, system.now, rooms.list/board, staff.list, catalog.categories/products/services,
+ * Qo'llab-quvvatlanadi: auth.*, settings.*, system.now, rooms.list/board, staff.list, waiters.list, catalog.categories/products/services,
  * debts.list. Qolganlari "Mock rejimida mavjud emas" xatosini beradi.
  */
 import type { PosApi } from '@shared/api'
@@ -18,7 +19,7 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
 const DEFAULT_SETTINGS: AppSettings = {
   receipt: {
-    businessName: 'Straus Sauna',
+    businessName: 'Delfin Sauna',
     address: "Toshkent sh., Chilonzor 12",
     phone: '+998 90 123 45 67',
     footer: 'Tashrifingiz uchun rahmat!',
@@ -30,6 +31,11 @@ const DEFAULT_SETTINGS: AppSettings = {
     printerName: ''
   },
   roundTo: 1000,
+  defaultHours: 2,
+  blockMinutes: 60,
+  graceMinutes: 0,
+  warnBeforeMinutes: 10,
+  theme: 'auto',
   lockEnabled: true,
   autoLockMinutes: 5,
   language: 'uz'
@@ -39,12 +45,13 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
   let staff: Staff[] = opts.empty
     ? []
     : [
-        { id: 1, name: 'Aziz Rahimov', role: 'owner', active: true, isProvider: false },
-        { id: 2, name: 'Dilnoza Karimova', role: 'admin', active: true, isProvider: false },
-        { id: 3, name: 'Jasur Toshmatov', role: 'cashier', active: true, isProvider: false },
-        { id: 4, name: 'Malika Yusupova', role: 'cashier', active: true, isProvider: true }
+        { id: 1, name: 'Aziz Rahimov', role: 'owner', active: true, isProvider: false, isWaiter: false, commissionPct: 0 },
+        { id: 2, name: 'Dilnoza Karimova', role: 'admin', active: true, isProvider: false, isWaiter: false, commissionPct: 0 },
+        { id: 3, name: 'Jasur Toshmatov', role: 'cashier', active: true, isProvider: false, isWaiter: false, commissionPct: 0 },
+        { id: 4, name: 'Malika Yusupova', role: 'cashier', active: true, isProvider: true, isWaiter: false, commissionPct: 0 },
+        { id: 5, name: 'Bekzod Aliyev', role: 'waiter', active: true, isProvider: false, isWaiter: true, commissionPct: 10 }
       ]
-  const pins = new Map<number, string>(opts.empty ? [] : [[1, '1234'], [2, '1111'], [3, '0000'], [4, '2222']])
+  const pins = new Map<number, string>(opts.empty ? [] : [[1, '1234'], [2, '1111'], [3, '0000'], [4, '2222'], [5, '3333']])
   let settings: AppSettings = clone(DEFAULT_SETTINGS)
   if (opts.empty) settings.receipt.businessName = ''
   let current: Staff | null = null
@@ -98,7 +105,7 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
         if (staff.length > 0) return fail("Ega allaqachon yaratilgan")
         if (!/^\d{4,6}$/.test(pin)) return fail("PIN 4–6 ta raqamdan iborat bo'lishi kerak")
         if (!name.trim()) return fail('Ismni kiriting')
-        staff = [{ id: 1, name: name.trim(), role: 'owner', active: true, isProvider: false }]
+        staff = [{ id: 1, name: name.trim(), role: 'owner', active: true, isProvider: false, isWaiter: false, commissionPct: 0 }]
         pins.set(1, pin)
         settings = { ...settings, receipt: { ...settings.receipt, businessName: businessName.trim() } }
         return delay(undefined, 300)
@@ -122,6 +129,12 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
     },
     staff: {
       list: () => delay(clone(staff))
+    },
+    waiters: {
+      list: () => delay(clone(staff.filter((s) => s.active && s.isWaiter))),
+      monthly: () => delay([]),
+      sessions: () => delay([]),
+      payouts: () => delay([])
     },
     catalog: {
       categories: () => delay(clone(categories)),
