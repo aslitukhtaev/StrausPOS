@@ -158,6 +158,12 @@ if (!gotLock) {
     .whenReady()
     .then(async () => {
       Menu.setApplicationMenu(null)
+      // Oflayn ilova: Chromium'ning DNS-over-HTTPS (dns.google) tekshiruvlari o'chiriladi
+      try {
+        app.configureHostResolver({ secureDnsMode: 'off' })
+      } catch {
+        /* eski/yangi API farqi — muhim emas */
+      }
       // Kamera, mikrofon va h.k. ruxsat so'rovlari rad etiladi
       session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false))
       await bootstrap()
