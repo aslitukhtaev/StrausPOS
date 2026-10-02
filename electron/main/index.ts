@@ -2,7 +2,7 @@
  * Electron main: oyna, xavfsizlik, DB va PosService ni ishga tushirish, IPC.
  * Electron 22 / Node 16 (CJS bundle).
  */
-import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeTheme, session, shell } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import { PosService } from './PosService'
@@ -13,6 +13,42 @@ import { writeFileAtomic } from './db'
 
 let mainWindow: BrowserWindow | null = null
 let service: PosService | null = null
+
+const APP_NAME = 'Delfin Sauna'
+const USER_DATA_DIR = 'DelfinSauna'
+const DB_FILE_NAME = 'delfin.db'
+/** Oldingi nom (StrausPOS) bilan o'rnatilgan dasturning bazasi — birinchi ishga tushishda ko'chiriladi. */
+const LEGACY_DIR = 'StrausPOS'
+const LEGACY_DB = 'straus.db'
+const BG = { dark: '#04223a', light: '#eaf7fd' }
+
+// Brend va ma'lumotlar papkasi: app ready dan OLDIN (single-instance qulfi ham shu papkaga bog'liq)
+app.setName(APP_NAME)
+app.setPath('userData', path.join(app.getPath('appData'), USER_DATA_DIR))
+
+/** Eski versiya bazasini yangi papkaga nusxalash (agar yangisi hali yo'q bo'lsa). Asl fayl o'chirilmaydi. */
+function importLegacyDb(dbFile: string): void {
+  if (fs.existsSync(dbFile)) return
+  const legacy = path.join(app.getPath('appData'), LEGACY_DIR, LEGACY_DB)
+  if (!fs.existsSync(legacy)) return
+  try {
+    writeFileAtomic(dbFile, fs.readFileSync(legacy))
+  } catch (e) {
+    console.error('[main] eski bazani ko‘chirib bo‘lmadi:', e)
+  }
+}
+
+/** Sozlamadagi rejim (auto = tizim) bo'yicha oyna fon rangi — yuklanishda "oq chaqnash" bo'lmasin. */
+function windowBackground(): string {
+  let theme: 'light' | 'dark' | 'auto' = 'auto'
+  try {
+    theme = service?.currentTheme() ?? 'auto'
+  } catch {
+    /* standart */
+  }
+  const dark = theme === 'dark' || (theme === 'auto' && nativeTheme.shouldUseDarkColors)
+  return dark ? BG.dark : BG.light
+}
 
 const DEV_URL = process.env.ELECTRON_RENDERER_URL || process.env.VITE_DEV_SERVER_URL || ''
 
@@ -47,7 +83,7 @@ function createHost(): PosHost {
       const opts = {
         title: 'Zaxira nusxani saqlash',
         defaultPath: path.join(app.getPath('documents'), suggestedName),
-        filters: [{ name: 'StrausPOS zaxira', extensions: ['db'] }]
+        filters: [{ name: 'Delfin Sauna zaxira', extensions: ['db'] }]
       }
       const res = mainWindow ? await dialog.showSaveDialog(mainWindow, opts) : await dialog.showSaveDialog(opts)
       if (res.canceled || !res.filePath) return null
@@ -59,7 +95,7 @@ function createHost(): PosHost {
       const opts = {
         title: 'Zaxiradan tiklash',
         properties: ['openFile' as const],
-        filters: [{ name: 'StrausPOS zaxira', extensions: ['db'] }]
+        filters: [{ name: 'Delfin Sauna zaxira', extensions: ['db'] }]
       }
       const res = mainWindow ? await dialog.showOpenDialog(mainWindow, opts) : await dialog.showOpenDialog(opts)
       if (res.canceled || res.filePaths.length === 0) return null
@@ -92,8 +128,8 @@ function createWindow(): void {
     minWidth: 1024,
     minHeight: 700,
     show: false,
-    backgroundColor: '#11161f',
-    title: 'StrausPOS',
+    backgroundColor: windowBackground(),
+    title: APP_NAME,
     autoHideMenuBar: true,
     webPreferences: {
       preload: preloadPath(),
@@ -112,13 +148,18 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+  // Tizim rejimi o'zgarsa (auto) — fon rangini ham moslaymiz
+  const onTheme = (): void => mainWindow?.setBackgroundColor(windowBackground())
+  nativeTheme.on('updated', onTheme)
+  mainWindow.on('closed', () => nativeTheme.removeListener('updated', onTheme))
 
   if (DEV_URL) void mainWindow.loadURL(DEV_URL)
   else void mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
 }
 
 async function bootstrap(): Promise<void> {
-  const dbFile = path.join(app.getPath('userData'), 'straus.db')
+  const dbFile = path.join(app.getPath('userData'), DB_FILE_NAME)
+  importLegacyDb(dbFile)
   service = await PosService.create({ file: dbFile, clock: () => Date.now(), host: createHost() })
   registerIpc(service, (e) => {
     const url = e.senderFrame?.url ?? ''
@@ -173,7 +214,7 @@ if (!gotLock) {
     })
     .catch((e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e)
-      dialog.showErrorBox('StrausPOS ishga tushmadi', msg)
+      dialog.showErrorBox(`${APP_NAME} ishga tushmadi`, msg)
       app.quit()
     })
 

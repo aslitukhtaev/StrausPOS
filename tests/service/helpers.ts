@@ -21,29 +21,36 @@ export class FakeClock {
   }
 }
 
+export type Who = 'owner' | 'admin' | 'cashier' | 'provider' | 'waiter' | 'waiter2'
+
 export interface Ctx {
   svc: PosService
   clock: FakeClock
-  staff: Record<'owner' | 'admin' | 'cashier' | 'provider', Staff>
-  pins: Record<'owner' | 'admin' | 'cashier' | 'provider', string>
-  loginAs(who: 'owner' | 'admin' | 'cashier' | 'provider'): Promise<void>
+  staff: Record<Who, Staff>
+  pins: Record<Who, string>
+  loginAs(who: Who): Promise<void>
   /** Standart xonalar: Sauna 1 (50k, 6), Sauna 2 (60k, 8), VIP xona (100k, 10) */
   rooms: { s1: number; s2: number; vip: number }
 }
 
-/** Xotiradagi baza + sozlangan ega + admin/kassir/massajchi. Ega sifatida kirilgan holatda qaytadi. */
+/**
+ * Xotiradagi baza + sozlangan ega + admin/kassir/massajchi + ofitsiantlar
+ * (Sardor: 'waiter' roli, 10%; Bekzod: kassir + isWaiter, 12%). Ega sifatida kirilgan holatda qaytadi.
+ */
 export async function setup(opts: { file?: string | null; host?: PosHost } = {}): Promise<Ctx> {
   const clock = new FakeClock()
   const svc = await PosService.create({ file: opts.file ?? null, clock: clock.now, host: opts.host })
-  await svc.auth.setupOwner('Ega', '1234', 'Straus Sauna')
+  await svc.auth.setupOwner('Ega', '1234', 'Delfin Sauna')
   const owner = (await svc.auth.current())!.staff
-  const mk = (name: string, role: Role, pin: string, isProvider = false) =>
-    svc.staff.save({ name, role, pin, isProvider, active: true })
+  const mk = (name: string, role: Role, pin: string, isProvider = false, isWaiter = false, commissionPct = 0) =>
+    svc.staff.save({ name, role, pin, isProvider, isWaiter, commissionPct, active: true })
   const admin = await mk('Admin', 'admin', '2222')
   const cashier = await mk('Kassir', 'cashier', '3333')
   const provider = await mk('Massajchi', 'cashier', '4444', true)
-  const staff = { owner, admin, cashier, provider }
-  const pins = { owner: '1234', admin: '2222', cashier: '3333', provider: '4444' }
+  const waiter = await mk('Sardor', 'waiter', '5555', false, false, 10)
+  const waiter2 = await mk('Bekzod', 'cashier', '6666', false, true, 12)
+  const staff = { owner, admin, cashier, provider, waiter, waiter2 }
+  const pins = { owner: '1234', admin: '2222', cashier: '3333', provider: '4444', waiter: '5555', waiter2: '6666' }
   const list = await svc.rooms.list()
   const byName = (n: string) => list.find((r) => r.name === n)!.id
   return {

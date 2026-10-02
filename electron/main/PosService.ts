@@ -1,5 +1,5 @@
 /**
- * PosService — StrausPOS ning barcha biznes mantig'i (PosApi shartnomasi).
+ * PosService — Delfin Sauna ning barcha biznes mantig'i (PosApi shartnomasi).
  * Electron (IPC), dev-server (HTTP /rpc) va testlar shu bitta klassdan foydalanadi.
  *
  *  - Har bir metod ruxsatni `can(role, perm)` bilan tekshiradi.
@@ -11,10 +11,13 @@ import type { PosApi, StaffInput } from '../../src/shared/api'
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
-  SalesReport, ServiceItem, Session, SessionView, Staff, TimeInterval
+  SalesReport, ServiceItem, Session, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow
 } from '../../src/shared/types'
 import { ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
-import { buildGuestView, buildLineView, computeTotals } from '../../src/shared/billing'
+import {
+  MS_MIN, buildGuestView, buildLineView, computeTotals, waiterCommission, waiterProductSales
+} from '../../src/shared/billing'
+import type { BillingOptions } from '../../src/shared/billing'
 import { Db } from './db'
 import { hashPin, isValidPin, verifyPin } from './pin'
 import { renderReceiptHtml } from './receipt'
@@ -52,7 +55,7 @@ function fail(msg: string): never {
 // ───────────── Standart qiymatlar ─────────────
 export const DEFAULT_SETTINGS: AppSettings = {
   receipt: {
-    businessName: 'StrausPOS',
+    businessName: 'Delfin Sauna',
     address: '',
     phone: '',
     footer: 'Tashrifingiz uchun rahmat!',
@@ -64,6 +67,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
     printerName: ''
   },
   roundTo: 1000,
+  defaultHours: 1,
+  blockMinutes: 60,
+  graceMinutes: 0,
+  warnBeforeMinutes: 10,
+  theme: 'auto',
   lockEnabled: true,
   autoLockMinutes: 0,
   language: 'uz'
@@ -73,9 +81,16 @@ const PERMISSION_DENIED = "Bu amal uchun ruxsatingiz yo'q"
 const LOGIN_REQUIRED = 'Avval tizimga kiring'
 const MAX_LOGIN_FAILS = 5
 const LOGIN_LOCK_MS = 30_000
+/** Bir martada olinadigan / qo'shiladigan vaqt chegarasi (daqiqa) */
+const MAX_PAID_MINUTES = 24 * 60
+/** Ochilgandan keyin shuncha vaqt o'tsa, kassir sessiyani bekor qila olmaydi (administrator kerak) */
+const CANCEL_FREE_MS = MS_MIN
+const MONTH_RE = /^(\d{4})-(0[1-9]|1[0-2])$/
 
 // ───────────── Qator turlari (DB) ─────────────
-interface StaffRow { id: number; name: string; role: Role; pin_hash: string; active: number; is_provider: number }
+interface StaffRow {
+  id: number; name: string; role: Role; pin_hash: string; active: number; is_provider: number; is_waiter: number; commission_pct: number
+}
 interface RoomRow { id: number; name: string; price_per_hour: number; capacity: number; active: number; sort_order: number; deleted: number }
 interface CategoryRow { id: number; name: string; sort_order: number }
 interface ProductRow { id: number; category_id: number; name: string; price: number; stock: number; track_stock: number; low_stock_at: number; active: number; deleted: number }
@@ -84,8 +99,9 @@ interface SessionRow {
   id: number; room_id: number; status: 'open' | 'closed'; opened_at: number; closed_at: number | null; opened_by: number
   closed_by: number | null; discount: number; note: string; cancelled: number; receipt_no: number | null
   time_total: number | null; lines_total: number | null; discount_applied: number | null; total: number | null
+  waiter_id: number | null; waiter_pct: number; product_sales: number | null; waiter_commission: number | null
 }
-interface GuestRow { id: number; session_id: number; label: string; state: GuestState }
+interface GuestRow { id: number; session_id: number; label: string; state: GuestState; paid_minutes: number }
 interface IntervalRow { id: number; guest_id: number; room_id: number; rate: number; start: number; end: number | null }
 interface LineRow {
   id: number; session_id: number; guest_id: number | null; kind: 'product' | 'service'; ref_id: number; name: string
@@ -95,8 +111,11 @@ interface PaymentRow { id: number; session_id: number; method: PayMethod; amount
 interface DebtRow { id: number; session_id: number | null; customer_name: string; phone: string; amount: number; paid: number; created_at: number; closed_at: number | null }
 interface DebtPaymentRow { id: number; debt_id: number; method: 'cash' | 'card'; amount: number; at: number; by: number }
 interface ReturnRow { id: number; line_id: number; session_id: number; qty: number; reason: string; at: number; by: number }
+interface PayoutRow { id: number; staff_id: number; month: string; amount: number; note: string; at: number; by: number }
 
-const toStaff = (r: StaffRow): Staff => ({ id: r.id, name: r.name, role: r.role, active: !!r.active, isProvider: !!r.is_provider })
+const toStaff = (r: StaffRow): Staff => ({
+  id: r.id, name: r.name, role: r.role, active: !!r.active, isProvider: !!r.is_provider, isWaiter: !!r.is_waiter, commissionPct: r.commission_pct ?? 0
+})
 const toRoom = (r: RoomRow): Room => ({ id: r.id, name: r.name, pricePerHour: r.price_per_hour, capacity: r.capacity, active: !!r.active, sortOrder: r.sort_order })
 const toCategory = (r: CategoryRow): ProductCategory => ({ id: r.id, name: r.name, sortOrder: r.sort_order })
 const toProduct = (r: ProductRow): Product => ({
@@ -104,7 +123,8 @@ const toProduct = (r: ProductRow): Product => ({
 })
 const toService = (r: ServiceRow): ServiceItem => ({ id: r.id, name: r.name, price: r.price, durationMin: r.duration_min, active: !!r.active })
 const toSession = (r: SessionRow): Session => ({
-  id: r.id, roomId: r.room_id, status: r.status, openedAt: r.opened_at, closedAt: r.closed_at, openedBy: r.opened_by, discount: r.discount, note: r.note
+  id: r.id, roomId: r.room_id, status: r.status, openedAt: r.opened_at, closedAt: r.closed_at, openedBy: r.opened_by, discount: r.discount, note: r.note,
+  waiterId: r.waiter_id ?? null, waiterPct: r.waiter_pct ?? 0
 })
 const toInterval = (r: IntervalRow): TimeInterval => ({ roomId: r.room_id, rate: r.rate, start: r.start, end: r.end })
 const toLine = (r: LineRow): OrderLine => ({
@@ -117,6 +137,7 @@ const toDebt = (r: DebtRow): Debt => ({
 })
 const toDebtPayment = (r: DebtPaymentRow): DebtPayment => ({ id: r.id, debtId: r.debt_id, method: r.method, amount: r.amount, at: r.at, by: r.by })
 const toReturn = (r: ReturnRow): ReturnRecord => ({ id: r.id, lineId: r.line_id, sessionId: r.session_id, qty: r.qty, reason: r.reason, at: r.at, by: r.by })
+const toPayout = (r: PayoutRow): WaiterPayout => ({ id: r.id, staffId: r.staff_id, month: r.month, amount: r.amount, note: r.note, at: r.at, by: r.by })
 
 // ───────────── Tekshiruv yordamchilari ─────────────
 function isInt(n: unknown): n is number {
@@ -149,6 +170,22 @@ function localDay(ms: number): string {
   const d = new Date(ms)
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
+/** 'YYYY-MM' → mahalliy vaqt bo'yicha [oy boshi, keyingi oy boshi) */
+function monthRange(month: unknown): { month: string; from: number; to: number } {
+  const m = typeof month === 'string' ? MONTH_RE.exec(month) : null
+  if (!m) fail("Oy noto'g'ri (YYYY-MM ko'rinishida bo'lishi kerak)")
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  return { month: m[0], from: new Date(y, mo - 1, 1).getTime(), to: new Date(y, mo, 1).getTime() }
+}
+/** Ofitsiant foizi: 0..100, ko'pi bilan 2 kasr xona */
+function reqPct(v: unknown): number {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 100) fail("Foiz 0 dan 100 gacha bo'lishi kerak")
+  return Math.round(v * 100) / 100
+}
+function reqMinutes(v: unknown, what: string): number {
+  return reqInt(v, `${what} 1 dan ${MAX_PAID_MINUTES} daqiqagacha butun son bo'lishi kerak`, 1, MAX_PAID_MINUTES)
+}
 
 function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   const s = (input && typeof input === 'object' ? input : {}) as Partial<AppSettings>
@@ -160,6 +197,13 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   reqInt(roundTo, "Yaxlitlash qiymati musbat butun son bo'lishi kerak", 1, 1_000_000)
   const autoLock = s.autoLockMinutes === undefined ? base.autoLockMinutes : s.autoLockMinutes
   reqInt(autoLock, "Avto-qulf daqiqasi 0 yoki musbat butun son bo'lishi kerak", 0, 24 * 60)
+  const pick = <K extends keyof AppSettings>(k: K): AppSettings[K] => (s[k] === undefined ? base[k] : (s[k] as AppSettings[K]))
+  const defaultHours = reqInt(pick('defaultHours'), "Standart soat 1 dan 24 gacha butun son bo'lishi kerak", 1, 24)
+  const blockMinutes = reqInt(pick('blockMinutes'), "Blok daqiqasi 1 dan 1440 gacha butun son bo'lishi kerak", 1, 24 * 60)
+  const graceMinutes = reqInt(pick('graceMinutes'), "Imtiyozli daqiqalar 0 dan 1440 gacha butun son bo'lishi kerak", 0, 24 * 60)
+  const warnBeforeMinutes = reqInt(pick('warnBeforeMinutes'), "Ogohlantirish daqiqasi 0 dan 1440 gacha butun son bo'lishi kerak", 0, 24 * 60)
+  const theme = pick('theme')
+  if (theme !== 'light' && theme !== 'dark' && theme !== 'auto') fail("Interfeys rejimi noto'g'ri")
   const str = (v: unknown, d: string, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : d)
   return {
     receipt: {
@@ -175,6 +219,11 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
       printerName: str(r.printerName, b.printerName, 200)
     },
     roundTo,
+    defaultHours,
+    blockMinutes,
+    graceMinutes,
+    warnBeforeMinutes,
+    theme,
     lockEnabled: bool(s.lockEnabled, base.lockEnabled),
     autoLockMinutes: autoLock,
     language: 'uz'
@@ -215,6 +264,18 @@ export class PosService implements PosApi {
     } catch {
       return JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as AppSettings
     }
+  }
+
+  private billingOpts(s: AppSettings = this.loadSettings()): BillingOptions {
+    return { roundTo: s.roundTo, blockMinutes: s.blockMinutes, graceMinutes: s.graceMinutes }
+  }
+
+  /** Biriktirish uchun ofitsiant: mavjud, faol va isWaiter bo'lishi shart. */
+  private waiterRow(id: unknown): StaffRow {
+    const r = isInt(id) ? this.staffRow(id) : undefined
+    if (!r || !r.is_waiter) fail('Ofitsiant topilmadi')
+    if (!r.active) fail('Ofitsiant faol emas')
+    return r
   }
 
   private storeSettings(s: AppSettings): void {
@@ -316,7 +377,8 @@ export class PosService implements PosApi {
       sessionId: g.session_id,
       label: g.label,
       state: g.state,
-      intervals: ivs.filter((i) => i.guest_id === g.id).map(toInterval)
+      intervals: ivs.filter((i) => i.guest_id === g.id).map(toInterval),
+      paidMinutes: g.paid_minutes ?? 0
     }))
   }
 
@@ -336,7 +398,8 @@ export class PosService implements PosApi {
     const guests = this.loadGuests(sessionId)
     const lines = this.db.all<LineRow>('SELECT * FROM order_lines WHERE session_id=? ORDER BY id', [sessionId]).map(toLine)
     const names = this.staffNames()
-    const guestViews = guests.map((g) => buildGuestView(g, lines, now, settings.roundTo))
+    const opts = this.billingOpts(settings)
+    const guestViews = guests.map((g) => buildGuestView(g, lines, now, opts))
     const lineViews = lines.map((l) => buildLineView(l, l.providerId != null ? names.get(l.providerId) ?? null : null))
     const totals = computeTotals(guestViews, lineViews, sr.discount)
     const payments = this.db.all<PaymentRow>('SELECT * FROM payments WHERE session_id=? ORDER BY id', [sessionId]).map(toPayment)
@@ -344,6 +407,7 @@ export class PosService implements PosApi {
     return {
       session: toSession(sr),
       room: toRoom(roomR),
+      waiterName: sr.waiter_id != null ? names.get(sr.waiter_id) ?? null : null,
       guests: guestViews,
       lines: lineViews,
       computedAt: now,
@@ -439,6 +503,11 @@ export class PosService implements PosApi {
     })
   }
 
+  /** Interfeys rejimi (Electron oyna foni uchun; ruxsat talab qilinmaydi — maxfiy emas). */
+  currentTheme(): AppSettings['theme'] {
+    return this.loadSettings().theme
+  }
+
   // ═════════════ Zaxira (to'g'ridan-to'g'ri, testlar va host uchun) ═════════════
   /** Bazaning to'liq nusxasi (sql.js eksport baytlari). */
   exportBytes(): Uint8Array {
@@ -456,7 +525,7 @@ export class PosService implements PosApi {
   auth: PosApi['auth'] = {
     listLoginStaff: async () =>
       this.db
-        .all<StaffRow>("SELECT * FROM staff WHERE active=1 ORDER BY CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, name")
+        .all<StaffRow>("SELECT * FROM staff WHERE active=1 ORDER BY CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'cashier' THEN 2 ELSE 3 END, name")
         .map(toStaff),
 
     login: async (staffId, pin) => {
@@ -493,7 +562,7 @@ export class PosService implements PosApi {
       if (!isValidPin(pin)) fail("PIN 4–8 ta raqamdan iborat bo'lishi kerak")
       const biz = reqText(businessName, 'Biznes nomini kiriting', 100)
       const id = this.db.tx(() => {
-        const sid = this.db.insert('INSERT INTO staff(name, role, pin_hash, active, is_provider, created_at) VALUES(?,?,?,1,0,?)', [
+        const sid = this.db.insert('INSERT INTO staff(name, role, pin_hash, active, is_provider, is_waiter, commission_pct, created_at) VALUES(?,?,?,1,0,0,0,?)', [
           n, 'owner', hashPin(pin), this.now()
         ])
         const s = this.loadSettings()
@@ -575,18 +644,25 @@ export class PosService implements PosApi {
 
   // ═════════════ SESSIONS ═════════════
   sessions: PosApi['sessions'] = {
-    open: async (roomId, guestCount) => {
+    open: async (roomId, guestCount, paidMinutes, waiterId) => {
       const me = this.need('session.open')
       const room = this.roomRow(roomId)
       if (!room.active) fail('Xona faol emas')
       if (this.openSessionForRoom(room.id)) fail('Xona band')
       if (!isInt(guestCount) || guestCount < 1) fail("Mehmonlar soni kamida 1 bo'lishi kerak")
       if (guestCount > room.capacity) fail(`Xona sig'imi ${room.capacity} kishi`)
+      const paid = reqMinutes(paidMinutes, 'Olingan vaqt')
+      const waiter = waiterId == null ? null : this.waiterRow(waiterId)
       const now = this.now()
       const id = this.db.tx(() => {
-        const sid = this.db.insert("INSERT INTO sessions(room_id, status, opened_at, opened_by) VALUES(?, 'open', ?, ?)", [room.id, now, me.id])
+        const sid = this.db.insert(
+          "INSERT INTO sessions(room_id, status, opened_at, opened_by, waiter_id, waiter_pct) VALUES(?, 'open', ?, ?, ?, ?)",
+          [room.id, now, me.id, waiter ? waiter.id : null, waiter ? waiter.commission_pct : 0]
+        )
         for (let i = 1; i <= guestCount; i++) {
-          const gid = this.db.insert("INSERT INTO guests(session_id, label, state) VALUES(?, ?, 'running')", [sid, `Mehmon ${i}`])
+          const gid = this.db.insert("INSERT INTO guests(session_id, label, state, paid_minutes) VALUES(?, ?, 'running', ?)", [
+            sid, `Mehmon ${i}`, paid
+          ])
           this.openInterval(gid, room.id, room.price_per_hour, now)
         }
         return sid
@@ -599,18 +675,52 @@ export class PosService implements PosApi {
       return this.view(sessionId)
     },
 
-    addGuest: async (sessionId) => {
+    addGuest: async (sessionId, paidMinutes) => {
       this.need('session.manage')
       const s = this.openSessionRow(sessionId)
+      const paid = reqMinutes(paidMinutes, 'Olingan vaqt')
       const room = this.roomRow(s.room_id)
       const n = this.activeGuestCount(s.id)
       if (n + 1 > room.capacity) fail(`Xona sig'imi ${room.capacity} kishi`)
       const total = this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM guests WHERE session_id=?', [s.id])?.n ?? 0
       const now = this.now()
       this.db.tx(() => {
-        const gid = this.db.insert("INSERT INTO guests(session_id, label, state) VALUES(?, ?, 'running')", [s.id, `Mehmon ${total + 1}`])
+        const gid = this.db.insert("INSERT INTO guests(session_id, label, state, paid_minutes) VALUES(?, ?, 'running', ?)", [
+          s.id, `Mehmon ${total + 1}`, paid
+        ])
         this.openInterval(gid, room.id, room.price_per_hour, now)
       })
+      return this.view(s.id)
+    },
+
+    extendGuest: async (guestId, minutes) => {
+      this.need('session.manage')
+      const g = this.guestRow(guestId)
+      this.openSessionRow(g.session_id)
+      const add = reqMinutes(minutes, "Qo'shiladigan vaqt")
+      if (g.state === 'finished') fail('Mehmon chiqib ketgan — avval vaqtini davom ettiring')
+      this.db.tx(() => this.db.run('UPDATE guests SET paid_minutes=paid_minutes+? WHERE id=?', [add, g.id]))
+      return this.view(g.session_id)
+    },
+
+    extendAll: async (sessionId, minutes) => {
+      this.need('session.manage')
+      const s = this.openSessionRow(sessionId)
+      const add = reqMinutes(minutes, "Qo'shiladigan vaqt")
+      if (this.activeGuestCount(s.id) === 0) fail("Sessiyada faol mehmon yo'q")
+      this.db.tx(() =>
+        this.db.run("UPDATE guests SET paid_minutes=paid_minutes+? WHERE session_id=? AND state<>'finished'", [add, s.id])
+      )
+      return this.view(s.id)
+    },
+
+    setWaiter: async (sessionId, waiterId) => {
+      this.need('session.manage')
+      const s = this.openSessionRow(sessionId)
+      const waiter = waiterId == null ? null : this.waiterRow(waiterId)
+      this.db.tx(() =>
+        this.db.run('UPDATE sessions SET waiter_id=?, waiter_pct=? WHERE id=?', [waiter ? waiter.id : null, waiter ? waiter.commission_pct : 0, s.id])
+      )
       return this.view(s.id)
     },
 
@@ -716,7 +826,8 @@ export class PosService implements PosApi {
       const v = this.view(s.id)
       if (v.lines.some((l) => l.activeQty > 0)) fail("Sessiyada buyurtmalar bor — bekor qilib bo'lmaydi")
       if (v.payments.length > 0) fail("Sessiyada to'lovlar bor — bekor qilib bo'lmaydi")
-      if (v.timeTotal > 0 && !can(me.role, 'discount.apply'))
+      // Oldindan olingan vaqt darhol hisoblanadi, shuning uchun "vaqt o'tganmi" bo'yicha tekshiramiz
+      if (v.guests.some((g) => g.elapsedMs >= CANCEL_FREE_MS) && !can(me.role, 'discount.apply'))
         fail('Vaqt hisoblangan — bekor qilish uchun administrator ruxsati kerak')
       const now = this.now()
       this.db.tx(() => {
@@ -866,10 +977,13 @@ export class PosService implements PosApi {
             s.id, debtorClean.name, debtorClean.phone, debtAmount, now
           ])
         const next = (this.db.get<{ m: number | null }>('SELECT MAX(receipt_no) AS m FROM sessions')?.m ?? 0) + 1
+        // Ofitsiant haqi: faqat bar mahsulotlari (qaytarishlar ayirilgan) × muzlatilgan foiz
+        const productSales = waiterProductSales(v.lines)
+        const commission = s.waiter_id != null ? waiterCommission(productSales, s.waiter_pct ?? 0) : 0
         this.db.run(
           `UPDATE sessions SET status='closed', closed_at=?, closed_by=?, receipt_no=?, discount=?,
-             time_total=?, lines_total=?, discount_applied=?, total=? WHERE id=?`,
-          [now, me.id, next, v.discount, v.timeTotal, v.linesTotal, v.discount, v.total, s.id]
+             time_total=?, lines_total=?, discount_applied=?, total=?, product_sales=?, waiter_commission=? WHERE id=?`,
+          [now, me.id, next, v.discount, v.timeTotal, v.linesTotal, v.discount, v.total, productSales, commission, s.id]
         )
       })
       return this.buildReceipt(s.id)
@@ -1056,7 +1170,7 @@ export class PosService implements PosApi {
     list: async () => {
       this.requireLogin()
       return this.db
-        .all<StaffRow>("SELECT * FROM staff ORDER BY active DESC, CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, name")
+        .all<StaffRow>("SELECT * FROM staff ORDER BY active DESC, CASE role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'cashier' THEN 2 ELSE 3 END, name")
         .map(toStaff)
     },
 
@@ -1064,20 +1178,25 @@ export class PosService implements PosApi {
       this.need('staff.manage')
       const name = reqText(input.name, 'Xodim ismini kiriting', 60)
       const role = input.role
-      if (role !== 'owner' && role !== 'admin' && role !== 'cashier') fail("Lavozim noto'g'ri")
+      if (role !== 'owner' && role !== 'admin' && role !== 'cashier' && role !== 'waiter') fail("Lavozim noto'g'ri")
       const active = bool(input.active, true)
-      const isProvider = bool(input.isProvider, false)
       const pin = typeof input.pin === 'string' ? input.pin : ''
-      if (input.id != null) {
-        const cur = this.staffRow(input.id)
-        if (!cur) fail('Xodim topilmadi')
+      const cur = input.id != null ? this.staffRow(input.id) : undefined
+      if (input.id != null && !cur) fail('Xodim topilmadi')
+      const isProvider = bool(input.isProvider, cur ? !!cur.is_provider : false)
+      // 'waiter' rolidagi xodim har doim ofitsiant; admin/kassir ham ofitsiant bo'lishi mumkin
+      const isWaiter = role === 'waiter' ? true : bool(input.isWaiter, cur ? !!cur.is_waiter : false)
+      const commissionPct = input.commissionPct === undefined ? (cur ? cur.commission_pct ?? 0 : 0) : reqPct(input.commissionPct)
+      if (cur) {
         if (pin && !isValidPin(pin)) fail("PIN 4–8 ta raqamdan iborat bo'lishi kerak")
         if (cur.role === 'owner' && cur.active && (role !== 'owner' || !active)) {
           const owners = this.db.get<{ n: number }>("SELECT COUNT(*) AS n FROM staff WHERE role='owner' AND active=1")?.n ?? 0
           if (owners <= 1) fail("Kamida bitta faol ega bo'lishi kerak")
         }
         this.db.tx(() => {
-          this.db.run('UPDATE staff SET name=?, role=?, active=?, is_provider=? WHERE id=?', [name, role, b2i(active), b2i(isProvider), cur.id])
+          this.db.run('UPDATE staff SET name=?, role=?, active=?, is_provider=?, is_waiter=?, commission_pct=? WHERE id=?', [
+            name, role, b2i(active), b2i(isProvider), b2i(isWaiter), commissionPct, cur.id
+          ])
           if (pin) this.db.run('UPDATE staff SET pin_hash=? WHERE id=?', [hashPin(pin), cur.id])
         })
         this.loginFails.delete(cur.id)
@@ -1085,9 +1204,10 @@ export class PosService implements PosApi {
       }
       if (!isValidPin(pin)) fail("PIN 4–8 ta raqamdan iborat bo'lishi kerak")
       const id = this.db.tx(() =>
-        this.db.insert('INSERT INTO staff(name, role, pin_hash, active, is_provider, created_at) VALUES(?,?,?,?,?,?)', [
-          name, role, hashPin(pin), b2i(active), b2i(isProvider), this.now()
-        ])
+        this.db.insert(
+          'INSERT INTO staff(name, role, pin_hash, active, is_provider, is_waiter, commission_pct, created_at) VALUES(?,?,?,?,?,?,?,?)',
+          [name, role, hashPin(pin), b2i(active), b2i(isProvider), b2i(isWaiter), commissionPct, this.now()]
+        )
       )
       return toStaff(this.staffRow(id)!)
     },
@@ -1100,6 +1220,98 @@ export class PosService implements PosApi {
       if (!isValidPin(newPin)) fail("PIN 4–8 ta raqamdan iborat bo'lishi kerak")
       this.db.tx(() => this.db.run('UPDATE staff SET pin_hash=? WHERE id=?', [hashPin(newPin), cur.id]))
       this.loginFails.delete(cur.id)
+    }
+  }
+
+  // ═════════════ WAITERS ═════════════
+  waiters: PosApi['waiters'] = {
+    list: async () => {
+      this.need('session.open')
+      return this.db.all<StaffRow>('SELECT * FROM staff WHERE active=1 AND is_waiter=1 ORDER BY name, id').map(toStaff)
+    },
+
+    monthly: async (month) => {
+      this.need('reports.view')
+      const r = monthRange(month)
+      const agg = this.db.all<{ waiter_id: number; n: number; sales: number | null; comm: number | null }>(
+        `SELECT waiter_id, COUNT(*) AS n, SUM(product_sales) AS sales, SUM(waiter_commission) AS comm FROM sessions
+         WHERE waiter_id IS NOT NULL AND status='closed' AND cancelled=0 AND closed_at>=? AND closed_at<? GROUP BY waiter_id`,
+        [r.from, r.to]
+      )
+      const paidRows = this.db.all<{ staff_id: number; a: number | null }>(
+        'SELECT staff_id, SUM(amount) AS a FROM waiter_payouts WHERE month=? GROUP BY staff_id',
+        [r.month]
+      )
+      const ids = new Set<number>()
+      for (const w of this.db.all<{ id: number }>('SELECT id FROM staff WHERE is_waiter=1 AND active=1')) ids.add(w.id)
+      for (const a of agg) ids.add(a.waiter_id)
+      for (const p of paidRows) ids.add(p.staff_id)
+      const rows: WaiterMonthRow[] = []
+      for (const id of ids) {
+        const st = this.staffRow(id)
+        if (!st) continue
+        const a = agg.find((x) => x.waiter_id === id)
+        const commission = a?.comm ?? 0
+        const paid = paidRows.find((x) => x.staff_id === id)?.a ?? 0
+        rows.push({
+          staffId: id,
+          name: st.name,
+          commissionPct: st.commission_pct ?? 0,
+          sessions: a?.n ?? 0,
+          productSales: a?.sales ?? 0,
+          commission,
+          paid,
+          balance: commission - paid
+        })
+      }
+      return rows.sort((x, y) => x.name.localeCompare(y.name) || x.staffId - y.staffId)
+    },
+
+    sessions: async (staffId, month) => {
+      this.need('reports.view')
+      const r = monthRange(month)
+      return this.db
+        .all<{ id: number; closed_at: number; room_name: string; product_sales: number | null; waiter_pct: number; waiter_commission: number | null }>(
+          `SELECT s.id, s.closed_at, rm.name AS room_name, s.product_sales, s.waiter_pct, s.waiter_commission
+           FROM sessions s JOIN rooms rm ON rm.id=s.room_id
+           WHERE s.waiter_id=? AND s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<?
+           ORDER BY s.closed_at, s.id`,
+          [isInt(staffId) ? staffId : -1, r.from, r.to]
+        )
+        .map(
+          (x): WaiterSessionRow => ({
+            sessionId: x.id,
+            closedAt: x.closed_at,
+            roomName: x.room_name,
+            productSales: x.product_sales ?? 0,
+            pct: x.waiter_pct ?? 0,
+            commission: x.waiter_commission ?? 0
+          })
+        )
+    },
+
+    payout: async (staffId, month, amount, note) => {
+      const me = this.need('staff.manage')
+      const r = monthRange(month)
+      const st = isInt(staffId) ? this.staffRow(staffId) : undefined
+      if (!st) fail('Xodim topilmadi')
+      const hasSessions = (this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM sessions WHERE waiter_id=?', [st.id])?.n ?? 0) > 0
+      if (!st.is_waiter && !hasSessions) fail('Xodim ofitsiant emas')
+      reqInt(amount, "Summa musbat butun son bo'lishi kerak", 1, 1_000_000_000)
+      const id = this.db.tx(() =>
+        this.db.insert('INSERT INTO waiter_payouts(staff_id, month, amount, note, at, by) VALUES(?,?,?,?,?,?)', [
+          st.id, r.month, amount, optText(note, 200), this.now(), me.id
+        ])
+      )
+      return toPayout(this.db.get<PayoutRow>('SELECT * FROM waiter_payouts WHERE id=?', [id])!)
+    },
+
+    payouts: async (staffId, month) => {
+      this.need('reports.view')
+      const r = monthRange(month)
+      return this.db
+        .all<PayoutRow>('SELECT * FROM waiter_payouts WHERE staff_id=? AND month=? ORDER BY at, id', [isInt(staffId) ? staffId : -1, r.month])
+        .map(toPayout)
     }
   }
 
@@ -1150,12 +1362,22 @@ export class PosService implements PosApi {
         byRoom: [],
         byProduct: [],
         byProvider: [],
-        byStaff: []
+        byStaff: [],
+        byWaiter: []
       }
       const byDay = new Map<string, number>()
       const byRoom = new Map<Id, { roomId: Id; roomName: string; sessions: number; total: number }>()
       const byStaff = new Map<Id, { staffId: Id; name: string; sessions: number; total: number }>()
+      const byWaiter = new Map<Id, SalesReport['byWaiter'][number]>()
+      const names = this.staffNames()
       for (const s of sessions) {
+        if (s.waiter_id != null) {
+          const w = byWaiter.get(s.waiter_id) ?? { staffId: s.waiter_id, name: names.get(s.waiter_id) ?? '', sessions: 0, productSales: 0, commission: 0 }
+          w.sessions++
+          w.productSales += s.product_sales ?? 0
+          w.commission += s.waiter_commission ?? 0
+          byWaiter.set(s.waiter_id, w)
+        }
         const total = s.total ?? 0
         report.timeRevenue += s.time_total ?? 0
         report.discounts += s.discount_applied ?? 0
@@ -1210,6 +1432,7 @@ export class PosService implements PosApi {
       report.byProduct = Array.from(byProduct.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
       report.byProvider = Array.from(byProvider.values()).sort((a, b) => b.amount - a.amount)
       report.byStaff = Array.from(byStaff.values()).sort((a, b) => b.total - a.total)
+      report.byWaiter = Array.from(byWaiter.values()).sort((a, b) => b.commission - a.commission || a.name.localeCompare(b.name))
       return report
     },
 
@@ -1265,7 +1488,7 @@ export class PosService implements PosApi {
       this.need('backup.manage')
       if (!this.host.saveBackup) fail('Zaxira nusxa bu muhitda mavjud emas')
       const d = new Date(this.now())
-      const name = `straus-zaxira-${localDay(this.now())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.db`
+      const name = `delfin-zaxira-${localDay(this.now())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.db`
       const path = await this.host.saveBackup(this.exportBytes(), name)
       return path ? { path } : null
     },

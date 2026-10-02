@@ -37,7 +37,7 @@ function tryResolve(): string | null {
 /** WASM faylning mumkin bo'lgan joylari (birinchi mavjudi olinadi). */
 export function wasmCandidates(): string[] {
   const out: string[] = []
-  const envPath = process.env.STRAUS_SQL_WASM
+  const envPath = process.env.DELFIN_SQL_WASM
   if (envPath) out.push(envPath)
   const resolved = tryResolve()
   if (resolved) {

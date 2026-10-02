@@ -9,7 +9,7 @@ describe('hisobotlar', () => {
 
     // 1-kun: Sauna 1, kassir yopadi
     await loginAs('cashier')
-    const a = await svc.sessions.open(rooms.s1, 2)
+    const a = await svc.sessions.open(rooms.s1, 2, 60, null)
     await svc.lines.addProduct(a.session.id, beer.id, 3, null)
     await svc.lines.addService(a.session.id, massage.id, null, staff.provider.id)
     await loginAs('admin')
@@ -24,7 +24,7 @@ describe('hisobotlar', () => {
     // 2-kun: VIP, ega yopadi
     clock.t = T0 + 24 * HOUR
     await loginAs('owner')
-    const b = await svc.sessions.open(rooms.vip, 1)
+    const b = await svc.sessions.open(rooms.vip, 1, 30, null) // 30 daqiqa olingan
     await svc.lines.addProduct(b.session.id, beer.id, 1, null)
     clock.advanceMin(30)
     v = await svc.sessions.get(b.session.id)
@@ -32,9 +32,9 @@ describe('hisobotlar', () => {
     await svc.checkout.pay(b.session.id, [{ method: 'card', amount: 70_000 }], null)
 
     // Bekor qilingan va ochiq sessiyalar hisobga kirmaydi
-    const c = await svc.sessions.open(rooms.s2, 1)
+    const c = await svc.sessions.open(rooms.s2, 1, 60, null)
     await svc.sessions.cancel(c.session.id)
-    await svc.sessions.open(rooms.s2, 1)
+    await svc.sessions.open(rooms.s2, 1, 60, null)
 
     const rep = await svc.reports.sales({ from: T0 - HOUR, to: T0 + 48 * HOUR })
     expect(rep.sessionsCount).toBe(2)
@@ -74,8 +74,8 @@ describe('hisobotlar', () => {
 
   it('yopilgandan keyin yaxlitlash sozlamasi o‘zgarsa ham hisobot o‘zgarmaydi', async () => {
     const { svc, rooms, clock } = await setup()
-    const a = await svc.sessions.open(rooms.s1, 1)
-    clock.advanceMin(7) // 5 833 → 6 000
+    const a = await svc.sessions.open(rooms.s1, 1, 7, null) // 7 daqiqa: 5 833 → 6 000
+    clock.advanceMin(7)
     await svc.checkout.pay(a.session.id, [{ method: 'cash', amount: 6_000 }], null)
     const s = await svc.settings.get()
     await svc.settings.save({ ...s, roundTo: 1 })

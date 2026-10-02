@@ -11,7 +11,8 @@ const MAP: MethodMap = {
   auth: { listLoginStaff: true, login: true, logout: true, current: true, needsSetup: true, setupOwner: true },
   rooms: { board: true, list: true, save: true, remove: true },
   sessions: {
-    open: true, get: true, addGuest: true, guestPause: true, guestResume: true, guestFinish: true,
+    open: true, get: true, addGuest: true, extendGuest: true, extendAll: true, setWaiter: true,
+    guestPause: true, guestResume: true, guestFinish: true,
     renameGuest: true, moveRoom: true, setDiscount: true, stopAll: true, cancel: true
   },
   lines: { addProduct: true, addService: true, returnLine: true },
@@ -22,6 +23,7 @@ const MAP: MethodMap = {
   },
   debts: { list: true, pay: true, payments: true },
   staff: { list: true, save: true, changePin: true },
+  waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
   settings: { get: true, save: true },
   reports: { sales: true, returns: true },
   system: { printReceipt: true, receiptHtml: true, backup: true, restore: true, now: true, listPrinters: true }

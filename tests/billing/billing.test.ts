@@ -1,8 +1,18 @@
 import { describe, it, expect } from 'vitest'
+/**
+ * Delfin Sauna hisob-kitob qoidalari ("qattiq" tizim, docs/ARCHITECTURE.md):
+ *  - olingan vaqt (paidMinutes) kamroq o'tirilsa ham to'liq to'lanadi;
+ *  - oshsa — graceMinutes dan keyin har boshlangan blockMinutes to'liq qo'shiladi;
+ *  - summa intervallar bo'ylab xronologik (har birining o'z tarifi), ishlatilmagan daqiqalar oxirgi tarifda.
+ */
 import {
   MS_MIN,
+  MS_HOUR,
+  DEFAULT_BILLING,
   intervalMs,
   guestElapsedMs,
+  billedMinutes,
+  remainingMs,
   guestTimeRaw,
   roundAmount,
   guestTimeAmount,
@@ -11,9 +21,14 @@ import {
   buildGuestView,
   buildLineView,
   computeTotals,
+  waiterProductSales,
+  waiterCommission,
   formatMoney,
-  formatDuration
+  formatDuration,
+  formatCountdown,
+  formatHours
 } from '../../src/shared/billing'
+import type { BillingOptions } from '../../src/shared/billing'
 import type { Guest, OrderLine, TimeInterval } from '../../src/shared/types'
 
 const m = (min: number) => min * MS_MIN
@@ -25,13 +40,17 @@ const iv = (rate: number, startMin: number, endMin: number | null, roomId = 1): 
   start: m(startMin),
   end: endMin === null ? null : m(endMin)
 })
-const guest = (id: number, intervals: TimeInterval[], state: Guest['state'] = 'finished'): Guest => ({
+const guest = (id: number, intervals: TimeInterval[], state: Guest['state'] = 'finished', paidMinutes = 60): Guest => ({
   id,
   sessionId: 1,
   label: `Mehmon ${id}`,
   state,
-  intervals
+  intervals,
+  paidMinutes
 })
+/** Standart: yaxlitlash 1000, blok 60, imtiyoz 0 */
+const OPT: BillingOptions = { ...DEFAULT_BILLING }
+const opt = (o: Partial<BillingOptions> = {}): BillingOptions => ({ ...OPT, ...o })
 const line = (o: Partial<OrderLine> = {}): OrderLine => ({
   id: 1,
   sessionId: 1,
@@ -82,78 +101,94 @@ describe('guestElapsedMs', () => {
   })
 })
 
-describe('guestTimeRaw', () => {
-  it('0 vaqt -> 0 so\'m', () => {
-    expect(guestTimeRaw([], m(10))).toBe(0)
-    expect(guestTimeRaw([iv(70000, 3, 3)], m(10))).toBe(0)
+describe('billedMinutes (blok qoidasi)', () => {
+  const B = { blockMinutes: 60, graceMinutes: 0 }
+  it('5 daqiqa o‘tirsa ham olingan 1 soat to‘liq', () => {
+    expect(billedMinutes(m(5), 60, B)).toBe(60)
+    expect(billedMinutes(0, 60, B)).toBe(60)
   })
-  it('1 soat = tarif', () => {
-    expect(guestTimeRaw([iv(70000, 0, 60)], m(60))).toBe(70000)
+  it('aynan olingan vaqt — qo‘shimcha blok yo‘q', () => {
+    expect(billedMinutes(m(60), 60, B)).toBe(60)
+    expect(billedMinutes(m(120), 120, B)).toBe(120)
   })
-  it('bitta minutdan kam vaqt = 0 (pastga)', () => {
-    expect(guestTimeRaw([iv(70000, 0, 0)].map((x) => ({ ...x, end: s(59) })), m(60))).toBe(0)
+  it('1 soniya oshsa ham keyingi blok to‘liq (qattiq)', () => {
+    expect(billedMinutes(m(60) + s(1), 60, B)).toBe(120)
   })
-  it('butun minut pastga: 1 daq 59 son = 1 daq', () => {
-    const x: TimeInterval = { roomId: 1, rate: 60000, start: 0, end: s(119) }
-    expect(guestTimeRaw([x], 0)).toBe(1000)
+  it('61 daqiqa, olingan 60 → 2 soat; 121 → 3 soat', () => {
+    expect(billedMinutes(m(61), 60, B)).toBe(120)
+    expect(billedMinutes(m(121), 60, B)).toBe(180)
+    expect(billedMinutes(m(180), 60, B)).toBe(180)
   })
-  it('bir xil tarifli kichik intervallar yig\'indisidan minut yo\'qolmaydi (59s x 5 = 295s = 4 min)', () => {
-    const ivs: TimeInterval[] = Array.from({ length: 5 }, (_, i) => ({
-      roomId: 1,
-      rate: 60000,
-      start: i * m(10),
-      end: i * m(10) + s(59)
-    }))
-    // interval-darajasida floor bo'lganda 0 chiqardi
-    expect(guestTimeRaw(ivs, m(100))).toBe(4000)
+  it('graceMinutes: imtiyoz ichida qo‘shilmaydi, undan oshsa butun blok', () => {
+    const G = { blockMinutes: 60, graceMinutes: 10 }
+    expect(billedMinutes(m(70), 60, G)).toBe(60)
+    expect(billedMinutes(m(70) + s(1), 60, G)).toBe(120)
+    // imtiyoz faqat birinchi oshishga: 125 daqiqa → 60 + 2 blok
+    expect(billedMinutes(m(125), 60, G)).toBe(180)
   })
-  it('30s + 30s (pauza/davom) = 1 to\'liq minut', () => {
-    const ivs: TimeInterval[] = [
-      { roomId: 1, rate: 60000, start: 0, end: s(30) },
-      { roomId: 1, rate: 60000, start: m(5), end: m(5) + s(30) }
-    ]
-    expect(guestTimeRaw(ivs, m(10))).toBe(1000)
+  it('blockMinutes=30: oshgan vaqt 30 daqiqalik bloklar bilan', () => {
+    const H = { blockMinutes: 30, graceMinutes: 0 }
+    expect(billedMinutes(m(61), 60, H)).toBe(90)
+    expect(billedMinutes(m(91), 60, H)).toBe(120)
   })
-  it('ochiq interval hozirgi vaqt bilan o\'sadi', () => {
-    const ivs = [iv(60000, 0, null)]
-    expect(guestTimeRaw(ivs, m(10))).toBe(10000)
-    expect(guestTimeRaw(ivs, m(11))).toBe(11000)
+  it('blockMinutes noto‘g‘ri (0) bo‘lsa 1 daqiqalik blok, cheksiz sikl yo‘q', () => {
+    expect(billedMinutes(m(62) + s(10), 60, { blockMinutes: 0, graceMinutes: 0 })).toBe(63)
   })
-  it('bir nechta tarif: har intervalga o\'z narxi', () => {
-    // 60 daq @70k + 30 daq @90k
-    expect(guestTimeRaw([iv(70000, 0, 60), iv(90000, 60, 90)], m(90))).toBe(70000 + 45000)
+  it('paidMinutes=0 (eski sessiyalar): boshlangan har soat', () => {
+    expect(billedMinutes(0, 0, B)).toBe(0)
+    expect(billedMinutes(s(1), 0, B)).toBe(60)
+    expect(billedMinutes(m(61), 0, B)).toBe(120)
   })
-  it('intervallar tartibi natijaga ta\'sir qilmaydi', () => {
-    const a = iv(70000, 0, 20), b = iv(90000, 20, 50), c = iv(70000, 60, 85)
-    const x = guestTimeRaw([a, b, c], m(100))
-    expect(guestTimeRaw([c, b, a], m(100))).toBeCloseTo(x, 6)
-    expect(guestTimeRaw([b, a, c], m(100))).toBeCloseTo(x, 6)
+  it('manfiy/NaN paidMinutes 0 deb olinadi', () => {
+    expect(billedMinutes(m(10), -30, B)).toBe(60)
+    expect(billedMinutes(m(10), NaN, B)).toBe(60)
   })
-  it('qo\'shni bo\'lmagan bir xil tarif intervallari birlashtiriladi (70k->90k->70k)', () => {
-    const ivs: TimeInterval[] = [
-      { roomId: 1, rate: 70000, start: 0, end: m(20) + s(30) },
-      { roomId: 2, rate: 90000, start: m(21), end: m(31) },
-      { roomId: 1, rate: 70000, start: m(40), end: m(60) + s(30) }
-    ]
-    // 70k guruh: 41 daq (20:30 + 20:30), 90k guruh: 10 daq
-    expect(guestTimeRaw(ivs, m(100))).toBeCloseTo((41 * 70000) / 60 + (10 * 90000) / 60, 6)
+  it('suzuvchi nuqta: 3 soat aniq — ortiqcha blok yo‘q', () => {
+    expect(billedMinutes(3 * MS_HOUR, 60, B)).toBe(180)
   })
-  it('tarif almashganda minut yo\'qolmaydi: 30:30@70k + 30:30@90k = jami 61 daq', () => {
-    const ivs: TimeInterval[] = [
-      { roomId: 1, rate: 70000, start: 0, end: m(30) + s(30) },
-      { roomId: 2, rate: 90000, start: m(31), end: m(61) + s(30) }
-    ]
-    // Jami 61 daq butun minutga kesiladi, har interval o'z tarifi bilan: 30.5*70000/60 + 30.5*90000/60
-    expect(guestTimeRaw(ivs, m(100))).toBeCloseTo((30.5 * 70000) / 60 + (30.5 * 90000) / 60, 6)
+})
+
+describe('remainingMs', () => {
+  it('qolgan vaqt orqaga sanaydi, oshsa manfiy', () => {
+    expect(remainingMs([iv(60000, 0, null)], 60, m(15))).toBe(m(45))
+    expect(remainingMs([iv(60000, 0, null)], 60, m(60))).toBe(0)
+    expect(remainingMs([iv(60000, 0, null)], 60, m(65))).toBe(-m(5))
   })
-  it('qayta ishlatilgan intervallar massivi o\'zgarmaydi (toza funksiya)', () => {
-    const ivs = [iv(70000, 0, null)]
+  it('pauza vaqti sanalmaydi', () => {
+    expect(remainingMs([iv(60000, 0, 20), iv(60000, 50, null)], 60, m(60))).toBe(m(30))
+  })
+})
+
+describe('guestTimeRaw (hisoblanadigan daqiqalar taqsimoti)', () => {
+  it('intervallar yo‘q yoki 0 daqiqa → 0', () => {
+    expect(guestTimeRaw([], 60, m(10))).toBe(0)
+    expect(guestTimeRaw([iv(60000, 0, 10)], 0, m(10))).toBe(0)
+  })
+  it('ishlatilmagan (oldindan olingan) daqiqalar oxirgi tarifda', () => {
+    // 5 daq o'tirdi, 60 daq to'lanadi
+    expect(guestTimeRaw([iv(60000, 0, 5)], 60, m(100))).toBe(60000)
+  })
+  it('xona almashtirish: eski narx eski vaqtda, qolgan daqiqalar yangi narxda', () => {
+    // 2 soat olingan: 30 daq @60k, keyin 10 daq @120k (hozir), qolgan 80 daq @120k
+    const ivs = [iv(60000, 0, 30, 1), iv(120000, 30, null, 2)]
+    expect(guestTimeRaw(ivs, 120, m(40))).toBe(30000 + 180000)
+  })
+  it('tartib natijaga ta‘sir qilmaydi (xronologik saralanadi)', () => {
+    const a = iv(60000, 0, 20), b = iv(90000, 20, 50), c = iv(120000, 60, 85)
+    const x = guestTimeRaw([a, b, c], 120, m(100))
+    expect(guestTimeRaw([c, b, a], 120, m(100))).toBeCloseTo(x, 6)
+    // 20@60k + 30@90k + 25@120k + qolgan 45@120k (oxirgi = eng kech boshlangan)
+    expect(x).toBeCloseTo(20000 + 45000 + 50000 + 90000, 6)
+  })
+  it('hisoblanadigan daqiqalar o‘tirilgandan kam (imtiyoz) — xronologik kesiladi', () => {
+    // 65 daq o'tirdi, imtiyoz bilan 60 daq hisoblanadi: 40@60k + 20@120k
+    expect(guestTimeRaw([iv(60000, 0, 40), iv(120000, 40, 65)], 60, m(65))).toBeCloseTo(40000 + 40000, 6)
+  })
+  it('toza funksiya: kirish massivi o‘zgarmaydi', () => {
+    const ivs = [iv(70000, 10, null), iv(50000, 0, 10)]
     const copy = JSON.stringify(ivs)
-    guestTimeRaw(ivs, m(50))
+    guestTimeRaw(ivs, 60, m(50))
     expect(JSON.stringify(ivs)).toBe(copy)
-  })
-  it('BILLING NOTE: kesishuvchi intervallar ikki marta sanaladi (dedup yo\'q)', () => {
-    expect(guestTimeRaw([iv(60000, 0, 10), iv(60000, 5, 15)], m(20))).toBe(20000)
   })
 })
 
@@ -195,18 +230,23 @@ describe('roundAmount', () => {
 })
 
 describe('guestTimeAmount', () => {
-  it('yaxlitlash bilan', () => {
-    // 25 daq @70k = 29166.67
-    expect(guestTimeAmount([iv(70000, 0, 25)], m(25), 1000)).toBe(29000)
-    expect(guestTimeAmount([iv(70000, 0, 25)], m(25), 1)).toBe(29167)
-    expect(guestTimeAmount([iv(70000, 0, 25)], m(25), 500)).toBe(29000)
+  it('5 daqiqa → 1 soat to‘liq', () => {
+    expect(guestTimeAmount([iv(50000, 0, 5)], 60, m(5), OPT)).toBe(50000)
   })
-  it('117 daq @70k = 136500 -> roundTo 1000 yarim chegarada 137000', () => {
-    expect(guestTimeAmount([iv(70000, 0, 117)], m(117), 1000)).toBe(137000)
-    expect(guestTimeAmount([iv(70000, 0, 117)], m(117), 500)).toBe(136500)
+  it('61 daqiqa (olingan 60) → 2 soat', () => {
+    expect(guestTimeAmount([iv(50000, 0, null)], 60, m(61), OPT)).toBe(100000)
   })
-  it('hech vaqt o\'tmagan -> 0', () => {
-    expect(guestTimeAmount([iv(70000, 0, null)], 0, 1000)).toBe(0)
+  it('grace', () => {
+    expect(guestTimeAmount([iv(50000, 0, null)], 60, m(65), opt({ graceMinutes: 5 }))).toBe(50000)
+    expect(guestTimeAmount([iv(50000, 0, null)], 60, m(66), opt({ graceMinutes: 5 }))).toBe(100000)
+  })
+  it('yaxlitlash: 7 daqiqa olingan @50k = 5833.33', () => {
+    expect(guestTimeAmount([iv(50000, 0, 7)], 7, m(7), opt({ roundTo: 1000 }))).toBe(6000)
+    expect(guestTimeAmount([iv(50000, 0, 7)], 7, m(7), opt({ roundTo: 1 }))).toBe(5833)
+    expect(guestTimeAmount([iv(50000, 0, 7)], 7, m(7), opt({ roundTo: 500 }))).toBe(6000)
+  })
+  it('hech qanday interval yo‘q → 0', () => {
+    expect(guestTimeAmount([], 60, m(10), OPT)).toBe(0)
   })
 })
 
@@ -228,52 +268,79 @@ describe('lineAmount / qaytarish', () => {
 })
 
 describe('buildGuestView / buildLineView', () => {
-  it('ishlayotgan mehmon: runningRate = ochiq interval tarifi', () => {
-    const g = guest(1, [iv(70000, 0, 10), iv(90000, 10, null)], 'running')
-    const v = buildGuestView(g, [], m(70), 1000)
+  it('ishlayotgan mehmon: runningRate, remainingMs, billedMinutes, timeAmount', () => {
+    const g = guest(1, [iv(70000, 0, 10), iv(90000, 10, null)], 'running', 120)
+    const v = buildGuestView(g, [], m(70), OPT)
     expect(v.runningRate).toBe(90000)
     expect(v.elapsedMs).toBe(m(70))
-    expect(v.timeAmount).toBe(guestTimeAmount(g.intervals, m(70), 1000))
+    expect(v.remainingMs).toBe(m(50))
+    expect(v.billedMinutes).toBe(120)
+    expect(v.paidMinutes).toBe(120)
+    // 10@70k + 110@90k = 11666.67 + 165000 → 177000
+    expect(v.timeAmount).toBe(177000)
+    expect(v.timeAmount).toBe(guestTimeAmount(g.intervals, 120, m(70), OPT))
   })
-  it('pauzadagi mehmon: runningRate = 0', () => {
+  it('oshib ketgan mehmon: remainingMs manfiy', () => {
+    const v = buildGuestView(guest(1, [iv(60000, 0, null)], 'running', 60), [], m(75), OPT)
+    expect(v.remainingMs).toBe(-m(15))
+    expect(v.billedMinutes).toBe(120)
+    expect(v.timeAmount).toBe(120000)
+  })
+  it('pauzadagi mehmon: runningRate = 0, vaqt o‘tsa ham summa o‘zgarmaydi', () => {
     const g = guest(1, [iv(70000, 0, 10)], 'paused')
-    expect(buildGuestView(g, [], m(70), 1000).runningRate).toBe(0)
+    expect(buildGuestView(g, [], m(70), OPT).runningRate).toBe(0)
+    expect(buildGuestView(g, [], m(70), OPT).timeAmount).toBe(buildGuestView(g, [], m(500), OPT).timeAmount)
   })
-  it('state=finished lekin ochiq interval (nomuvofiq) -> runningRate 0', () => {
-    const g = guest(1, [iv(70000, 0, null)], 'finished')
-    expect(buildGuestView(g, [], m(10), 1).runningRate).toBe(0)
+  it('erta chiqib ketgan (finished) — olingan vaqt baribir to‘lanadi', () => {
+    const v = buildGuestView(guest(1, [iv(60000, 0, 10)], 'finished', 120), [], m(500), OPT)
+    expect(v.timeAmount).toBe(120000)
+    expect(v.remainingMs).toBe(m(110))
   })
-  it('state=running, ochiq interval yo\'q -> runningRate 0 va xato yo\'q', () => {
-    const g = guest(1, [iv(70000, 0, 10)], 'running')
-    expect(buildGuestView(g, [], m(10), 1).runningRate).toBe(0)
+  it('state=finished lekin ochiq interval (nomuvofiq) → runningRate 0', () => {
+    expect(buildGuestView(guest(1, [iv(70000, 0, null)], 'finished'), [], m(10), OPT).runningRate).toBe(0)
   })
-  it('linesAmount faqat shu mehmon qatorlari, qaytarish hisobga olingan, umumiy (null) qator kirmaydi', () => {
+  it('linesAmount faqat shu mehmon qatorlari, qaytarish hisobga olingan', () => {
     const g = guest(1, [])
     const lines = [
-      line({ id: 1, guestId: 1, qty: 2, returnedQty: 1, unitPrice: 10000 }), // 10000
-      line({ id: 2, guestId: 1, qty: 1, unitPrice: 5000 }), // 5000
-      line({ id: 3, guestId: 2, qty: 5, unitPrice: 1000 }), // boshqa mehmon
-      line({ id: 4, guestId: null, qty: 1, unitPrice: 99000 }) // guruh
+      line({ id: 1, guestId: 1, qty: 2, returnedQty: 1, unitPrice: 10000 }),
+      line({ id: 2, guestId: 1, qty: 1, unitPrice: 5000 }),
+      line({ id: 3, guestId: 2, qty: 5, unitPrice: 1000 }),
+      line({ id: 4, guestId: null, qty: 1, unitPrice: 99000 })
     ]
-    expect(buildGuestView(g, lines, 0, 1).linesAmount).toBe(15000)
-  })
-  it('asl mehmon maydonlarini saqlaydi', () => {
-    const g = guest(7, [])
-    const v = buildGuestView(g, [], 0, 1)
-    expect(v.id).toBe(7)
-    expect(v.label).toBe('Mehmon 7')
+    expect(buildGuestView(g, lines, 0, OPT).linesAmount).toBe(15000)
   })
   it('buildLineView: activeQty, amount, providerName', () => {
     const v = buildLineView(line({ qty: 4, returnedQty: 1, unitPrice: 2500, kind: 'service' }), 'Dilnoza')
-    expect(v.activeQty).toBe(3)
-    expect(v.amount).toBe(7500)
-    expect(v.providerName).toBe('Dilnoza')
+    expect(v).toMatchObject({ activeQty: 3, amount: 7500, providerName: 'Dilnoza' })
     expect(buildLineView(line(), null).providerName).toBeNull()
   })
 })
 
+describe('ofitsiant haqi', () => {
+  const lines = [
+    line({ id: 1, kind: 'product', qty: 3, returnedQty: 1, unitPrice: 20000 }), // 40 000
+    line({ id: 2, kind: 'product', qty: 1, unitPrice: 15000, guestId: 2 }), // 15 000
+    line({ id: 3, kind: 'service', qty: 1, unitPrice: 150000, providerId: 9 }), // xizmat — kirmaydi
+    line({ id: 4, kind: 'product', qty: 2, returnedQty: 2, unitPrice: 9000 }) // to'liq qaytarilgan
+  ]
+  it('waiterProductSales: faqat mahsulotlar, qaytarishlar ayirilgan', () => {
+    expect(waiterProductSales(lines)).toBe(55000)
+    expect(waiterProductSales([])).toBe(0)
+    expect(waiterProductSales([lines[2]])).toBe(0)
+  })
+  it('waiterCommission: foiz, yaxlitlash, chegaralar', () => {
+    expect(waiterCommission(55000, 10)).toBe(5500)
+    expect(waiterCommission(12000, 7.5)).toBe(900)
+    expect(waiterCommission(333, 10)).toBe(33)
+    expect(waiterCommission(55000, 0)).toBe(0)
+    expect(waiterCommission(55000, 150)).toBe(55000)
+    expect(waiterCommission(55000, -5)).toBe(0)
+    expect(waiterCommission(55000, NaN)).toBe(0)
+  })
+})
+
 describe('computeTotals', () => {
-  const gv = (timeAmount: number) => ({ ...buildGuestView(guest(1, []), [], 0, 1), timeAmount })
+  const gv = (timeAmount: number) => ({ ...buildGuestView(guest(1, []), [], 0, OPT), timeAmount })
   const lv = (amount: number) => ({ ...buildLineView(line(), null), amount })
 
   it('oddiy yig\'indi', () => {
@@ -358,99 +425,108 @@ describe('formatDuration', () => {
   })
 })
 
-describe('Real senariylar (qo\'lda hisoblangan)', () => {
-  const RATE = 70000
-  const NOW = m(127) // 2 soat 7 daqiqa
-  // A: 25 daqiqada chiqadi; B: 40-daqiqadan 10 daqiqa pauza; C, D: to'liq
-  const A = guest(1, [iv(RATE, 0, 25)])
-  const B = guest(2, [iv(RATE, 0, 40), iv(RATE, 50, 127)])
-  const C = guest(3, [iv(RATE, 0, 127)])
-  const D = guest(4, [iv(RATE, 0, 127)])
-  const all = [A, B, C, D]
+describe('formatMoney', () => {
+  it('0', () => expect(formatMoney(0)).toBe('0'))
+  it('1000 ajratgichlar', () => {
+    expect(formatMoney(999)).toBe('999')
+    expect(formatMoney(1000)).toBe('1 000')
+    expect(formatMoney(1234567)).toBe('1 234 567')
+    expect(formatMoney(100000)).toBe('100 000')
+  })
+  it('manfiy: belgi ajratgichdan keyin chiqmaydi', () => {
+    expect(formatMoney(-999)).toBe('-999')
+    expect(formatMoney(-1234)).toBe('-1 234')
+    expect(formatMoney(-1234567)).toBe('-1 234 567')
+  })
+  it('-0 va -0.4 -> "0"', () => {
+    expect(formatMoney(-0)).toBe('0')
+    expect(formatMoney(-0.4)).toBe('0')
+  })
+  it('kasr yaxlitlanadi', () => {
+    expect(formatMoney(1234.5)).toBe('1 235')
+    expect(formatMoney(999.4)).toBe('999')
+  })
+  it('katta son', () => {
+    expect(formatMoney(1_000_000_000_000)).toBe('1 000 000 000 000')
+  })
+})
 
-  it('har bir mehmonning vaqti (ms)', () => {
-    expect(all.map((g) => guestElapsedMs(g.intervals, NOW))).toEqual([m(25), m(117), m(127), m(127)])
+describe('formatDuration', () => {
+  it('0', () => expect(formatDuration(0)).toBe('00:00:00'))
+  it('soniya qismi tashlanadi', () => expect(formatDuration(59_999)).toBe('00:00:59'))
+  it('1 daq, 1 soat', () => {
+    expect(formatDuration(m(1))).toBe('00:01:00')
+    expect(formatDuration(3_600_000)).toBe('01:00:00')
   })
-  it('roundTo=1: 29167 + 136500 + 148167 + 148167 = 462001', () => {
-    // 25*70000/60 = 29166.67; 117*70000/60 = 136500; 127*70000/60 = 148166.67
-    const amounts = all.map((g) => guestTimeAmount(g.intervals, NOW, 1))
-    expect(amounts).toEqual([29167, 136500, 148167, 148167])
-    expect(amounts.reduce((a, b) => a + b, 0)).toBe(462001)
+  it('2 soat 7 daqiqa 5 soniya', () => expect(formatDuration(m(127) + s(5))).toBe('02:07:05'))
+  it('24 soatdan ortiq: soat 24 dan keyin o\'ramaydi', () => {
+    expect(formatDuration(25 * 3_600_000 + m(1) + s(1))).toBe('25:01:01')
+    expect(formatDuration(100 * 3_600_000 + s(1))).toBe('100:00:01')
   })
-  it('roundTo=1000: 29000 + 137000 (136500 yarim -> yuqoriga) + 148000 + 148000 = 462000', () => {
-    const amounts = all.map((g) => guestTimeAmount(g.intervals, NOW, 1000))
-    expect(amounts).toEqual([29000, 137000, 148000, 148000])
-    expect(amounts.reduce((a, b) => a + b, 0)).toBe(462000)
+  it('BILLING XATO (tuzatildi): manfiy davomiylik "-1:-1:-1" kabi buzuq satr beradi', () => {
+    // Reproduksiya: formatDuration(-1000) === "-1:-1:-1"; kutilgan "00:00:00"
+    expect(formatDuration(-1000)).toMatch(/^\d{2,}:\d{2}:\d{2}$/)
   })
-  it('roundTo=500: 29000 + 136500 + 148000 + 148000 = 461500', () => {
-    // 29166.67/500 = 58.33 -> 58 -> 29000; 148166.67/500 = 296.33 -> 296 -> 148000
-    const amounts = all.map((g) => guestTimeAmount(g.intervals, NOW, 500))
-    expect(amounts).toEqual([29000, 136500, 148000, 148000])
+})
+
+describe('formatCountdown / formatHours', () => {
+  it('qolgan vaqt yuqoriga soniyagacha', () => {
+    expect(formatCountdown(m(60))).toBe('01:00:00')
+    expect(formatCountdown(m(59) + 1)).toBe('00:59:01')
+    expect(formatCountdown(0)).toBe('00:00:00')
   })
-  it('to\'liq hisob: vaqt + mahsulot + chegirma', () => {
+  it('oshib ketgan: + belgisi', () => {
+    expect(formatCountdown(-m(5) - s(12))).toBe('+00:05:12')
+  })
+  it('formatHours', () => {
+    expect(formatHours(60)).toBe('1 soat')
+    expect(formatHours(150)).toBe('2 soat 30 daq')
+    expect(formatHours(45)).toBe('45 daq')
+  })
+})
+
+describe('Real senariylar (qo‘lda hisoblangan)', () => {
+  const RATE = 60000
+  it('4 mehmon, har biriga 1 soat: erta chiqqan, pauzali, oshib ketgan', () => {
+    const NOW = m(127)
+    const A = guest(1, [iv(RATE, 0, 25)]) // 25 daq → 1 soat
+    const B = guest(2, [iv(RATE, 0, 40), iv(RATE, 50, null)], 'running') // 117 daq → 2 soat
+    const C = guest(3, [iv(RATE, 0, null)], 'running') // 127 daq → 3 soat
+    const D = guest(4, [iv(RATE, 0, null)], 'running', 180) // 3 soat olingan → 3 soat
+    const gvs = [A, B, C, D].map((g) => buildGuestView(g, [], NOW, OPT))
+    expect(gvs.map((g) => g.billedMinutes)).toEqual([60, 120, 180, 180])
+    expect(gvs.map((g) => g.timeAmount)).toEqual([60000, 120000, 180000, 180000])
+    expect(gvs.map((g) => g.remainingMs)).toEqual([m(35), -m(57), -m(67), m(53)])
     const lines = [
-      line({ id: 1, guestId: 1, qty: 2, returnedQty: 1, unitPrice: 10000 }), // A: 10000
-      line({ id: 2, guestId: 3, qty: 1, unitPrice: 25000 }), // C: 25000
-      line({ id: 3, guestId: null, kind: 'service', qty: 1, unitPrice: 150000, providerId: 5 }) // guruh: 150000
+      line({ id: 1, guestId: 1, qty: 2, returnedQty: 1, unitPrice: 10000 }),
+      line({ id: 2, kind: 'service', qty: 1, unitPrice: 150000, providerId: 5 })
     ]
-    const gvs = all.map((g) => buildGuestView(g, lines, NOW, 1000))
-    const lvs = lines.map((l) => buildLineView(l, null))
-    expect(gvs.map((g) => g.linesAmount)).toEqual([10000, 0, 25000, 0])
-    const t = computeTotals(gvs, lvs, 20000)
-    expect(t.timeTotal).toBe(462000)
-    expect(t.linesTotal).toBe(185000)
-    expect(t.discount).toBe(20000)
-    expect(t.total).toBe(462000 + 185000 - 20000)
-  })
-  it('B hozir pauzadan keyin ishlayapti (ochiq interval): runningRate va vaqt', () => {
-    const Bopen = guest(2, [iv(RATE, 0, 40), iv(RATE, 50, null)], 'running')
-    const v = buildGuestView(Bopen, [], NOW, 1000)
-    expect(v.elapsedMs).toBe(m(117))
-    expect(v.timeAmount).toBe(137000)
-    expect(v.runningRate).toBe(RATE)
-  })
-  it('B hozir pauzada (50-daqiqagacha): pauza vaqti hisoblanmaydi, soat o\'tsa ham o\'zgarmaydi', () => {
-    const Bp = guest(2, [iv(RATE, 0, 40)], 'paused')
-    expect(buildGuestView(Bp, [], m(45), 1).timeAmount).toBe(buildGuestView(Bp, [], m(500), 1).timeAmount)
-    expect(buildGuestView(Bp, [], m(45), 1).timeAmount).toBe(46667) // 40*70000/60 = 46666.67
+    const t = computeTotals(gvs, lines.map((l) => buildLineView(l, null)), 20000)
+    expect(t).toEqual({ timeTotal: 540000, linesTotal: 160000, discount: 20000, total: 680000 })
+    expect(waiterCommission(waiterProductSales(lines), 10)).toBe(1000)
   })
 
-  describe('xona almashtirish 70k -> 90k', () => {
-    it('eski intervalda eski narx qoladi, yangisida yangi', () => {
-      // 60 daq @70k, keyin 30 daq @90k
-      const g = guest(1, [iv(70000, 0, 60, 1), iv(90000, 60, 90, 2)])
-      expect(guestTimeRaw(g.intervals, m(90))).toBe(70000 + 45000)
-      // butun vaqtga 90k qo'llanganda 135000 bo'lardi
-      expect(guestTimeRaw(g.intervals, m(90))).not.toBe(135000)
-    })
-    it('narx keyin o\'zgarsa eski yopiq interval hisobi o\'zgarmaydi (faqat ochiq interval yangi tarifda)', () => {
-      const before = guestTimeRaw([iv(70000, 0, 60)], m(60))
-      const after = guestTimeRaw([iv(70000, 0, 60), iv(90000, 60, null)], m(60))
-      expect(after).toBe(before) // yangi interval hali 0 daq
-      expect(guestTimeRaw([iv(70000, 0, 60), iv(90000, 60, null)], m(80))).toBe(70000 + 30000)
-    })
-    it('pauza + xona almashtirish: B 30 daq @70k, pauza, 70-daqiqadan @90k', () => {
-      const B2 = guest(2, [iv(70000, 0, 30, 1), iv(90000, 70, 90, 2)])
-      expect(guestTimeRaw(B2.intervals, m(90))).toBe(35000 + 30000)
-    })
-    it('A (ishlayapti) va B (pauzada) almashtirishda: faqat ishlayotganning yangi intervali ochiladi', () => {
-      const Ar = guest(1, [iv(70000, 0, 60, 1), iv(90000, 60, null, 2)], 'running')
-      const Bp = guest(2, [iv(70000, 0, 45, 1)], 'paused')
-      const va = buildGuestView(Ar, [], m(90), 1)
-      const vb = buildGuestView(Bp, [], m(90), 1)
-      expect(va.runningRate).toBe(90000)
-      expect(va.timeAmount).toBe(115000)
-      expect(vb.runningRate).toBe(0)
-      expect(vb.timeAmount).toBe(52500) // 45 * 70000/60
-    })
-    it('almashtirish chegarasida soniyalar: 60:40@70k + 29:20@90k -> minut yo\'qolmaydi', () => {
-      const g = [
-        { roomId: 1, rate: 70000, start: 0, end: m(60) + s(40) },
-        { roomId: 2, rate: 90000, start: m(60) + s(40), end: m(90) }
-      ] as TimeInterval[]
-      expect(guestElapsedMs(g, m(90))).toBe(m(90))
-      // 90 daq to'liq hisoblanadi: (60+40/60)*70000/60 + (29+20/60)*90000/60
-      expect(guestTimeRaw(g, m(90))).toBeCloseTo(((60 + 40 / 60) * 70000) / 60 + ((29 + 20 / 60) * 90000) / 60, 6)
-    })
+  it('xona almashtirish 50k → 100k, 2 soat olingan: 60 daqiqada ko‘chdi', () => {
+    const g = guest(1, [iv(50000, 0, 60, 1), iv(100000, 60, null, 2)], 'running', 120)
+    // Ko'chgan zahoti: 60@50k + qolgan 60@100k
+    expect(buildGuestView(g, [], m(60), OPT).timeAmount).toBe(150000)
+    // 2 soat ichida o'zgarmaydi
+    expect(buildGuestView(g, [], m(120), OPT).timeAmount).toBe(150000)
+    // Oshdi: keyingi blok yangi narxda
+    expect(buildGuestView(g, [], m(121), OPT).timeAmount).toBe(250000)
+  })
+
+  it('xona almashtirish: erta ko‘chish (10 daqiqa) — qolgan 50 daqiqa yangi narxda', () => {
+    const g = guest(1, [iv(60000, 0, 10, 1), iv(120000, 10, null, 2)], 'running', 60)
+    expect(buildGuestView(g, [], m(10), OPT).timeAmount).toBe(10000 + 100000)
+  })
+
+  it('uzaytirish (+1 soat) oshib ketishdan oldin — qo‘shimcha jarima bloki yo‘q', () => {
+    const ivs = [iv(RATE, 0, null)]
+    // 50-daqiqada +60 → paidMinutes 120; 100-daqiqada hisob 2 soat
+    expect(guestTimeAmount(ivs, 120, m(100), OPT)).toBe(120000)
+    // uzaytirilmaganda 100 daqiqa ham 2 soat (blok), 121 da farq: 3 soat
+    expect(guestTimeAmount(ivs, 60, m(100), OPT)).toBe(120000)
+    expect(guestTimeAmount(ivs, 120, m(121), OPT)).toBe(180000)
   })
 })

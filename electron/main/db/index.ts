@@ -94,7 +94,7 @@ export class Db {
     } finally {
       tmp?.close()
     }
-    if (!ok) throw new Error('Fayl StrausPOS zaxira nusxasi emas yoki buzilgan')
+    if (!ok) throw new Error('Fayl Delfin Sauna zaxira nusxasi emas yoki buzilgan')
     if (ver > SCHEMA_VERSION) throw new Error('Zaxira nusxa dasturning yangiroq versiyasida yaratilgan')
   }
 
@@ -111,14 +111,23 @@ export class Db {
     const cur = this.version
     if (cur > SCHEMA_VERSION) throw new Error("Ma'lumotlar bazasi dasturning yangiroq versiyasiga tegishli")
     if (cur === SCHEMA_VERSION) return false
-    this.db.run('BEGIN')
+    // Jadvalni qayta qurish (masalan v2: staff) uchun tashqi kalitlar vaqtincha o'chiriladi —
+    // PRAGMA foreign_keys tranzaksiya ichida ishlamaydi, shuning uchun BEGIN dan oldin.
+    this.db.run('PRAGMA foreign_keys = OFF')
     try {
-      for (let v = cur; v < SCHEMA_VERSION; v++) this.db.exec(MIGRATIONS[v])
-      this.db.run(`PRAGMA user_version = ${SCHEMA_VERSION}`)
-      this.db.run('COMMIT')
-    } catch (e) {
-      this.db.run('ROLLBACK')
-      throw e
+      this.db.run('BEGIN')
+      try {
+        for (let v = cur; v < SCHEMA_VERSION; v++) this.db.exec(MIGRATIONS[v])
+        const bad = this.db.exec('PRAGMA foreign_key_check')
+        if (bad.length > 0 && bad[0].values.length > 0) throw new Error("Ma'lumotlar bazasini yangilashda bog'lanish xatosi")
+        this.db.run(`PRAGMA user_version = ${SCHEMA_VERSION}`)
+        this.db.run('COMMIT')
+      } catch (e) {
+        this.db.run('ROLLBACK')
+        throw e
+      }
+    } finally {
+      this.applyPragmas()
     }
     return true
   }

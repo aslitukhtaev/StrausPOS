@@ -14,7 +14,7 @@ describe('birinchi ishga tushirish', () => {
 
   it('setupOwner: ega yaratiladi, kiriladi, 3 xona + katalog + xizmatlar qo‘shiladi', async () => {
     const svc = await PosService.create({ clock: new FakeClock().now })
-    await svc.auth.setupOwner('Ali', '1234', 'Straus Sauna')
+    await svc.auth.setupOwner('Ali', '1234', 'Delfin Sauna')
     expect(await svc.auth.needsSetup()).toBe(false)
     const cur = await svc.auth.current()
     expect(cur?.staff.name).toBe('Ali')
@@ -24,7 +24,7 @@ describe('birinchi ishga tushirish', () => {
     expect((await svc.catalog.categories()).length).toBeGreaterThanOrEqual(3)
     expect((await svc.catalog.products()).length).toBeGreaterThan(5)
     expect((await svc.catalog.services()).length).toBeGreaterThanOrEqual(2)
-    expect((await svc.settings.get()).receipt.businessName).toBe('Straus Sauna')
+    expect((await svc.settings.get()).receipt.businessName).toBe('Delfin Sauna')
     await expect(svc.auth.setupOwner('Boshqa', '9999', 'X')).rejects.toThrow('allaqachon sozlangan')
   })
 
@@ -113,11 +113,11 @@ describe('ruxsatlar', () => {
     await expect(svc.reports.returns({ from: 0, to: 1 })).rejects.toThrow(denied)
     await expect(svc.system.backup()).rejects.toThrow(denied)
     await expect(svc.system.restore()).rejects.toThrow(denied)
-    await expect(svc.staff.save({ name: 'Y', role: 'cashier', pin: '5555', isProvider: false, active: true })).rejects.toThrow(denied)
+    await expect(svc.staff.save({ name: 'Y', role: 'cashier', pin: '5555', isProvider: false, isWaiter: false, commissionPct: 0, active: true })).rejects.toThrow(denied)
     await expect(svc.catalog.adjustStock(1, 5, '')).rejects.toThrow(denied)
     await expect(svc.catalog.saveProduct({ name: 'Z', categoryId: 1, price: 1 })).rejects.toThrow(denied)
     await expect(svc.staff.changePin(staff.owner.id, '9999')).rejects.toThrow(denied)
-    const v = await svc.sessions.open(rooms.s1, 1)
+    const v = await svc.sessions.open(rooms.s1, 1, 60, null)
     await expect(svc.sessions.setDiscount(v.session.id, 1000)).rejects.toThrow(denied)
     // o'z PINini o'zgartira oladi
     await svc.staff.changePin(staff.cashier.id, '7777')
@@ -139,7 +139,7 @@ describe('ruxsatlar', () => {
   it('kirmagan foydalanuvchi hech narsa qila olmaydi', async () => {
     const { svc, rooms } = await setup()
     await svc.auth.logout()
-    await expect(svc.sessions.open(rooms.s1, 1)).rejects.toThrow('Avval tizimga kiring')
+    await expect(svc.sessions.open(rooms.s1, 1, 60, null)).rejects.toThrow('Avval tizimga kiring')
     await expect(svc.catalog.products()).rejects.toThrow('Avval tizimga kiring')
     // Ochiq metodlar
     await expect(svc.settings.get()).resolves.toBeTruthy()

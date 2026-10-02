@@ -6,7 +6,7 @@ describe('mahsulot qo‘shish va ombor', () => {
     const { svc, rooms } = await setup()
     const water = await productByName(svc, 'Suv 0.5 L')
     expect(water.stock).toBe(48)
-    const v0 = await svc.sessions.open(rooms.s1, 2)
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60, null)
     await svc.lines.addProduct(v0.session.id, water.id, 2, null)
     const v = await svc.lines.addProduct(v0.session.id, water.id, 3, null)
     expect(v.lines).toHaveLength(1)
@@ -24,7 +24,7 @@ describe('mahsulot qo‘shish va ombor', () => {
   it('omborda yetarli bo‘lmasa rad etiladi (atomik)', async () => {
     const { svc, rooms } = await setup()
     const pista = await productByName(svc, 'Pista')
-    const v0 = await svc.sessions.open(rooms.s1, 1)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
     await expect(svc.lines.addProduct(v0.session.id, pista.id, 11, null)).rejects.toThrow('Omborda yetarli emas (qoldi: 10)')
     expect((await productByName(svc, 'Pista')).stock).toBe(10)
     expect((await svc.sessions.get(v0.session.id)).lines).toHaveLength(0)
@@ -36,15 +36,15 @@ describe('mahsulot qo‘shish va ombor', () => {
     const { svc, rooms } = await setup()
     const tea = await productByName(svc, 'Qahva')
     expect(tea.trackStock).toBe(false)
-    const v0 = await svc.sessions.open(rooms.s1, 1)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
     const v = await svc.lines.addProduct(v0.session.id, tea.id, 20, null)
     expect(v.linesTotal).toBe(300_000)
   })
 
   it('boshqa sessiya mehmoni / nofaol mahsulot rad etiladi', async () => {
     const { svc, rooms } = await setup()
-    const a = await svc.sessions.open(rooms.s1, 1)
-    const b = await svc.sessions.open(rooms.s2, 1)
+    const a = await svc.sessions.open(rooms.s1, 1, 60, null)
+    const b = await svc.sessions.open(rooms.s2, 1, 60, null)
     const water = await productByName(svc, 'Suv 0.5 L')
     await expect(svc.lines.addProduct(a.session.id, water.id, 1, b.guests[0].id)).rejects.toThrow('tegishli emas')
     await svc.catalog.saveProduct({ ...water, active: false })
@@ -56,7 +56,7 @@ describe('xizmatlar', () => {
   it('xizmat qat‘iy narx, provider yoziladi', async () => {
     const { svc, rooms, staff } = await setup()
     const massage = await serviceByName(svc, 'Klassik massaj')
-    const v0 = await svc.sessions.open(rooms.s1, 2)
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60, null)
     const v = await svc.lines.addService(v0.session.id, massage.id, v0.guests[0].id, staff.provider.id)
     expect(v.lines[0]).toMatchObject({ kind: 'service', unitPrice: 150_000, qty: 1, providerId: staff.provider.id, providerName: 'Massajchi' })
     expect(v.guests[0].linesAmount).toBe(150_000)
@@ -69,7 +69,7 @@ describe('qaytarish (X tugmasi)', () => {
     const { svc, rooms, loginAs, staff, clock } = await setup()
     await loginAs('admin')
     const cola = await productByName(svc, 'Coca-Cola 1 L')
-    const v0 = await svc.sessions.open(rooms.s1, 1)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
     let v = await svc.lines.addProduct(v0.session.id, cola.id, 3, null)
     const lineId = v.lines[0].id
     expect((await productByName(svc, 'Coca-Cola 1 L')).stock).toBe(21)
@@ -94,7 +94,7 @@ describe('qaytarish (X tugmasi)', () => {
   it('kassir qaytara olmaydi', async () => {
     const { svc, rooms, loginAs } = await setup()
     const cola = await productByName(svc, 'Coca-Cola 1 L')
-    const v0 = await svc.sessions.open(rooms.s1, 1)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
     const v = await svc.lines.addProduct(v0.session.id, cola.id, 1, null)
     await loginAs('cashier')
     await expect(svc.lines.returnLine(v.lines[0].id, 1, '')).rejects.toThrow("ruxsatingiz yo'q")
@@ -103,20 +103,20 @@ describe('qaytarish (X tugmasi)', () => {
   it('xizmatni qaytarish omborga ta’sir qilmaydi; qaytarishdan keyin chegirma moslashadi', async () => {
     const { svc, rooms } = await setup()
     const peel = await serviceByName(svc, 'Peeling')
-    const v0 = await svc.sessions.open(rooms.s1, 1)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
     let v = await svc.lines.addService(v0.session.id, peel.id, null, null)
-    v = await svc.sessions.setDiscount(v0.session.id, 80_000)
+    v = await svc.sessions.setDiscount(v0.session.id, 130_000) // vaqt 50 000 + peeling 80 000
     expect(v.total).toBe(0)
     v = await svc.lines.returnLine(v.lines[0].id, 1, 'Bekor')
-    expect(v.discount).toBe(0)
-    expect(v.session.discount).toBe(0)
+    expect(v.discount).toBe(50_000)
+    expect(v.session.discount).toBe(50_000)
     expect(v.total).toBe(0)
   })
 
   it('yopilgan sessiyada qaytarish mumkin emas', async () => {
     const { svc, rooms } = await setup()
     const cola = await productByName(svc, 'Coca-Cola 1 L')
-    const v0 = await svc.sessions.open(rooms.s1, 1)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
     const v = await svc.lines.addProduct(v0.session.id, cola.id, 1, null)
     await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: v.total }], null)
     await expect(svc.lines.returnLine(v.lines[0].id, 1, '')).rejects.toThrow('Sessiya yopilgan')
@@ -157,7 +157,7 @@ describe('katalog boshqaruvi', () => {
     const r = await svc.rooms.save({ name: 'Kichik', pricePerHour: 30_000, capacity: 2 })
     expect(r.sortOrder).toBe(4)
     await expect(svc.rooms.save({ name: 'X', pricePerHour: 1, capacity: 0 })).rejects.toThrow("Sig'im")
-    const v = await svc.sessions.open(rooms.s1, 3)
+    const v = await svc.sessions.open(rooms.s1, 3, 60, null)
     const s1 = (await svc.rooms.list()).find((x) => x.id === rooms.s1)!
     await expect(svc.rooms.save({ ...s1, capacity: 2 })).rejects.toThrow('3 mehmon')
     await expect(svc.rooms.remove(rooms.s1)).rejects.toThrow('ochiq sessiya')

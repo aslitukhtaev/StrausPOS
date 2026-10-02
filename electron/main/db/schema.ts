@@ -164,6 +164,45 @@ export const MIGRATIONS: string[] = [
     at INTEGER NOT NULL,
     by INTEGER
   );
+  `,
+  // v2 — Delfin Sauna: ofitsiantlar (rol + foiz), oldindan olinadigan vaqt, to'lovda muzlatiladigan ofitsiant haqi.
+  // staff jadvali qayta quriladi (role CHECK ga 'waiter'). Db.migrate() buni foreign_keys=OFF holatda bajaradi
+  // va oxirida foreign_key_check qiladi. Eski guests.paid_minutes = 0 (blok qoidasi bilan hisoblanadi).
+  `
+  CREATE TABLE staff_v2 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('owner','admin','cashier','waiter')),
+    pin_hash TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    is_provider INTEGER NOT NULL DEFAULT 0,
+    is_waiter INTEGER NOT NULL DEFAULT 0,
+    commission_pct REAL NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+  INSERT INTO staff_v2(id, name, role, pin_hash, active, is_provider, is_waiter, commission_pct, created_at)
+    SELECT id, name, role, pin_hash, active, is_provider, 0, 0, created_at FROM staff;
+  DROP TABLE staff;
+  ALTER TABLE staff_v2 RENAME TO staff;
+
+  ALTER TABLE sessions ADD COLUMN waiter_id INTEGER REFERENCES staff(id);
+  ALTER TABLE sessions ADD COLUMN waiter_pct REAL NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN product_sales INTEGER;
+  ALTER TABLE sessions ADD COLUMN waiter_commission INTEGER;
+  CREATE INDEX idx_sessions_waiter ON sessions(waiter_id, closed_at);
+
+  ALTER TABLE guests ADD COLUMN paid_minutes INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE waiter_payouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    staff_id INTEGER NOT NULL REFERENCES staff(id),
+    month TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL,
+    by INTEGER NOT NULL REFERENCES staff(id)
+  );
+  CREATE INDEX idx_waiter_payouts ON waiter_payouts(staff_id, month);
   `
 ]
 

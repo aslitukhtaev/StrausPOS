@@ -41,7 +41,7 @@ export function renderReceiptHtml(data: ReceiptData): string {
     `<div class="row${cls ? ' ' + cls : ''}"><span class="l">${left}</span><span class="r">${right}</span></div>`
 
   const parts: string[] = []
-  parts.push(`<div class="center title">${e(s.businessName || 'StrausPOS')}</div>`)
+  parts.push(`<div class="center title">${e(s.businessName || 'Delfin Sauna')}</div>`)
   if (s.address) parts.push(`<div class="center">${e(s.address)}</div>`)
   if (s.phone) parts.push(`<div class="center">Tel: ${e(s.phone)}</div>`)
   parts.push('<div class="sep"></div>')

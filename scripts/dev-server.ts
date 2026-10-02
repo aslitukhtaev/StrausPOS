@@ -1,16 +1,18 @@
 /**
  * Dev server: haqiqiy PosService ni HTTP orqali beradi (brauzerda UI ishlab chiqish va e2e testlar uchun).
  *
- *   npm run dev:server                 → ./dev-data/straus.db (mavjud bo'lsa davom etadi)
+ *   npm run dev:server                 → ./dev-data/delfin.db (mavjud bo'lsa davom etadi)
  *   npm run dev:server -- --reset      → bazani tozalab boshlash (yoki RESET=1)
- *   npm run dev:server -- --demo       → toza baza + tayyor xodimlar (setupOwner o'tgan holat)
+ *   npm run dev:server -- --demo       → toza baza + tayyor xodimlar va ofitsiantlar (setupOwner o'tgan holat)
+ * Ma'lumotlar papkasi: DELFIN_DATA_DIR (eski nomi STRAUS_DATA_DIR ham qabul qilinadi — e2e moslik).
  *
  * Endpointlar (port 5174, PORT env bilan o'zgaradi):
  *   POST /rpc            {"method":"rooms.board","args":[...]} → 200 {"result": ...} | 400 {"error": "..."}
  *   POST /rpc?reset=1    (xuddi shu) — avval bazani tozalaydi (faqat test uchun qulaylik)
  *   POST /__test/reset   {"setup"?: boolean, "login"?: "owner"|"admin"|"cashier"|null}
- *                        → toza baza. setup=true bo'lsa: ega/admin/kassir/massajchi + standart ma'lumotlar,
- *                        javob: {ok, staff: {owner:{name,pin..}...}, ids: {owner, admin, cashier, provider}}; login standart 'owner'.
+ *                        → toza baza. setup=true bo'lsa: ega/admin/kassir/massajchi/2 ofitsiant + standart ma'lumotlar,
+ *                        javob: {ok, staff: {owner:{name,pin..}...}, ids: {owner, admin, cashier, provider, waiter1, waiter2}};
+ *                        login standart 'owner'.
  *   POST /__test/clock   {"now": number} — soatni shu vaqtga muzlatadi; {"advanceMs": number} — oldinga suradi;
  *                        {"now": null} — haqiqiy soatga qaytadi. Javob: {"now": hozirgi vaqt}
  *   GET  /__test/state   → {"now", "frozen", "file"}
@@ -25,15 +27,20 @@ import { invokeApi, parseMethod } from '../electron/main/apiMethods'
 import { writeFileAtomic } from '../electron/main/db'
 
 const PORT = Number(process.env.PORT || 5174)
-const DATA_DIR = path.resolve(process.env.STRAUS_DATA_DIR || './dev-data')
-const DB_FILE = path.join(DATA_DIR, 'straus.db')
+const DATA_DIR = path.resolve(process.env.DELFIN_DATA_DIR || process.env.STRAUS_DATA_DIR || './dev-data')
+const DB_NAME = 'delfin.db'
+const DB_FILE = path.join(DATA_DIR, DB_NAME)
+const BUSINESS_NAME = 'Delfin Sauna'
 const BACKUP_DIR = path.join(DATA_DIR, 'backups')
 
+const NO_WAITER = { isWaiter: false, commissionPct: 0 }
 export const TEST_STAFF = {
-  owner: { name: 'Ega', role: 'owner' as const, pin: '1234', isProvider: false },
-  admin: { name: 'Administrator', role: 'admin' as const, pin: '2222', isProvider: false },
-  cashier: { name: 'Kassir', role: 'cashier' as const, pin: '3333', isProvider: false },
-  provider: { name: 'Massajchi', role: 'cashier' as const, pin: '4444', isProvider: true }
+  owner: { name: 'Ega', role: 'owner' as const, pin: '1234', isProvider: false, ...NO_WAITER },
+  admin: { name: 'Administrator', role: 'admin' as const, pin: '2222', isProvider: false, ...NO_WAITER },
+  cashier: { name: 'Kassir', role: 'cashier' as const, pin: '3333', isProvider: false, ...NO_WAITER },
+  provider: { name: 'Massajchi', role: 'cashier' as const, pin: '4444', isProvider: true, ...NO_WAITER },
+  waiter1: { name: 'Sardor', role: 'waiter' as const, pin: '5555', isProvider: false, isWaiter: true, commissionPct: 10 },
+  waiter2: { name: 'Bekzod', role: 'waiter' as const, pin: '6666', isProvider: false, isWaiter: true, commissionPct: 12 }
 }
 
 // ───── Boshqariladigan soat ─────
@@ -65,7 +72,7 @@ let service: PosService
 
 function removeDbFiles(): void {
   for (const f of fs.existsSync(DATA_DIR) ? fs.readdirSync(DATA_DIR) : []) {
-    if (f === 'straus.db' || f.startsWith('straus.db.tmp')) fs.rmSync(path.join(DATA_DIR, f), { force: true })
+    if (f === DB_NAME || f.startsWith(DB_NAME + '.tmp')) fs.rmSync(path.join(DATA_DIR, f), { force: true })
   }
 }
 
@@ -78,11 +85,11 @@ async function open(reset: boolean): Promise<void> {
 
 async function setupStaff(login: keyof typeof TEST_STAFF | null): Promise<Record<string, number>> {
   const o = TEST_STAFF.owner
-  await service.auth.setupOwner(o.name, o.pin, 'Straus Sauna')
+  await service.auth.setupOwner(o.name, o.pin, BUSINESS_NAME)
   const ids: Record<string, number> = {}
   const me = await service.auth.current()
   ids.owner = me!.staff.id
-  for (const key of ['admin', 'cashier', 'provider'] as const) {
+  for (const key of ['admin', 'cashier', 'provider', 'waiter1', 'waiter2'] as const) {
     const s = await service.staff.save({ ...TEST_STAFF[key], active: true })
     ids[key] = s.id
   }
@@ -194,7 +201,8 @@ async function main(): Promise<void> {
   })
   server.listen(PORT, () => {
     console.log(`[dev-server] http://localhost:${PORT}/rpc  baza: ${DB_FILE}${reset || demo ? ' (toza)' : ''}`)
-    if (demo) console.log('[dev-server] demo xodimlar: Ega 1234, Administrator 2222, Kassir 3333, Massajchi 4444')
+    if (demo)
+      console.log('[dev-server] demo xodimlar: Ega 1234, Administrator 2222, Kassir 3333, Massajchi 4444, ofitsiantlar: Sardor 5555 (10%), Bekzod 6666 (12%)')
   })
 }
 
