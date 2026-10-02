@@ -249,3 +249,33 @@ test('5 marta noto\'g\'ri PIN → 30 soniya blok (to\'g\'ri PIN ham qabul qilinm
   await pos.setNow(pos.now + 31_000)
   await pos.login('cashier')
 })
+
+test('Qaytarishdan keyin chegirma jami summadan oshmaydi (avtomatik kamayadi)', async ({ pos }) => {
+  await pos.open()
+  await pos.login('admin')
+  await openRoom(pos, 'Sauna 1', 1)
+  const add = await openAdd(pos)
+  await addProduct(pos, add, 'Shashlik', 2) // 50 000, vaqt 0
+  await closeAdd(pos, add)
+  const b = pos.backend
+  await b.rpc('sessions.setDiscount', 1, 40_000)
+  const v = await b.rpc<View>('sessions.get', 1)
+  const after = await b.rpc<View & { discount: number }>('lines.returnLine', v.lines[0].id, 1, '')
+  // gross 25 000 → chegirma 40 000 dan 25 000 ga tushadi, jami 0 (manfiy emas)
+  expect(after).toMatchObject({ discount: 25_000, total: 0 })
+  await expect(line(pos, 'Shashlik')).toBeVisible()
+})
+
+test('Hisobot: qarz to\'lovlari (kassaga kirim) ko\'rinishi kerak', async ({ pos }) => {
+  // OCHIQ (SHARTNOMA TAKLIFI): SalesReport da qarzdan keyin undirilgan to'lovlar yo'q. Kun oxirida kassadagi naqd
+  // = byMethod.cash + qarz to'lovlari(naqd), lekin hisobot buni ko'rsatmaydi. Taklif: SalesReport.debtPayments: {cash, card}.
+  test.fixme(true, "SalesReport da debtPayments maydoni yo'q (src/shared/types.ts) — shartnoma o'zgarishi kerak")
+  await pos.open()
+  await pos.login('admin')
+  await openRoom(pos, 'Sauna 1', 1)
+  await pos.advance(60)
+  await pos.backend.rpc('checkout.pay', 1, [{ method: 'debt', amount: 50_000 }], { name: 'Ali', phone: '901234567' })
+  await pos.backend.rpc('debts.pay', 1, 'cash', 50_000)
+  const r = await pos.backend.rpc<Record<string, unknown>>('reports.sales', { from: T0, to: T0 + 86_400_000 })
+  expect(r.debtPayments).toEqual({ cash: 50_000, card: 0 })
+})

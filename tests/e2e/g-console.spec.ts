@@ -19,13 +19,13 @@ test('Ega: barcha ekranlar va sozlamalar bo\'limlari xatosiz ochiladi', async ({
   await pos.advance(15)
   for (const s of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Xodimlar', 'Sozlamalar']) {
     await pos.nav(s)
-    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(700)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)
     await expect(page.locator('.shell__main')).not.toContainText('tayyorlanmoqda')
   }
   for (const sec of ['Xonalar', 'Chek', 'Xavfsizlik', 'Hisob-kitob', 'Zaxira', 'Haqida']) {
     await page.locator('.set-nav').getByText(sec, { exact: true }).click()
-    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(700)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)
   }
   // Bar ichidagi tablar
@@ -49,7 +49,7 @@ test('Kassir: ruxsat etilgan ekranlar xatosiz', async ({ pos, page }) => {
   await pos.login('cashier')
   for (const s of ['Qarzlar', 'Xonalar']) {
     await pos.nav(s)
-    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(700)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)
   }
   expect(pos.consoleIssues()).toEqual([])
