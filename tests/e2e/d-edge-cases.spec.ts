@@ -267,9 +267,6 @@ test('Qaytarishdan keyin chegirma jami summadan oshmaydi (avtomatik kamayadi)', 
 })
 
 test('Hisobot: qarz to\'lovlari (kassaga kirim) ko\'rinishi kerak', async ({ pos }) => {
-  // OCHIQ (SHARTNOMA TAKLIFI): SalesReport da qarzdan keyin undirilgan to'lovlar yo'q. Kun oxirida kassadagi naqd
-  // = byMethod.cash + qarz to'lovlari(naqd), lekin hisobot buni ko'rsatmaydi. Taklif: SalesReport.debtPayments: {cash, card}.
-  test.fixme(true, "SalesReport da debtPayments maydoni yo'q (src/shared/types.ts) — shartnoma o'zgarishi kerak")
   await pos.open()
   await pos.login('admin')
   await openRoom(pos, 'Sauna 1', 1)

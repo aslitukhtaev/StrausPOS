@@ -1144,6 +1144,7 @@ export class PosService implements PosApi {
         discounts: 0,
         total: 0,
         byMethod: { cash: 0, card: 0, debt: 0 },
+        debtPayments: { cash: 0, card: 0 },
         returnsAmount: 0,
         byDay: [],
         byRoom: [],
@@ -1194,6 +1195,10 @@ export class PosService implements PosApi {
         }
       }
       for (const p of pays) report.byMethod[p.method] += p.amount
+      for (const d of this.db.all<{ method: 'cash' | 'card'; a: number }>(
+        'SELECT method, SUM(amount) AS a FROM debt_payments WHERE at>=? AND at<? GROUP BY method',
+        [from, to]
+      )) report.debtPayments[d.method] += d.a ?? 0
       const ret = this.db.get<{ a: number | null }>(
         `SELECT SUM(r.qty * l.unit_price) AS a FROM returns r JOIN order_lines l ON l.id=r.line_id
          JOIN sessions s ON s.id=r.session_id WHERE s.cancelled=0 AND r.at>=? AND r.at<?`,

@@ -285,6 +285,8 @@ export interface SalesReport {
   discounts: number
   total: number
   byMethod: { cash: number; card: number; debt: number }
+  /** Shu davrda qarzdan undirilgan to'lovlar (kassadagi naqd = byMethod.cash + debtPayments.cash) */
+  debtPayments: { cash: number; card: number }
   returnsAmount: number
   byDay: { day: string; total: number }[]
   byRoom: { roomId: Id; roomName: string; sessions: number; total: number }[]

@@ -352,6 +352,13 @@ function PaymentShare({ s }: { s: SalesReport }) {
               </div>
             ))}
           </div>
+          {s.debtPayments.cash + s.debtPayments.card > 0 && (
+            <div className="rep-pay__row" title="Oldingi qarzlardan shu davrda yig'ilgan pul">
+              <Icon name="wallet" size={22} />
+              <span className="rep-pay__name">Qarzdan undirildi (naqd {formatMoney(s.debtPayments.cash)}, karta {formatMoney(s.debtPayments.card)})</span>
+              <Money value={s.debtPayments.cash + s.debtPayments.card} size="md" currency={false} />
+            </div>
+          )}
         </>
       )}
     </Card>
