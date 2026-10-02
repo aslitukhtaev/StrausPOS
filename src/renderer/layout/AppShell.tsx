@@ -11,6 +11,7 @@ import { useNow } from '../store/clock'
 import { Avatar, Button, ErrorBoundary, Icon, IconButton, Logo, formatClock, formatDate, cx } from '../ui'
 import { SCREENS, screenAllowed } from './routes'
 import { useAutoLock } from './useAutoLock'
+import { useRoomsBackground } from '../screens/rooms/background'
 
 /** Kunduzgi ↔ tungi tezkor almashtirgich */
 function ThemeToggle() {
@@ -41,6 +42,8 @@ function Clock() {
 
 export function AppShell() {
   useAutoLock()
+  // Vaqt tugash ogohlantirishlari har qanday ekranda ham chalinsin
+  useRoomsBackground()
   const staff = useAuth((s) => s.staff)
   const permissions = useAuth((s) => s.permissions)
   const businessName = useApp((s) => s.businessName)
