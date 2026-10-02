@@ -24,3 +24,5 @@
 .debts-hist__row > :last-child { text-align: right; }
 .debts-hist__empty { padding: var(--sp-3); }
 .debts-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); margin-bottom: var(--sp-4); padding: var(--sp-4); background: var(--surface-2); border-radius: var(--r-md); }
+
+.debts-row .ui-dt__tools .ui-btn { padding: 0 16px; }

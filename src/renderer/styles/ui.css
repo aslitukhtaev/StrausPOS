@@ -675,6 +675,9 @@
 .ui-dt__head { min-height: 50px; padding-top: 0; padding-bottom: 0; border-bottom: 1px solid var(--line); }
 .ui-dt__head + .ui-dt__row { border-top: 0; }
 .ui-dt__th { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-dt__th > .r, .ui-dt__th > .c { display: block; }
+.ui-dt__th > .r { text-align: right; }
+.ui-dt__th > .c { text-align: center; }
 .ui-dt__row.is-muted > * { opacity: 0.6; }
 .ui-dt__row.is-muted > .ui-dt__tools { opacity: 1; }
 .ui-dt__row.is-danger { background: linear-gradient(90deg, rgba(242, 85, 95, 0.12), rgba(242, 85, 95, 0.02) 60%); box-shadow: inset 4px 0 0 var(--danger); }
