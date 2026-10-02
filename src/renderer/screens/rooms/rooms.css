@@ -256,6 +256,7 @@
 .rooms-guest__money .ui-money { white-space: nowrap; flex: none; }
 .rooms-guest__meta { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); color: var(--text-3); min-width: 0; }
 .rooms-guest__extra b { color: var(--text-2); }
+.rooms-guest__meta .nowrap { white-space: nowrap; }
 .rooms-guest__actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 2px; }
 .rooms-guest__actions .ui-btn { padding: 0 12px; }
 .rooms-guest__actions--one { display: flex; }
@@ -459,7 +460,7 @@
     align-items: center; gap: 4px 16px; padding: 8px 14px 10px 16px;
   }
   .rooms-guest__head { grid-area: head; }
-  .rooms-guest__name { height: 40px; flex: 0 1 auto; min-width: 96px; }
+  .rooms-guest__name { height: 40px; flex: 0 0 auto; max-width: 260px; }
   .rooms-guest__timerrow { grid-area: timer; justify-content: flex-start; gap: 12px; min-width: 0; }
   .rooms-guest__countdown { order: -1; }
   .rooms-guest__paid { display: none; }
@@ -469,7 +470,7 @@
   .rooms-guest__progress { grid-area: bar; height: 6px; }
   .rooms-guest__overnote { grid-area: note; }
   .rooms-guest__money { grid-area: money; justify-content: flex-end; gap: 14px; }
-  .rooms-guest__meta { align-items: flex-end; text-align: right; }
+  .rooms-guest__meta { align-items: flex-end; text-align: right; max-width: 180px; line-height: 1.25; }
   .rooms-guest__actions { grid-area: actions; display: flex; margin-top: 0; justify-content: flex-end; }
   .rooms-guest__actions .ui-btn { padding: 0 16px; }
 

@@ -285,7 +285,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
             </div>
             {canManage && (
               <div className="rooms-sec__actions">
-                <Button icon="swap" onClick={() => setDialog({ kind: 'move' })} disabled={busy != null} title="Xonani almashtirish">
+                <Button icon="swap" onClick={() => setDialog({ kind: 'move' })} disabled={busy != null} aria-label="Xonani almashtirish">
                   Xona
                 </Button>
                 {active > 0 && (
@@ -301,6 +301,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
                 <Button
                   icon="userPlus"
                   onClick={() => setDialog({ kind: 'addGuest' })}
+                  aria-label="Mehmon qo'shish"
                   disabled={capFull || busy != null}
                   title={capFull ? `Xona sig'imi ${room.capacity} kishi` : undefined}
                 >
