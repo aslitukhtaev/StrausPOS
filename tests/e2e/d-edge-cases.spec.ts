@@ -242,7 +242,7 @@ test('5 marta noto\'g\'ri PIN → 30 soniya blok (to\'g\'ri PIN ham qabul qilinm
   await page.keyboard.press('Enter')
   await expect(page.locator('.lock-pin__error')).toContainText("Juda ko'p noto'g'ri urinish. 30 soniyadan keyin")
   // Boshqa xodim bloklanmagan
-  await page.getByRole('button', { name: 'Boshqa xodim' }).click()
+  await page.locator('.lock-pin__switch').click()
   await pos.login('admin')
   await pos.lock()
   // 31 soniyadan keyin kassir kira oladi
