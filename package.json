@@ -14,8 +14,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "e2e": "playwright test",
-    "dist": "electron-vite build && electron-builder --win",
-    "check:compat": "electron-vite build && node scripts/check-compat.mjs"
+    "dist": "electron-vite build && electron-builder --win nsis --x64 --ia32",
+    "check:compat": "electron-vite build && node scripts/check-compat.mjs",
+    "dist:x64": "electron-vite build && electron-builder --win nsis --x64 -c.nsis.artifactName=${productName}-Setup-${version}-x64.${ext}",
+    "dist:ia32": "electron-vite build && electron-builder --win nsis --ia32 -c.nsis.artifactName=${productName}-Setup-${version}-ia32.${ext}",
+    "dist:dir": "electron-vite build && electron-builder --win dir --x64"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -43,13 +46,27 @@
   "build": {
     "appId": "uz.straus.pos",
     "productName": "StrausPOS",
+    "copyright": "© StrausPOS",
+    "electronVersion": "22.3.27",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
+    "asar": true,
     "files": [
-      "out/**"
+      "out/**",
+      "package.json",
+      "!**/*.map",
+      "!node_modules/sql.js/dist/!(sql-wasm.js|sql-wasm.wasm)",
+      "!node_modules/{react,react-dom,scheduler,loose-envify,js-tokens,zustand}/**"
     ],
+    "asarUnpack": [
+      "node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
+    "publish": null,
     "win": {
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
       "target": [
         {
           "target": "nsis",
@@ -58,11 +75,30 @@
             "ia32"
           ]
         }
-      ]
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "signAndEditExecutable": true,
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "StrausPOS",
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "icon": "build/icon.png",
+      "category": "Office"
     }
   }
 }
