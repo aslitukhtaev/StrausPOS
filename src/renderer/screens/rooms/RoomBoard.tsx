@@ -2,63 +2,39 @@
  * Xonalar paneli (bosh ekran): barcha faol xonalar yirik kartalarda, jonli taymer va summa bilan.
  * Har ~10 soniyada `rooms.board()` dan yangilanadi; oraliqda `useNow` + billing bilan lokal yuradi.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { RoomCard } from '@shared/types'
-import { api } from '@/api'
+import { formatCountdown, formatHours } from '@shared/billing'
 import { useCan } from '@/store/auth'
 import {
-  Button, Card, EmptyState, Icon, IconButton, Money, PageHeader, Spinner, StatusPill, Timer, cx, formatClock, formatMoney,
-  getNow, toast, useNow
+  Button, Card, EmptyState, Icon, IconButton, Money, PageHeader, Spinner, StatusPill, cx, formatMoney, toast, useNow
 } from '@/ui'
-import { alertLabel, liveTotals, roomTone, useBillingOptions, type LiveTotals } from './live'
+import { alertLabel, liveTotals, roomTone, useBillingOptions, useWarnMs, type LiveTotals } from './live'
 import { OpenRoomDialog } from './OpenRoomDialog'
-
-const REFRESH_MS = 10_000
-
-interface BoardData {
-  cards: RoomCard[]
-  at: number
-}
+import { useBoard } from './boardStore'
 
 export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number) => void }) {
-  const [data, setData] = useState<BoardData | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
+  const cards = useBoard((s) => s.cards)
+  const at = useBoard((s) => s.at)
+  const loadError = useBoard((s) => s.error)
   const [refreshing, setRefreshing] = useState(false)
   const [opening, setOpening] = useState<RoomCard | null>(null)
-  const failStreak = useRef(0)
   const canOpen = useCan('session.open')
-
-  const load = useCallback(async (manual = false) => {
+  const data = cards ? { cards, at } : null
+  const load = async (manual = false) => {
     if (manual) setRefreshing(true)
-    try {
-      const cards = await api.rooms.board()
-      setData({ cards, at: getNow() })
-      setLoadError(null)
-      failStreak.current = 0
-    } catch (e) {
-      failStreak.current++
-      const msg = e instanceof Error ? e.message : String(e)
-      setLoadError(msg)
-      // Fon yangilanishida xatoni faqat bir marta ko'rsatamiz (spam bo'lmasin)
-      if (manual || failStreak.current === 1) toast.error(e)
-    } finally {
-      if (manual) setRefreshing(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void load()
-    const id = setInterval(() => void load(), REFRESH_MS)
-    return () => clearInterval(id)
-  }, [load])
+    await useBoard.getState().load(manual)
+    if (manual) setRefreshing(false)
+  }
 
   const now = useNow()
   const billing = useBillingOptions()
+  const warnMs = useWarnMs()
   const lives = useMemo(() => {
     const m = new Map<number, LiveTotals>()
-    if (data) for (const c of data.cards) if (c.session) m.set(c.room.id, liveTotals(c.session, data.at, now, billing))
+    if (cards) for (const c of cards) if (c.session) m.set(c.room.id, liveTotals(c.session, at, now, billing, warnMs))
     return m
-  }, [data, now, billing])
+  }, [cards, at, now, billing, warnMs])
 
   const stats = useMemo(() => {
     let busy = 0
@@ -73,7 +49,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
         total += l.due
       }
     return { busy, guests, total, rooms: data ? data.cards.length : 0 }
-  }, [data, lives])
+  }, [data, lives])  // eslint-disable-line
 
   const onCardClick = (c: RoomCard) => {
     if (c.session) {
@@ -155,7 +131,11 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
           onClose={() => setOpening(null)}
           onOpened={(v) => {
             setOpening(null)
-            toast.success(`${v.room.name} ochildi`, { description: `${v.guests.length} mehmon · vaqt boshlandi` })
+            useBoard.getState().patchSession(v)
+            toast.success(`${v.room.name} ochildi`, {
+              description: `${v.guests.length} mehmon · ${formatHours(v.guests[0] ? v.guests[0].paidMinutes : 0)}` +
+                (v.waiterName ? ` · ofitsiant ${v.waiterName}` : ' · ofitsiantsiz')
+            })
             void load()
           }}
         />
@@ -167,8 +147,10 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
 function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | null; onClick: () => void }) {
   const { room, session } = card
   const tone = roomTone(live)
-  const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'busy' : 'danger'
+  const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'busy' : tone === 'warn' ? 'warning' : 'danger'
   const people = live ? live.running + live.paused : 0
+  const waiter = session ? session.waiterName : null
+  const left = live ? live.minRemainingMs : null
   return (
     <Card
       interactive
@@ -185,6 +167,8 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
           <div className="rooms-tile__name" title={room.name}>{room.name}</div>
           {tone === 'free' && <StatusPill status="free" size="lg" />}
           {tone === 'busy' && <StatusPill status="busy" size="lg" />}
+          {tone === 'warn' && <StatusPill status="paused" size="lg">Tugayapti</StatusPill>}
+          {tone === 'over' && <StatusPill status="ending" size="lg">Vaqt tugadi!</StatusPill>}
           {tone === 'alert' && live && <StatusPill status="ending" size="lg">{alertLabel(live)}</StatusPill>}
         </div>
         <div className="rooms-tile__meta">
@@ -204,15 +188,19 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
             </span>
             <span>
               <span className="rooms-tile__freetitle">Xonani ochish</span>
-              <span className="rooms-tile__freehint">Bosing va mehmonlar sonini tanlang</span>
+              <span className="rooms-tile__freehint">Bosing: mehmonlar, vaqt, ofitsiant</span>
             </span>
           </div>
         ) : (
           <>
             <div className="rooms-tile__live">
               <div className="rooms-tile__timer">
-                <Timer ms={live.longestMs} running={live.anyRunning} paused={!live.anyRunning} size="xl" />
-                <span className="rooms-tile__since">{formatClock(session.session.openedAt)} dan beri</span>
+                <span className="rooms-tile__since">
+                  {left == null ? 'Vaqt' : left <= 0 ? 'Oshib ketdi' : live.anyRunning ? 'Qolgan vaqt' : 'Pauzada qolgan'}
+                </span>
+                <span className={cx('rooms-tile__countdown', 'num', !live.anyRunning && 'is-paused')} data-testid="tile-countdown">
+                  {left == null ? '—' : formatCountdown(left)}
+                </span>
               </div>
               <div className="rooms-tile__people" title="Xonadagi mehmonlar">
                 <Icon name="users" size={26} />
@@ -223,10 +211,11 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
               </div>
             </div>
             <div className="rooms-tile__total">
-              <span className="rooms-tile__totallabel">
-                {live.paused > 0 && live.running > 0 ? `${live.paused} ta pauzada · ` : ''}Hozirgi hisob
+              <span className={cx('rooms-tile__waiter', !waiter && 'is-missing')} title={waiter ? 'Ofitsiant' : 'Ofitsiant biriktirilmagan'}>
+                <Icon name={waiter ? 'user' : 'alert'} size={16} />
+                <span className="ellipsis">{waiter || 'Ofitsiant yo‘q'}</span>
               </span>
-              <Money value={live.due} size="3xl" tone={tone === 'alert' ? 'danger' : 'accent'} />
+              <Money value={live.due} size="3xl" tone={tone === 'alert' || tone === 'over' ? 'danger' : 'accent'} />
             </div>
           </>
         )}

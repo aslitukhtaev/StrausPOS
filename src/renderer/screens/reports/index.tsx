@@ -7,6 +7,7 @@ import type { ReportRange, SalesReport } from '@shared/types'
 import type { IconName } from '../../ui'
 import { api } from '../../api'
 import { useApp } from '../../store/app'
+import { useNav } from '../../store/nav'
 import {
   Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Spinner, formatDate, formatDateShort,
   formatDateTime, formatMoney, getNow, toast, cx
@@ -65,6 +66,7 @@ const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 
 
 export default function ReportsScreen() {
   const businessName = useApp((s) => s.businessName)
+  const go = useNav((s) => s.go)
   const [preset, setPreset] = useState<Preset>('today')
   const [fromStr, setFromStr] = useState(() => toInput(getNow()))
   const [toStr, setToStr] = useState(() => toInput(getNow()))
@@ -253,6 +255,38 @@ export default function ReportsScreen() {
           </div>
 
           <TableCard
+            title="Ofitsiantlar"
+            subtitle="Faqat bar mahsulotlaridan (qaytarishlar ayirilgan); xizmatlar va xona vaqti kirmaydi"
+            actions={<Button variant="ghost" size="sm" iconRight="chevronRight" onClick={() => go('waiters')}>Oylik hisob</Button>}
+          >
+            {s.byWaiter.length === 0 ? <div className="rep-pad"><Mute>Ofitsiant biriktirilgan sessiya yo'q</Mute></div> : (
+              <table className="ui-table rep-table" data-testid="rep-waiters">
+                <thead><tr><th>Ofitsiant</th><th className="r">Sessiyalar</th><th className="r">Bar savdosi</th><th className="r">Haq</th></tr></thead>
+                <tbody>
+                  {s.byWaiter.map((w) => (
+                    <tr key={w.staffId}>
+                      <td>{w.name || '—'}</td>
+                      <td className="r num">{w.sessions} ta</td>
+                      <td className="r"><Money value={w.productSales} size="sm" currency={false} /></td>
+                      <td className="r"><Money value={w.commission} size="sm" currency={false} tone="accent" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+                {s.byWaiter.length > 1 && (
+                  <tfoot>
+                    <tr className="rep-table__total">
+                      <td>Jami</td>
+                      <td className="r num">{s.byWaiter.reduce((a, w) => a + w.sessions, 0)} ta</td>
+                      <td className="r"><Money value={s.byWaiter.reduce((a, w) => a + w.productSales, 0)} size="sm" currency={false} /></td>
+                      <td className="r"><Money value={s.byWaiter.reduce((a, w) => a + w.commission, 0)} size="sm" currency={false} /></td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            )}
+          </TableCard>
+
+          <TableCard
             title="Qaytarishlar"
             subtitle={data!.returns.length ? data!.returns.length + ' ta, jami ' + formatMoney(s.returnsAmount) + " so'm" : undefined}
           >
@@ -285,12 +319,17 @@ export default function ReportsScreen() {
   )
 }
 
-function TableCard({ title, subtitle, children }: { title: string; subtitle?: React.ReactNode; children: React.ReactNode }) {
+function TableCard({ title, subtitle, actions, children }: {
+  title: string; subtitle?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode
+}) {
   return (
     <Card padding="none" className="rep-tcard">
       <div className="rep-tcard__head">
-        <div className="rep-tcard__title">{title}</div>
-        {subtitle && <div className="rep-tcard__sub">{subtitle}</div>}
+        <div className="rep-tcard__titles">
+          <div className="rep-tcard__title">{title}</div>
+          {subtitle && <div className="rep-tcard__sub">{subtitle}</div>}
+        </div>
+        {actions && <div className="rep-tcard__actions">{actions}</div>}
       </div>
       {children}
     </Card>

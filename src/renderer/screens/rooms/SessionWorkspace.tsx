@@ -7,13 +7,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GuestView, LineView, ReceiptData, SessionView } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
-import { useApp } from '@/store/app'
+import { formatCountdown, formatHours } from '@shared/billing'
 import {
-  Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, Timer, confirmDialog, cx, formatClock,
+  Avatar, Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, confirmDialog, cx, formatClock,
   formatMoney, getNow, isAnyModalOpen, toast
 } from '@/ui'
-import { alertLabel, roomTone, useLive } from './live'
+import { alertLabel, roomTone, useLive, useWarnMs } from './live'
 import { GuestCard } from './GuestCard'
+import { AddGuestDialog } from './AddGuestDialog'
+import { WaiterDialog } from './WaiterPicker'
+import { useBoard } from './boardStore'
 import { AddItemsDialog } from './AddItemsDialog'
 import { DiscountDialog, MoveRoomDialog, RenameGuestDialog, ReturnLineDialog } from './Dialogs'
 import { CheckoutDialog } from './checkoutModule'
@@ -27,6 +30,8 @@ type DialogState =
   | { kind: 'add' }
   | { kind: 'discount' }
   | { kind: 'checkout' }
+  | { kind: 'addGuest' }
+  | { kind: 'waiter' }
   | null
 
 export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onBack: () => void }) {
@@ -38,13 +43,16 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   onBackRef.current = onBack
 
   const canManage = useCan('session.manage')
-  // Vaqtincha: yangi mehmonga standart soat (tanlash UI keyingi bosqichda)
-  const defaultHours = useApp((s) => (s.settings ? s.settings.defaultHours : 1))
+  const warnMs = useWarnMs()
   const canPay = useCan('session.pay')
   const canReturn = useCan('line.return')
   const canDiscount = useCan('discount.apply')
 
-  const setView = useCallback((v: SessionView) => setState({ view: v, at: getNow() }), [])
+  const setView = useCallback((v: SessionView) => {
+    setState({ view: v, at: getNow() })
+    // Xonalar paneli va ogohlantirishlar ham darhol yangilansin
+    useBoard.getState().patchSession(v)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -133,15 +141,35 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   const lines = view.lines.slice().sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
 
   const finishGuest = async (g: GuestView) => {
+    const early = g.remainingMs > 0
     const ok = await confirmDialog({
       title: `${g.label} chiqib ketdimi?`,
-      message: `Vaqti to'xtatiladi va hisobda qoladi. ${active > 1 ? "Qolgan mehmonlar vaqti davom etadi." : ''}`,
+      message:
+        (early
+          ? `Olingan vaqt (${formatHours(g.paidMinutes)}) baribir to'lanadi: ${formatMoney(g.timeAmount)} so'm. `
+          : `Vaqt summasi: ${formatMoney(g.timeAmount)} so'm (${formatHours(g.billedMinutes)}). `) +
+        (active > 1 ? 'Qolgan mehmonlar vaqti davom etadi.' : ''),
       confirmText: 'Ha, tugatish',
       cancelText: "Yo'q",
       danger: true,
       icon: 'logout'
     })
     if (ok) await run('finish:' + g.id, () => api.sessions.guestFinish(g.id))
+  }
+
+  const extendGuest = (g: GuestView) =>
+    void run('extend:' + g.id, () => api.sessions.extendGuest(g.id, 60), `${g.label}: +1 soat qo'shildi`)
+
+  const extendAll = async () => {
+    const n = live.running + live.paused
+    const ok = await confirmDialog({
+      title: `Hammaga +1 soat qo'shilsinmi?`,
+      message: `${n} ta mehmonning har biriga 1 soat qo'shiladi: +${formatMoney(n * room.pricePerHour)} so'm.`,
+      confirmText: "Ha, qo'shish",
+      cancelText: "Yo'q",
+      icon: 'clock'
+    })
+    if (ok) await run('extendAll', () => api.sessions.extendAll(view.session.id, 60), `Hammaga +1 soat qo'shildi (${n} kishi)`)
   }
 
   const cancelSession = async () => {
@@ -206,7 +234,10 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
         <div className="rooms-ws__title">
           <div className="rooms-ws__titlerow">
             <h1 className="rooms-ws__room">{room.name}</h1>
-            {tone === 'busy' ? <StatusPill status="busy" /> : <StatusPill status="ending">{alertLabel(live)}</StatusPill>}
+            {tone === 'busy' && <StatusPill status="busy" />}
+            {tone === 'warn' && <StatusPill status="paused">Tugayapti</StatusPill>}
+            {tone === 'over' && <StatusPill status="ending">Vaqt tugadi!</StatusPill>}
+            {tone === 'alert' && <StatusPill status="ending">{alertLabel(live)}</StatusPill>}
           </div>
           <div className="rooms-ws__sub">
             <span>
@@ -232,6 +263,15 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
         </div>
       </header>
 
+      <WaiterStrip
+        name={view.waiterName}
+        pct={view.session.waiterPct}
+        assigned={view.session.waiterId != null}
+        canManage={canManage}
+        minRemaining={live.minRemainingMs}
+        onChange={() => setDialog({ kind: 'waiter' })}
+      />
+
       <div className="rooms-ws__body">
         {/* ───── Mehmonlar ───── */}
         <section className="rooms-ws__guests">
@@ -245,17 +285,26 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
             </div>
             {canManage && (
               <div className="rooms-sec__actions">
-                <Button icon="swap" onClick={() => setDialog({ kind: 'move' })} disabled={busy != null}>
-                  Xonani almashtirish
+                <Button icon="swap" onClick={() => setDialog({ kind: 'move' })} disabled={busy != null} title="Xonani almashtirish">
+                  Xona
                 </Button>
+                {active > 0 && (
+                  <Button
+                    icon="clock"
+                    onClick={() => void extendAll()}
+                    disabled={busy != null && busy !== 'extendAll'}
+                    loading={busy === 'extendAll'}
+                  >
+                    Hammaga +1 soat
+                  </Button>
+                )}
                 <Button
                   icon="userPlus"
-                  onClick={() => void run('addGuest', () => api.sessions.addGuest(view.session.id, Math.max(1, defaultHours) * 60))}
-                  disabled={capFull || (busy != null && busy !== 'addGuest')}
-                  loading={busy === 'addGuest'}
+                  onClick={() => setDialog({ kind: 'addGuest' })}
+                  disabled={capFull || busy != null}
                   title={capFull ? `Xona sig'imi ${room.capacity} kishi` : undefined}
                 >
-                  {capFull ? `Sig'im to'lgan (${room.capacity})` : "Mehmon qo'shish"}
+                  {capFull ? `To'lgan (${room.capacity})` : 'Mehmon'}
                 </Button>
               </div>
             )}
@@ -265,13 +314,14 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
               <GuestCard
                 key={g.id}
                 guest={g}
-                t={live.t}
+                warnMs={warnMs}
                 canManage={canManage}
                 busy={busy}
                 onRename={() => setDialog({ kind: 'rename', guest: g })}
                 onPause={() => void run('pause:' + g.id, () => api.sessions.guestPause(g.id))}
                 onResume={() => void run('resume:' + g.id, () => api.sessions.guestResume(g.id))}
                 onFinish={() => void finishGuest(g)}
+                onExtend={() => extendGuest(g)}
               />
             ))}
           </div>
@@ -385,6 +435,12 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
       {dialog && dialog.kind === 'add' && (
         <AddItemsDialog sessionId={view.session.id} guests={view.guests} onClose={() => setDialog(null)} onUpdate={setView} />
       )}
+      {dialog && dialog.kind === 'addGuest' && (
+        <AddGuestDialog view={view} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />
+      )}
+      {dialog && dialog.kind === 'waiter' && (
+        <WaiterDialog view={view} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />
+      )}
       {dialog && dialog.kind === 'checkout' && CheckoutDialog && (
         <CheckoutDialog
           sessionId={view.session.id}
@@ -394,6 +450,60 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
           }}
           onPaid={onPaid}
         />
+      )}
+    </div>
+  )
+}
+
+function WaiterStrip({
+  name, pct, assigned, canManage, minRemaining, onChange
+}: {
+  name: string | null
+  pct: number
+  assigned: boolean
+  canManage: boolean
+  minRemaining: number | null
+  onChange: () => void
+}) {
+  return (
+    <div className={cx('rooms-wstrip', !assigned && 'is-missing')} data-testid="waiter-strip">
+      {assigned ? (
+        <>
+          <Avatar name={name || '?'} size={40} />
+          <div className="rooms-wstrip__text">
+            <span className="rooms-wstrip__label">Ofitsiant</span>
+            <span className="rooms-wstrip__name">
+              {name} <span className="rooms-wstrip__pct num">· {pct}% bardan</span>
+            </span>
+          </div>
+          {canManage && (
+            <Button size="sm" variant="ghost" icon="swap" onClick={onChange}>
+              Almashtirish
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          <span className="rooms-wstrip__warnicon">
+            <Icon name="alert" size={26} />
+          </span>
+          <div className="rooms-wstrip__text">
+            <span className="rooms-wstrip__name">Ofitsiant biriktirilmagan</span>
+            <span className="rooms-wstrip__label">Bar savdosidan foiz hech kimga yozilmaydi</span>
+          </div>
+          {canManage && (
+            <Button size="md" icon="userPlus" onClick={onChange} className="rooms-wstrip__btn">
+              Biriktirish
+            </Button>
+          )}
+        </>
+      )}
+      <div className="spacer" />
+      {minRemaining != null && (
+        <div className={cx('rooms-wstrip__left', minRemaining <= 0 && 'is-over')}>
+          <span className="rooms-wstrip__label">{minRemaining <= 0 ? 'Vaqt oshdi' : 'Eng kam qolgan'}</span>
+          <span className="rooms-wstrip__time num">{formatCountdown(minRemaining)}</span>
+        </div>
       )}
     </div>
   )

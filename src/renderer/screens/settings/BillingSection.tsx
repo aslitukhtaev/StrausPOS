@@ -1,89 +1,160 @@
-import { useEffect, useState } from 'react'
-import type { TimeInterval } from '@shared/types'
-import { billedMinutes, formatHours, guestTimeAmount, guestTimeRaw } from '@shared/billing'
-import { Money, Segmented, formatMoney } from '@/ui'
+import { useEffect, useMemo, useState } from 'react'
+import type { AppSettings, TimeInterval } from '@shared/types'
+import { MS_MIN, billedMinutes, formatHours, guestTimeAmount } from '@shared/billing'
+import { api } from '@/api'
+import { Icon, Money, Segmented, formatMoney } from '@/ui'
 import { Note, SaveBar, SectionHead, useReportDirty, type SectionProps } from './common'
 
-const ROUND_OPTIONS = [1, 100, 500, 1000, 5000]
-const EX_MIN = 97 // 1 soat 37 daqiqa o'tirdi
-const EX_PAID = 60 // 1 soat olingan
-const EX_RATE = 73_300
-const EX_INTERVALS: TimeInterval[] = [{ roomId: 0, rate: EX_RATE, start: 0, end: EX_MIN * 60_000 }]
-const EX_NOW = EX_MIN * 60_000
+type BillingKeys = 'defaultHours' | 'blockMinutes' | 'graceMinutes' | 'warnBeforeMinutes' | 'roundTo'
+type Draft = Pick<AppSettings, BillingKeys>
 
-function rawText(n: number) {
-  const cents = Math.round(n * 100)
-  const frac = cents % 100
-  return formatMoney(Math.floor(cents / 100)) + (frac ? ',' + String(frac).padStart(2, '0') : '')
+const HOURS = [1, 2, 3, 4]
+const BLOCKS = [30, 60]
+const GRACE = [0, 5, 10, 15]
+const WARN = [5, 10, 15]
+const ROUND = [1, 100, 500, 1000, 5000]
+const FALLBACK_RATE = 100_000
+
+const pick = (s: AppSettings): Draft => ({
+  defaultHours: s.defaultHours,
+  blockMinutes: s.blockMinutes,
+  graceMinutes: s.graceMinutes,
+  warnBeforeMinutes: s.warnBeforeMinutes,
+  roundTo: s.roundTo
+})
+const same = (a: Draft, b: Draft) => (Object.keys(a) as BillingKeys[]).every((k) => a[k] === b[k])
+
+/** Standart variantlar + (agar boshqacha saqlangan bo'lsa) joriy qiymat */
+function withCurrent(list: number[], cur: number): number[] {
+  return list.indexOf(cur) >= 0 ? list : [...list, cur].sort((a, b) => a - b)
 }
 
-function label(r: number) {
-  return r === 1 ? 'Yaxlitlamaslik' : formatMoney(r)
+/** "25 daqiqa", "2 soat 10 daqiqa" — misollar uchun to'liq so'z bilan */
+function longDuration(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h && m) return h + ' soat ' + m + ' daqiqa'
+  if (h) return h + ' soat'
+  return m + ' daqiqa'
 }
 
 export function BillingSection({ settings, save, onDirty }: SectionProps) {
-  const [roundTo, setRoundTo] = useState(settings.roundTo)
+  const base = useMemo(() => pick(settings), [settings])
+  const [d, setD] = useState<Draft>(base)
   const [saving, setSaving] = useState(false)
-  useEffect(() => setRoundTo(settings.roundTo), [settings.roundTo])
+  const [room, setRoom] = useState<{ name: string; rate: number } | null>(null)
+  useEffect(() => setD(base), [base])
 
-  const dirty = roundTo !== settings.roundTo
+  useEffect(() => {
+    let alive = true
+    api.rooms
+      .list()
+      .then((rs) => {
+        const r = rs.filter((x) => x.active && x.pricePerHour > 0).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)[0]
+        if (alive && r) setRoom({ name: r.name, rate: r.pricePerHour })
+      })
+      .catch(() => {
+        /* misol standart narx bilan ko'rsatiladi */
+      })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const dirty = !same(d, base)
   useReportDirty(dirty, onDirty)
+  const set = <K extends BillingKeys>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }))
 
-  const rule = { blockMinutes: settings.blockMinutes, graceMinutes: settings.graceMinutes }
-  const billed = billedMinutes(EX_NOW, EX_PAID, rule)
-  const raw = guestTimeRaw(EX_INTERVALS, billed, EX_NOW)
-  const rounded = guestTimeAmount(EX_INTERVALS, EX_PAID, EX_NOW, { roundTo, ...rule })
+  const rate = room?.rate ?? FALLBACK_RATE
+  const paid = d.defaultHours * 60
+  const opts = { roundTo: d.roundTo, blockMinutes: d.blockMinutes, graceMinutes: d.graceMinutes }
+  const examples = [25, paid + 10, paid + d.blockMinutes + 10].map((sat) => {
+    const ms = sat * MS_MIN
+    const iv: TimeInterval[] = [{ roomId: 0, rate, start: 0, end: ms }]
+    const billed = billedMinutes(ms, paid, opts)
+    return { sat, billed, extra: billed > paid, amount: guestTimeAmount(iv, paid, ms, opts) }
+  })
 
   const onSave = async () => {
     setSaving(true)
-    await save({ ...settings, roundTo }, 'Yaxlitlash saqlandi')
+    await save({ ...settings, ...d }, 'Hisob-kitob sozlamalari saqlandi')
     setSaving(false)
   }
 
-  // Nostandart qiymat (masalan oldin boshqa joyda saqlangan) bo'lsa ham ko'rsatamiz
-  const options = ROUND_OPTIONS.indexOf(settings.roundTo) >= 0 ? ROUND_OPTIONS : [...ROUND_OPTIONS, settings.roundTo].sort((a, b) => a - b)
-
   return (
     <div className="set-section">
-      <SectionHead icon="percent" title="Hisob-kitob" description="Vaqt summasi qanday yaxlitlanadi" />
+      <SectionHead icon="percent" title="Hisob-kitob" description="Oldindan olinadigan vaqt, oshib ketganda bloklar va yaxlitlash" />
       <div className="set-section__body">
-        <div className="set-group">
-          <div className="set-group__title">Vaqt summasini yaxlitlash (so'm)</div>
-          <Segmented block size="lg" value={roundTo} onChange={setRoundTo} options={options.map((r) => ({ value: r, label: label(r) }))} />
+        <div className="set-bill">
+          <div className="set-bill__item">
+            <div className="set-bill__title"><Icon name="clock" size={22} /> Standart soat</div>
+            <Segmented
+              block size="lg" value={d.defaultHours} onChange={(v) => set('defaultHours', v)}
+              options={withCurrent(HOURS, settings.defaultHours).map((h) => ({ value: h, label: h + ' soat' }))}
+            />
+            <div className="set-bill__hint">Xona ochilganda har mehmonga shuncha vaqt tanlangan holda chiqadi</div>
+          </div>
+          <div className="set-bill__item">
+            <div className="set-bill__title"><Icon name="plus" size={22} /> Oshib ketganda blok</div>
+            <Segmented
+              block size="lg" value={d.blockMinutes} onChange={(v) => set('blockMinutes', v)}
+              options={withCurrent(BLOCKS, settings.blockMinutes).map((m) => ({ value: m, label: m === 60 ? '1 soat' : m + ' daqiqa' }))}
+            />
+            <div className="set-bill__hint">Olingan vaqtdan oshsa, har boshlangan blok to'liq qo'shiladi</div>
+          </div>
+          <div className="set-bill__item">
+            <div className="set-bill__title"><Icon name="timer" size={22} /> Imtiyozli daqiqa</div>
+            <Segmented
+              block size="lg" value={d.graceMinutes} onChange={(v) => set('graceMinutes', v)}
+              options={withCurrent(GRACE, settings.graceMinutes).map((m) => ({ value: m, label: m === 0 ? "Yo'q" : m + ' daq' }))}
+            />
+            <div className="set-bill__hint">
+              {d.graceMinutes === 0 ? "Qattiq: 1 daqiqa oshsa ham keyingi blok qo'shiladi" : d.graceMinutes + " daqiqagacha oshsa — qo'shimcha to'lov yo'q"}
+            </div>
+          </div>
+          <div className="set-bill__item">
+            <div className="set-bill__title"><Icon name="alert" size={22} /> Ogohlantirish</div>
+            <Segmented
+              block size="lg" value={d.warnBeforeMinutes} onChange={(v) => set('warnBeforeMinutes', v)}
+              options={withCurrent(WARN, settings.warnBeforeMinutes).map((m) => ({ value: m, label: m + ' daq qolganda' }))}
+            />
+            <div className="set-bill__hint">Vaqt tugashiga shuncha qolganda xona kartasi va taymer qizaradi</div>
+          </div>
+          <div className="set-bill__item is-wide">
+            <div className="set-bill__title"><Icon name="cash" size={22} /> Vaqt summasini yaxlitlash (so'm)</div>
+            <Segmented
+              block size="lg" value={d.roundTo} onChange={(v) => set('roundTo', v)}
+              options={withCurrent(ROUND, settings.roundTo).map((r) => ({ value: r, label: r === 1 ? 'Yaxlitlamaslik' : formatMoney(r) }))}
+            />
+          </div>
         </div>
 
-        <div className="set-example" data-testid="round-example">
-          <div className="set-example__title">Misol</div>
-          <div className="set-example__formula">
-            <span className="num">{formatHours(billed)}</span>
-            <span className="set-example__op">×</span>
-            <Money value={EX_RATE} size="lg" />
-            <span className="set-example__unit">/ soat</span>
+        <div className="set-example" data-testid="billing-example">
+          <div className="set-example__title">
+            Jonli misol — {room ? '«' + room.name + '»' : 'xona'}, {formatMoney(rate)} so'm / soat, 1 mehmon
           </div>
           <div className="set-example__steps">
-            <div className="set-example__step">
-              <span className="muted">{formatHours(EX_PAID)} olingan, 1 soat 37 daq o'tirdi</span>
-              <span className="num">→ {formatHours(billed)}</span>
-            </div>
-            <div className="set-example__step">
-              <span className="muted">Aniq hisob: {billed} daq × {formatMoney(EX_RATE)} / 60</span>
-              <span className="num">≈ {rawText(raw)} so'm</span>
-            </div>
-            <div className="set-example__step is-result">
-              <span>Chekda {roundTo > 1 ? `(${formatMoney(roundTo)} ga yaxlitlangan)` : ''}</span>
-              <Money value={rounded} size="2xl" tone="accent" />
-            </div>
+            {examples.map((e) => (
+              <div key={e.sat} className="set-example__step set-bill__ex">
+                <span className="set-bill__ex-text">
+                  <b>{formatHours(paid)}</b> olingan, <b>{longDuration(e.sat)}</b> o'tirdi
+                  <span className="set-example__op"> → </span>
+                  <b className={e.extra ? 't-danger' : 't-success'}>{formatHours(e.billed)}</b> to'lanadi
+                </span>
+                <Money value={e.amount} size="xl" tone={e.extra ? 'default' : 'accent'} />
+              </div>
+            ))}
           </div>
         </div>
 
         <Note>
-          Har bir mehmonning vaqti alohida hisoblanadi: olingan vaqt to'liq to'lanadi, oshib ketsa har boshlangan
-          blok ({formatHours(settings.blockMinutes)}) qo'shiladi. Summa xona narxi / 60 × daqiqa, keyin shu qiymatga
-          eng yaqin songa yaxlitlanadi (yarmidan yuqorisi — tepaga). Mahsulot va xizmat narxlari yaxlitlanmaydi.
-          Saqlangach ochiq hisoblar ham yangi qoida bilan ko'rsatiladi; yopilgan (to'langan) cheklar o'zgarmaydi.
+          Mehmon kamroq o'tirsa ham olingan vaqt to'liq to'lanadi. Oshib ketsa{' '}
+          {d.graceMinutes > 0 ? d.graceMinutes + ' daqiqa imtiyozdan keyin ' : ''}har boshlangan {formatHours(d.blockMinutes)} to'liq qo'shiladi.
+          Mahsulot va xizmat narxlari yaxlitlanmaydi. Saqlangach ochiq hisoblar yangi qoida bilan ko'rsatiladi; yopilgan (to'langan)
+          cheklar o'zgarmaydi.
         </Note>
       </div>
-      <SaveBar dirty={dirty} saving={saving} onSave={() => void onSave()} onReset={() => setRoundTo(settings.roundTo)} />
+      <SaveBar dirty={dirty} saving={saving} onSave={() => void onSave()} onReset={() => setD(base)} />
     </div>
   )
 }

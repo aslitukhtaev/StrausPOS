@@ -23,7 +23,10 @@
   .rep-kpi--main { grid-row: span 2; }
 }
 
-.rep-tcard__head { padding: var(--sp-4) var(--sp-4) var(--sp-3); }
+.rep-tcard__head { padding: var(--sp-4) var(--sp-4) var(--sp-3); display: flex; align-items: flex-start; gap: var(--sp-3); }
+.rep-tcard__titles { flex: 1; min-width: 0; }
+.rep-tcard__actions { flex: none; }
+.rep-table__total td { border-top: 2px solid var(--line-strong); font-weight: var(--fw-bold); }
 .rep-tcard__title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
 .rep-tcard__sub { font-size: var(--fs-sm); color: var(--text-3); margin-top: 2px; }
 
@@ -69,6 +72,7 @@
   .shell { display: block !important; height: auto !important; background: var(--paper) !important; }
   .shell__side, .shell__top, .ui-toasts, .ui-modal-root, .ui-pagehead__actions, .rep-period { display: none !important; }
   .shell__main { overflow: visible !important; padding: 0 !important; animation: none !important; }
+  .rep-tcard__actions { display: none !important; }
   .rep { gap: 12px; color: var(--paper-ink); }
   .rep * { color: var(--paper-ink) !important; box-shadow: none !important; }
   .rep .ui-card { background: var(--paper) !important; border: 1px solid var(--print-line) !important; break-inside: avoid; }

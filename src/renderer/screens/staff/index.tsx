@@ -1,27 +1,37 @@
 /**
- * Xodimlar ekrani: kartalar, qo'shish/tahrirlash, PIN o'zgartirish, nofaol qilish, rol ruxsatlari jadvali.
+ * Xodimlar ekrani: kartalar (Hammasi / Ofitsiantlar), qo'shish/tahrirlash (ofitsiant foizi bilan), PIN o'zgartirish,
+ * nofaol qilish, rol ruxsatlari jadvali.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Permission, Role, Staff } from '@shared/types'
 import { ROLE_LABELS, ROLE_PERMISSIONS } from '@shared/permissions'
 import { api } from '../../api'
 import { useAuth, useCan } from '../../store/auth'
+import { useNav } from '../../store/nav'
 import {
   Switch, Avatar, Badge, Button, Card, EmptyState, Field, Icon, Input, Modal, Numpad, PageHeader, PinDots, Segmented, Spinner,
-  Tabs, confirmDialog, toast, cx
+  Tabs, confirmDialog, formatMoney, toast, cx
 } from '../../ui'
 import './staff.css'
 
 const PIN_MIN = 4
 const PIN_MAX = 6
 
-const ROLES: Role[] = ['owner', 'admin', 'cashier']
-const ROLE_TONE: Record<Role, 'accent' | 'info' | 'neutral'> = { owner: 'accent', admin: 'info', cashier: 'neutral', waiter: 'neutral' }
+const ROLES: Role[] = ['owner', 'admin', 'cashier', 'waiter']
+const PCT_PRESETS = [5, 10, 12, 15]
+const DEFAULT_PCT = 10
+
+/** "10" / "12,5" — foizni ko'rsatish */
+export function pctText(p: number): string {
+  return String(Math.round(p * 100) / 100).replace('.', ',')
+}
+const ROLE_TONE: Record<Role, 'accent' | 'info' | 'neutral' | 'success'> = { owner: 'accent', admin: 'info', cashier: 'neutral', waiter: 'success' }
+const ROLE_ICON: Record<Role, 'key' | 'shield' | 'user' | 'bar'> = { owner: 'key', admin: 'shield', cashier: 'user', waiter: 'bar' }
 const ROLE_HINT: Record<Role, string> = {
   owner: "Hamma narsa, shu jumladan xodimlar, sozlamalar va zaxira",
   admin: "Kundalik boshqaruv: bar, hisobot, qaytarish, chegirma",
   cashier: "Xonalarni ochish, vaqt, to'lov va qarz",
-  waiter: "Xonani ochish va bar buyurtmalari (to'lovsiz)"
+  waiter: "Xonani ochish va bar buyurtmalari (to'lovsiz). Bar savdosidan foiz oladi"
 }
 
 const PERM_LABELS: { perm: Permission; label: string; hint: string }[] = [
@@ -39,13 +49,15 @@ const PERM_LABELS: { perm: Permission; label: string; hint: string }[] = [
   { perm: 'backup.manage', label: 'Zaxira nusxa', hint: 'Saqlash va tiklash' }
 ]
 
-type EditTarget = { mode: 'new' } | { mode: 'edit'; staff: Staff }
+type EditTarget = { mode: 'new'; waiter?: boolean } | { mode: 'edit'; staff: Staff }
 
 export default function StaffScreen() {
   const me = useAuth((s) => s.staff)
   const canManage = useCan('staff.manage')
   const [list, setList] = useState<Staff[] | null>(null)
-  const [tab, setTab] = useState<'people' | 'perms'>('people')
+  const go = useNav((s) => s.go)
+  const canReports = useCan('reports.view')
+  const [tab, setTab] = useState<'all' | 'waiters' | 'perms'>('all')
   const [edit, setEdit] = useState<EditTarget | null>(null)
   const [pinFor, setPinFor] = useState<Staff | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -59,6 +71,8 @@ export default function StaffScreen() {
   useEffect(load, [load])
 
   const activeCount = useMemo(() => (list ?? []).filter((s) => s.active).length, [list])
+  const waiterCount = useMemo(() => (list ?? []).filter((s) => s.isWaiter).length, [list])
+  const shown = useMemo(() => (list ?? []).filter((s) => tab !== 'waiters' || s.isWaiter), [list, tab])
 
   const toggleActive = async (s: Staff) => {
     if (s.active) {
@@ -91,8 +105,8 @@ export default function StaffScreen() {
         subtitle={list ? activeCount + ' ta faol, jami ' + list.length + ' ta xodim' : undefined}
         actions={
           canManage && (
-            <Button variant="primary" icon="userPlus" onClick={() => setEdit({ mode: 'new' })}>
-              Xodim qo'shish
+            <Button variant="primary" icon="userPlus" onClick={() => setEdit({ mode: 'new', waiter: tab === 'waiters' })}>
+              {tab === 'waiters' ? "Ofitsiant qo'shish" : "Xodim qo'shish"}
             </Button>
           )
         }
@@ -100,17 +114,26 @@ export default function StaffScreen() {
 
       <Tabs
         value={tab}
-        onChange={(v) => setTab(v as 'people' | 'perms')}
+        onChange={(v) => setTab(v as 'all' | 'waiters' | 'perms')}
         items={[
-          { id: 'people', label: 'Xodimlar', icon: 'users', badge: list ? list.length : undefined },
+          { id: 'all', label: 'Hammasi', icon: 'users', badge: list ? list.length : undefined },
+          { id: 'waiters', label: 'Ofitsiantlar', icon: 'bar', badge: list ? waiterCount : undefined },
           { id: 'perms', label: 'Kim nima qila oladi', icon: 'shield' }
         ]}
       />
 
-      {tab === 'people' && (
+      {tab !== 'perms' && (
         <div className="staff__body">
           {list === null ? (
             <div className="staff__loading"><Spinner size={36} /></div>
+          ) : tab === 'waiters' && shown.length === 0 ? (
+            <EmptyState
+              size="lg"
+              icon="bar"
+              title="Ofitsiantlar yo'q"
+              description="Ofitsiant xonaga biriktiriladi va shu xonada sotilgan bar mahsulotlaridan foiz oladi (xizmatlardan emas)."
+              action={canManage ? <Button variant="primary" icon="userPlus" onClick={() => setEdit({ mode: 'new', waiter: true })}>Ofitsiant qo'shish</Button> : undefined}
+            />
           ) : list.length === 0 ? (
             <EmptyState
               size="lg"
@@ -121,7 +144,7 @@ export default function StaffScreen() {
             />
           ) : (
             <div className="staff__grid">
-              {list.map((s) => {
+              {shown.map((s) => {
                 const isMe = me?.id === s.id
                 return (
                   <Card key={s.id} className={cx('staff-card', !s.active && 'is-inactive')} tone={s.active ? 'default' : 'default'} padding="md">
@@ -130,9 +153,16 @@ export default function StaffScreen() {
                       <div className="staff-card__who">
                         <div className="staff-card__name ellipsis">{s.name}</div>
                         <div className="staff-card__badges">
-                          <Badge tone={ROLE_TONE[s.role]} size="md" icon={s.role === 'owner' ? 'key' : s.role === 'admin' ? 'shield' : 'user'}>
-                            {ROLE_LABELS[s.role]}
-                          </Badge>
+                          {s.role !== 'waiter' && (
+                            <Badge tone={ROLE_TONE[s.role]} size="md" icon={ROLE_ICON[s.role]}>
+                              {ROLE_LABELS[s.role]}
+                            </Badge>
+                          )}
+                          {s.isWaiter && (
+                            <Badge tone="success" size="md" icon="bar" className="staff-waiter-badge">
+                              {ROLE_LABELS.waiter} · {pctText(s.commissionPct)}%
+                            </Badge>
+                          )}
                           {s.isProvider && <Badge tone="success" size="md" icon="sparkles">Xizmat ko'rsatuvchi</Badge>}
                           {isMe && <Badge tone="neutral" size="md">Siz</Badge>}
                         </div>
@@ -150,6 +180,11 @@ export default function StaffScreen() {
                         <Button variant="secondary" size="sm" icon="key" onClick={() => setPinFor(s)}>
                           PIN
                         </Button>
+                        {s.isWaiter && canReports && (
+                          <Button variant="secondary" size="sm" icon="wallet" onClick={() => go('waiters', { staffId: s.id })}>
+                            Hisob
+                          </Button>
+                        )}
                         <Button
                           variant={s.active ? 'danger' : 'success'}
                           size="sm"
@@ -241,8 +276,11 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
 }) {
   const cur = target.mode === 'edit' ? target.staff : null
   const [name, setName] = useState(cur?.name ?? '')
-  const [role, setRole] = useState<Role>(cur?.role ?? 'cashier')
+  const newWaiter = target.mode === 'new' && !!target.waiter
+  const [role, setRole] = useState<Role>(cur?.role ?? (newWaiter ? 'waiter' : 'cashier'))
   const [isProvider, setIsProvider] = useState(cur?.isProvider ?? false)
+  const [isWaiter, setIsWaiter] = useState(cur ? cur.isWaiter || cur.role === 'waiter' : newWaiter)
+  const [pctStr, setPctStr] = useState(() => pctText(cur && (cur.isWaiter || cur.commissionPct > 0) ? cur.commissionPct : DEFAULT_PCT))
   const [active, setActive] = useState(cur?.active ?? true)
   const [pin, setPin] = useState('')
   const [busy, setBusy] = useState(false)
@@ -250,13 +288,25 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
 
   const nameErr = name.trim() === '' ? 'Ismni kiriting' : null
   const pinErr = !cur && pin.length < PIN_MIN ? 'PIN kamida ' + PIN_MIN + ' ta raqam' : null
+  const waiterOn = role === 'waiter' || isWaiter
+  const pct = pctStr.trim() === '' ? NaN : Number(pctStr.replace(',', '.'))
+  const pctErr = waiterOn && !(pct >= 0 && pct <= 100) ? "Foiz 0 dan 100 gacha bo'lishi kerak" : null
+
+  const pickRole = (r: Role) => {
+    setRole(r)
+    if (r === 'waiter') setIsWaiter(true)
+  }
+  const onPctInput = (v: string) => {
+    const clean = v.replace(/[^0-9.,]/g, '').replace('.', ',')
+    if (/^\d{0,3}(,\d{0,2})?$/.test(clean)) setPctStr(clean)
+  }
 
   const save = async () => {
     setTried(true)
-    if (nameErr || pinErr || busy) return
+    if (nameErr || pinErr || pctErr || busy) return
     setBusy(true)
     try {
-      await api.staff.save({ ...(cur ?? {}), name: name.trim(), role, pin: cur ? '' : pin, isProvider, isWaiter: cur?.isWaiter ?? false, commissionPct: cur?.commissionPct ?? 0, active })
+      await api.staff.save({ ...(cur ?? {}), name: name.trim(), role, pin: cur ? '' : pin, isProvider, isWaiter: waiterOn, commissionPct: waiterOn ? pct : (cur?.commissionPct ?? 0), active })
       toast.success(cur ? 'Saqlandi' : name.trim() + " qo'shildi")
       onSaved()
     } catch (e) {
@@ -296,7 +346,7 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
             <Segmented
               block
               value={role}
-              onChange={(v) => setRole(v as Role)}
+              onChange={(v) => pickRole(v as Role)}
               options={ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r], disabled: isMe && r !== role }))}
             />
           </Field>
@@ -307,6 +357,47 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
             label="Xizmat ko'rsatuvchi"
             description="Massaj kabi xizmatlarda xodim sifatida tanlanadi"
           />
+          <Switch
+            checked={waiterOn}
+            onChange={setIsWaiter}
+            disabled={role === 'waiter'}
+            label="Ofitsiant (xonaga biriktiriladi)"
+            description={role === 'waiter' ? "Ofitsiant lavozimida doim yoqilgan" : 'Xona ochilganda tanlanadi va bar savdosidan foiz oladi'}
+            data-testid="staff-waiter-switch"
+          />
+          {waiterOn && (
+            <div className="staff-pct">
+              <Field label="Ofitsiant foizi" required error={tried ? pctErr : null} hint="Faqat bar mahsulotlaridan; xizmatlar va xona vaqti kirmaydi">
+                <Input
+                  size="lg"
+                  inputMode="decimal"
+                  className="staff-pct__input"
+                  value={pctStr}
+                  invalid={tried && !!pctErr}
+                  suffix="%"
+                  onChange={(e) => onPctInput(e.target.value)}
+                  data-testid="staff-pct"
+                />
+              </Field>
+              <div className="staff-pct__presets" role="group" aria-label="Tezkor foiz">
+                {PCT_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    className={cx('staff-pct__chip', pct === p && 'is-active')}
+                    onClick={() => setPctStr(String(p))}
+                  >
+                    {p}%
+                  </button>
+                ))}
+              </div>
+              {pct > 0 && pct <= 100 && (
+                <div className="staff-pct__example subtle">
+                  Misol: xonada 200 000 so'mlik bar mahsuloti sotilsa — haq {formatMoney(Math.round(200000 * pct / 100))} so'm
+                </div>
+              )}
+            </div>
+          )}
           <Switch
             checked={active}
             onChange={setActive}

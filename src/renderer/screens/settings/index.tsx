@@ -13,17 +13,19 @@ import { RoomsSection } from './RoomsSection'
 import { ReceiptSection } from './ReceiptSection'
 import { SecuritySection } from './SecuritySection'
 import { BillingSection } from './BillingSection'
+import { AppearanceSection } from './AppearanceSection'
 import { BackupSection } from './BackupSection'
 import { AboutSection, APP_VERSION } from './AboutSection'
 import './settings.css'
 
-type SectionId = 'rooms' | 'receipt' | 'security' | 'billing' | 'backup' | 'about'
+type SectionId = 'rooms' | 'receipt' | 'security' | 'billing' | 'appearance' | 'backup' | 'about'
 
 const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'rooms', label: 'Xonalar', desc: 'Narx, sig\'im, tartib', icon: 'rooms' },
   { id: 'receipt', label: 'Chek', desc: 'Matn, printer', icon: 'receipt' },
   { id: 'security', label: 'Xavfsizlik', desc: 'Qulf, PIN', icon: 'shield' },
-  { id: 'billing', label: 'Hisob-kitob', desc: 'Yaxlitlash', icon: 'percent' },
+  { id: 'billing', label: 'Hisob-kitob', desc: 'Soat, blok, yaxlitlash', icon: 'percent' },
+  { id: 'appearance', label: "Ko'rinish", desc: 'Kunduzgi / tungi', icon: 'sun' },
   { id: 'backup', label: 'Zaxira', desc: 'Nusxa, tiklash', icon: 'database' },
   { id: 'about', label: 'Haqida', desc: 'Versiya ' + APP_VERSION, icon: 'info' }
 ]
@@ -128,7 +130,8 @@ export default function SettingsScreen() {
     body =
       tab === 'receipt' ? <ReceiptSection {...p} />
         : tab === 'security' ? <SecuritySection {...p} />
-          : <BillingSection {...p} />
+          : tab === 'appearance' ? <AppearanceSection {...p} />
+            : <BillingSection {...p} />
   }
 
   return (

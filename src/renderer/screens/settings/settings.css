@@ -368,3 +368,39 @@
   .set-rooms { --dt-cols: 44px minmax(120px, 1fr) 150px 92px 100px 112px; }
   .set-rooms .ui-dt__row { gap: var(--sp-3); padding-left: var(--sp-4); padding-right: var(--sp-4); }
 }
+
+/* ── Hisob-kitob sozlamalari ── */
+.set-bill { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5) var(--sp-5); width: 100%; max-width: 1040px; }
+.set-bill__item { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.set-bill__item.is-wide { grid-column: 1 / -1; }
+.set-bill__title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
+.set-bill__title svg { color: var(--accent); flex: none; }
+.set-bill__hint { font-size: var(--fs-sm); color: var(--text-3); }
+.set-bill__ex { padding: var(--sp-2) 0; border-bottom: 1px dashed var(--line); }
+.set-bill__ex:last-child { border-bottom: 0; }
+.set-bill__ex-text { font-size: var(--fs-md); color: var(--text-2); }
+.set-bill__ex-text b { color: var(--text); font-weight: var(--fw-semibold); }
+.set-bill__ex-text b.t-danger { color: var(--danger); }
+.set-bill__ex-text b.t-success { color: var(--free); }
+.set-section__body > .set-bill { max-width: 1040px; }
+
+/* ── Ko'rinish ── */
+.set-theme { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
+.set-theme__opt {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3);
+  min-height: 180px; padding: var(--sp-5); border: 2px solid var(--line); border-radius: var(--r-lg);
+  background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+.set-theme__opt:hover { border-color: var(--line-strong); }
+.set-theme__opt:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.set-theme__opt.is-active { border-color: var(--accent); background: var(--accent-soft); }
+.set-theme__icon {
+  display: flex; align-items: center; justify-content: center; width: 64px; height: 64px;
+  border-radius: var(--r-md); background: var(--surface-3); color: var(--text-2);
+}
+.set-theme__opt.is-active .set-theme__icon { background: var(--accent-fill); color: var(--accent-ink); }
+.set-theme__head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
+.set-theme__label { flex: 1; font-size: var(--fs-xl); font-weight: var(--fw-bold); }
+.set-theme__check { color: var(--accent); }
+.set-theme__desc { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.4; }
