@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GuestView, LineView, ReceiptData, SessionView } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
-import { formatCountdown, formatHours } from '@shared/billing'
+import { MS_MIN, formatCountdown, formatHours } from '@shared/billing'
 import {
   Avatar, Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, confirmDialog, cx, formatClock,
   formatMoney, getNow, isAnyModalOpen, toast
@@ -136,7 +136,10 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   const active = live.running + live.paused
   const capFull = active >= room.capacity
   const activeLines = view.lines.filter((l) => l.activeQty > 0)
-  const canCancel = canManage && activeLines.length === 0 && view.payments.length === 0 && (live.timeTotal === 0 || canDiscount)
+  // Oldindan olingan vaqt summasi darhol paydo bo'ladi — shuning uchun server kabi "o'tirgan vaqt" bo'yicha:
+  // hech kim 1 daqiqa o'tirmagan bo'lsa (xato ochilgan) kassir ham bekor qila oladi
+  const freshOpen = live.guests.every((g) => g.elapsedMs < MS_MIN)
+  const canCancel = canManage && activeLines.length === 0 && view.payments.length === 0 && (freshOpen || canDiscount)
   const guestLabel = (id: number | null) => (id == null ? null : view.guests.find((g) => g.id === id)?.label ?? 'Mehmon')
   const lines = view.lines.slice().sort((a, b) => b.createdAt - a.createdAt || b.id - a.id)
 

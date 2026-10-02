@@ -3,7 +3,7 @@
  *
  *  - `backend` (worker): har bir worker o'z dev-serverini (alohida port + alohida baza papkasi) ko'taradi.
  *    Vite `/rpc` ni `e2e-backend` cookie bo'yicha shu serverga yo'naltiradi (tests/e2e/vite.e2e.config.ts).
- *  - `pos` (test): toza baza (Ega/Admin/Kassir/Massajchi + standart xonalar/katalog), soat T0 da muzlatilgan
+ *  - `pos` (test): toza baza (Ega/Admin/Kassir/Massajchi + ofitsiantlar Sardor/Bekzod + standart xonalar/katalog), soat T0 da muzlatilgan
  *    (server ham, brauzer ham — `page.clock.setFixedTime`), konsol tinglovchisi.
  *    Har test oxirida konsolda kutilmagan error/warning yoki sahifa istisnosi bo'lsa — test yiqiladi.
  */

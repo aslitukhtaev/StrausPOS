@@ -15,18 +15,98 @@ export function tile(pos: Pos, room: string): Locator {
   return pos.page.locator(`.rooms-tile[data-room="${room}"]`)
 }
 
-/** Bosh ekrandan bo'sh xonani N mehmon bilan ochadi va sessiya oynasiga kiradi. */
-export async function openRoom(pos: Pos, room: string, guests: number): Promise<void> {
+export interface OpenOpts {
+  /** Har mehmonga olinadigan vaqt, daqiqa (standart 60 = sozlamalardagi defaultHours=1). 60/120/180/240 — tezkor tugma, boshqasi "Boshqa" */
+  minutes?: number
+  /** Ofitsiant ismi (masalan "Sardor"); null/yo'q — "Ofitsiant biriktirilmadi!" ogohlantirishi → "Ofitsiantsiz boshlash" */
+  waiter?: string | null
+}
+
+/** "2 soat", "1 soat 30 daq", "45 daq" — billing.formatHours bilan bir xil */
+export function hoursText(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h && m) return `${h} soat ${m} daq`
+  if (h) return `${h} soat`
+  return `${m} daq`
+}
+
+/** Vaqt tanlash (TimePicker) — ochish va "Mehmon qo'shish" oynalarida */
+export async function pickTime(d: Locator, minutes: number): Promise<void> {
+  const quick = d.locator('.rooms-time__btn').filter({ has: d.page().locator('.rooms-time__n', { hasText: new RegExp('^' + minutes / 60 + '$') }) })
+  if (minutes % 60 === 0 && minutes >= 60 && minutes <= 240) {
+    await quick.click()
+    await expect(quick).toHaveAttribute('aria-pressed', 'true')
+    return
+  }
+  await d.locator('.rooms-time__btn--other').click()
+  const [hs, ms] = [d.locator('.rooms-time__custom .ui-stepper').nth(0), d.locator('.rooms-time__custom .ui-stepper').nth(1)]
+  const val = async (st: Locator) => money(await st.locator('.ui-stepper__value').textContent())
+  const th = Math.floor(minutes / 60)
+  const tm = minutes % 60
+  for (let i = 0; i < 40 && (await val(hs)) !== th; i++) {
+    await hs.getByRole('button', { name: (await val(hs)) < th ? "Ko'paytirish" : 'Kamaytirish' }).click()
+  }
+  for (let i = 0; i < 10 && (await val(ms)) !== tm; i++) {
+    await ms.getByRole('button', { name: (await val(ms)) < tm ? "Ko'paytirish" : 'Kamaytirish' }).click()
+  }
+  expect(await val(hs)).toBe(th)
+  expect(await val(ms)).toBe(tm)
+}
+
+/**
+ * Bosh ekrandan bo'sh xonani N mehmon bilan ochadi (vaqt + ofitsiant tanlab) va sessiya oynasiga kiradi.
+ * Ofitsiant berilmasa — "Ofitsiant biriktirilmadi!" ogohlantirishi chiqishi tekshiriladi va "Ofitsiantsiz boshlash" bosiladi.
+ */
+export async function openRoom(pos: Pos, room: string, guests: number, opts: OpenOpts = {}): Promise<void> {
   const { page } = pos
+  const minutes = opts.minutes ?? 60
+  const waiter = opts.waiter ?? null
   await tile(pos, room).click()
   const d = pos.dialog(room + ' — xonani ochish')
   await expect(d).toBeVisible()
+  // Ofitsiantlar ro'yxati yuklanguncha kutamiz (aks holda ogohlantirish mantiqi hali ishlamaydi)
+  await expect(d.locator('.rooms-waiter').first()).toBeVisible()
   await d.locator('.rooms-open__n', { hasText: new RegExp('^' + guests + '$') }).click()
-  await d.getByRole('button', { name: `Boshlash · ${guests} kishi` }).click()
+  await pickTime(d, minutes)
+  if (waiter) {
+    const w = d.locator(`.rooms-waiter[data-waiter="${waiter}"]`)
+    await w.click()
+    await expect(w).toHaveAttribute('aria-checked', 'true')
+  }
+  await d.getByRole('button', { name: `Boshlash · ${guests} kishi · ${hoursText(minutes)}` }).click()
+  if (!waiter) {
+    const warn = page.locator('.ui-modal.rooms-nowaiter')
+    await expect(warn).toContainText('Ofitsiant biriktirilmadi!')
+    await warn.getByRole('button', { name: 'Ofitsiantsiz boshlash' }).click()
+  }
   await expect(pos.toast(`${room} ochildi`)).toBeVisible()
   await expect(d).toHaveCount(0)
   await enterSession(pos, room)
   await expect(page.locator('.rooms-guest')).toHaveCount(guests)
+}
+
+/** Sessiya oynasidagi ofitsiant tasmasi orqali biriktirish / almashtirish */
+export async function setWaiterUi(pos: Pos, name: string): Promise<void> {
+  const strip = pos.page.getByTestId('waiter-strip')
+  await strip.getByRole('button', { name: /Biriktirish|Almashtirish/ }).click()
+  const d = pos.dialog(/Ofitsiant(ni)? (biriktirish|almashtirish)/i)
+  await expect(d).toBeVisible()
+  await d.locator(`.rooms-waiter[data-waiter="${name}"]`).click()
+  await d.getByRole('button', { name: 'Biriktirish', exact: true }).click()
+  await expect(pos.toast(`Ofitsiant biriktirildi: ${name}`)).toBeVisible()
+  await expect(d).toHaveCount(0)
+  await expect(strip).toContainText(name)
+}
+
+/** "Mehmon qo'shish" → vaqt tanlash → "Qo'shish · …" */
+export async function addGuest(pos: Pos, minutes = 60): Promise<void> {
+  await pos.page.getByRole('button', { name: "Mehmon qo'shish" }).click()
+  const d = pos.dialog("Mehmon qo'shish")
+  await expect(d).toBeVisible()
+  await pickTime(d, minutes)
+  await d.getByRole('button', { name: `Qo'shish · ${hoursText(minutes)}` }).click()
+  await expect(d).toHaveCount(0)
 }
 
 /** Band xona kartasini bosib sessiya oynasiga kirish */

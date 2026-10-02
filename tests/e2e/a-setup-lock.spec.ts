@@ -7,13 +7,16 @@ test('Setup: biznes va ega → PIN tasdig\'i → avtomatik kirish → qulf → P
   await pos.backend.reset(false) // xodimlar yo'q → birinchi ishga tushirish
   await pos.open()
   await expect(page.getByRole('heading', { name: 'Xush kelibsiz!' })).toBeVisible()
+  // Brend: Delfin Sauna (sarlavha, logotip)
+  await expect(page).toHaveTitle('Delfin Sauna')
+  await expect(page.getByRole('img', { name: 'Delfin Sauna' }).first()).toBeVisible()
 
   // Bo'sh maydonlar bilan davom etib bo'lmaydi
   await page.getByRole('button', { name: 'Davom etish' }).click()
   await expect(page.getByText('Biznes nomini kiriting')).toBeVisible()
   await expect(page.getByText('Ismingizni kiriting')).toBeVisible()
 
-  await page.getByPlaceholder('Masalan: Straus Sauna').fill('Test Sauna')
+  await page.getByPlaceholder('Masalan: Delfin Sauna').fill('Delfin Sauna Chilonzor')
   await page.getByPlaceholder('Ism Familiya').fill('Bekzod')
   await page.getByRole('button', { name: 'Davom etish' }).click()
   await expect(page.getByRole('heading', { name: "PIN kod o'rnating" })).toBeVisible()
@@ -32,12 +35,12 @@ test('Setup: biznes va ega → PIN tasdig\'i → avtomatik kirish → qulf → P
 
   await expect(page.locator('.shell')).toBeVisible()
   await expect(page.locator('.topbar__username')).toHaveText('Bekzod')
-  await expect(page.locator('.topbar__bizname')).toHaveText('Test Sauna')
+  await expect(page.locator('.topbar__bizname')).toHaveText('Delfin Sauna Chilonzor')
   await expect(pos.toast('Xush kelibsiz, Bekzod!')).toBeVisible()
   // Standart xonalar yaratilgan
   await expect(page.locator('[data-room="Sauna 1"]')).toBeVisible()
   // Ega barcha bo'limlarni ko'radi
-  for (const l of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Xodimlar', 'Sozlamalar']) {
+  for (const l of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
     await expect(page.locator('.side__item', { hasText: l })).toBeVisible()
   }
   // Setup qayta chaqirilmaydi
@@ -51,7 +54,7 @@ test('Setup: biznes va ega → PIN tasdig\'i → avtomatik kirish → qulf → P
   await page.keyboard.press('Enter')
   await expect(page.locator('.lock-pin__error')).toContainText("PIN noto'g'ri")
   // Biznes nomi qulf ekranida ham ko'rinadi
-  await expect(page.locator('.auth')).toContainText('Test Sauna')
+  await expect(page.locator('.auth')).toContainText('Delfin Sauna Chilonzor')
 
   await pos.typeDigits('5678')
   await page.keyboard.press('Enter')

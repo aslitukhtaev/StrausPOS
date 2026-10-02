@@ -15,14 +15,17 @@ test('Sahifa yangilanishi: ochiq sessiya va jonli vaqt davom etadi', async ({ po
   await page.reload()
   // Server sessiyasi saqlangan — qulf ekrani emas, to'g'ridan-to'g'ri qobiq
   await expect(page.locator('.shell')).toBeVisible()
-  await pos.advance(30)
+  await pos.advance(31)
   await expect(tile(pos, 'Sauna 1')).toHaveAttribute('aria-label', 'Sauna 1 — band')
   await enterSession(pos, 'Sauna 1')
-  // M1: 60 daq = 50 000; M2: 30 daq (pauza) = 25 000
-  await expectGuest(pos, 'Mehmon 1', 50_000)
-  await expectGuest(pos, 'Mehmon 2', 25_000)
+  // 1 soat olingan. M1: 61 daq → 1 daqiqa oshdi → keyingi soat to'liq: 2 × 50 000 = 100 000
+  // M2: 30 daq (pauza) — olingan 1 soat baribir: 50 000; taymer 30 daqiqa qolganda to'xtagan
+  await expectGuest(pos, 'Mehmon 1', 100_000)
+  await expectGuest(pos, 'Mehmon 2', 50_000)
+  await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('+00:01:00')
+  await expect(guest(pos, 'Mehmon 2').getByTestId('countdown')).toHaveText('00:30:00')
   await expect(guest(pos, 'Mehmon 2')).toHaveClass(/rooms-guest--paused/)
-  await expectWsTotal(pos, 75_000)
+  await expectWsTotal(pos, 150_000)
 })
 
 test('Dev-server qayta ishga tushirilsa: sessiya, vaqt, buyurtma va chegirma bazadan tiklanadi', async ({ pos, page }) => {
@@ -30,12 +33,15 @@ test('Dev-server qayta ishga tushirilsa: sessiya, vaqt, buyurtma va chegirma baz
   pos.allowConsole(/Failed to load resource: the server responded with a status of 502/)
   await pos.open()
   await pos.login('admin')
-  await openRoom(pos, 'Sauna 1', 2)
+  await openRoom(pos, 'Sauna 1', 2, { waiter: 'Sardor' })
   const add = await openAdd(pos)
   await addProduct(pos, add, 'Suv 0.5 L', 3)
   await closeAdd(pos, add)
   await pos.advance(30)
   await setDiscount(pos, 5_000)
+  // Mehmon 1 ga +1 soat (paidMinutes 60 → 120)
+  await guest(pos, 'Mehmon 1').getByRole('button', { name: '1 soat' }).click()
+  await expect(pos.toast("Mehmon 1: +1 soat qo'shildi")).toBeVisible()
   await backToBoard(pos)
 
   await pos.backend.stop()
@@ -52,11 +58,16 @@ test('Dev-server qayta ishga tushirilsa: sessiya, vaqt, buyurtma va chegirma baz
   await expect(page.locator('.auth')).toBeVisible()
   await pos.login('admin')
   await enterSession(pos, 'Sauna 1')
-  // 2 × 60 daq × 50 000/60 = 100 000; Suv 3 × 5 000 = 15 000; chegirma 5 000 → 110 000
-  await expectGuest(pos, 'Mehmon 1', 50_000)
+  // M1: 2 soat olingan = 100 000; M2: 1 soat (60 daq o'tirdi, oshmagan) = 50 000; Suv 3 × 5 000 = 15 000;
+  // chegirma 5 000 → 160 000
+  await expectGuest(pos, 'Mehmon 1', 100_000)
   await expectGuest(pos, 'Mehmon 2', 50_000)
+  await expect(guest(pos, 'Mehmon 1')).toContainText('2 soat olingan')
   await expect(line(pos, 'Suv 0.5 L')).toContainText('3 × 5 000')
-  await expectWsTotal(pos, 110_000)
+  await expectWsTotal(pos, 160_000)
+  // Ofitsiant va muzlatilgan foiz ham saqlangan
+  await expect(page.getByTestId('waiter-strip')).toContainText('Sardor')
+  await expect(page.getByTestId('waiter-strip')).toContainText('10% bardan')
   const v = await pos.backend.rpc<{ session: { openedAt: number }; discount: number }>('sessions.get', 1)
   expect(v.session.openedAt).toBe(T0)
   expect(v.discount).toBe(5_000)

@@ -28,11 +28,11 @@ test('Zaxira → yangi savdo → tiklash: holat zaxira paytiga qaytadi', async (
   await expect(pos.toast('Zaxira nusxa saqlandi')).toBeVisible()
   const files = fs.readdirSync(backups).filter((f) => f.endsWith('.db'))
   expect(files).toHaveLength(1)
-  expect(files[0]).toMatch(/^straus-zaxira-2026-10-01-\d{4}\.db$/)
+  expect(files[0]).toMatch(/^delfin-zaxira-2026-10-01-\d{4}\.db$/)
 
   // Zaxiradan keyin: yana bitta savdo + ochiq sessiya
   await pos.nav('Xonalar')
-  await paySauna1(pos, 120, 100_000)
+  await paySauna1(pos, 120, 100_000) // 1 soat olingan, 120 daq o'tirdi → +1 soat blok
   await openRoom(pos, 'VIP xona', 2)
   const range = { from: T0 - 3600_000, to: T0 + 24 * 3600_000 }
   expect((await pos.backend.rpc<{ total: number }>('reports.sales', range)).total).toBe(150_000)

@@ -4,7 +4,7 @@
  */
 import { test, expect, T0 } from './fixtures'
 import {
-  addProduct, backToBoard, closeAdd, enterSession, finishReceipt, guest, line, openAdd, openRoom, startCheckout, tile
+  addGuest, addProduct, backToBoard, closeAdd, enterSession, finishReceipt, guest, line, openAdd, openRoom, startCheckout, tile, wsTotal
 } from './ui'
 
 interface View { session: { id: number; status: string }; total: number; guests: { id: number; state: string }[]; lines: { id: number }[] }
@@ -16,18 +16,25 @@ test('Sig\'im: ochishda 1..sig\'im, "Mehmon qo\'shish" to\'lganda o\'chiq, serve
   const d = pos.dialog('Sauna 1 — xonani ochish')
   await expect(d.locator('.rooms-open__n')).toHaveCount(6)
   await d.getByRole('button', { name: 'Bekor qilish' }).click()
-  expect(await pos.backend.rpcError('sessions.open', 1, 7)).toBe("Xona sig'imi 6 kishi")
-  expect(await pos.backend.rpcError('sessions.open', 1, 0)).toContain('kamida 1')
-  expect(await pos.backend.rpcError('sessions.open', 1, 2.5)).toContain('kamida 1')
+  expect(await pos.backend.rpcError('sessions.open', 1, 7, 60, null)).toBe("Xona sig'imi 6 kishi")
+  expect(await pos.backend.rpcError('sessions.open', 1, 0, 60, null)).toContain('kamida 1')
+  expect(await pos.backend.rpcError('sessions.open', 1, 2.5, 60, null)).toContain('kamida 1')
+  // Olingan vaqt: 1..max butun daqiqa; ofitsiant — faqat ofitsiant xodim
+  for (const m of [0, -60, 30.5, null]) expect(await pos.backend.rpcError('sessions.open', 1, 1, m, null)).toContain('Olingan vaqt')
+  expect(await pos.backend.rpcError('sessions.open', 1, 1, 60, pos.ids.cashier)).toBe('Ofitsiant topilmadi')
+  expect(await pos.backend.rpcError('sessions.open', 1, 1, 60, 9999)).toBe('Ofitsiant topilmadi')
 
   await openRoom(pos, 'Sauna 1', 6)
-  await expect(page.getByRole('button', { name: "Sig'im to'lgan (6)" })).toBeDisabled()
-  expect(await pos.backend.rpcError('sessions.addGuest', 1)).toBe("Xona sig'imi 6 kishi")
+  await expect(page.getByRole('button', { name: "Mehmon qo'shish" })).toBeDisabled()
+  await expect(page.getByRole('button', { name: "Mehmon qo'shish" })).toContainText("To'lgan (6)")
+  expect(await pos.backend.rpcError('sessions.addGuest', 1, 60)).toBe("Xona sig'imi 6 kishi")
+  expect(await pos.backend.rpcError('sessions.extendGuest', 1, 0)).toContain("Qo'shiladigan vaqt")
   // Bitta mehmon chiqib ketdi → joy bo'shadi → yangi mehmon qo'shiladi
   await guest(pos, 'Mehmon 6').getByRole('button', { name: 'Tugatish' }).click()
   await page.getByRole('button', { name: 'Ha, tugatish' }).click()
-  await page.getByRole('button', { name: "Mehmon qo'shish" }).click()
+  await addGuest(pos, 120)
   await expect(guest(pos, 'Mehmon 7')).toBeVisible()
+  await expect(guest(pos, 'Mehmon 7')).toContainText('2 soat olingan')
   // Endi chiqib ketgan mehmon qaytib kela olmaydi (sig'im to'la)
   await guest(pos, 'Mehmon 6').getByRole('button', { name: /Qaytib keldi/ }).click()
   await expect(pos.toast("Xona sig'imi 6 kishi")).toBeVisible()
@@ -125,19 +132,25 @@ test('Ikki marta to\'lash: UI ikki bosish bitta to\'lov; server qayta to\'lovni 
   expect(await b.rpcError('checkout.pay', 2, [{ method: 'bitcoin', amount: 50_000 }], null)).toContain('usuli')
 })
 
-test('0 so\'mlik sessiya: darhol bekor qilish va 0 so\'mga to\'lash; buyurtmali sessiyani bekor qilib bo\'lmaydi', async ({ pos, page }) => {
+test('Bekor qilish va 0 so\'mlik to\'lov: kassir xato ochilgan xonani darhol bekor qiladi; bepul xona 0 so\'mga yopiladi; buyurtmali sessiya bekor qilinmaydi', async ({ pos, page }) => {
+  // Tayyorlash (ega nomidan, UI dan oldin): Sauna 1 narxi 0 (bepul xona) — 0 so'mlik chek uchun
+  await pos.backend.loginAs('owner', pos.ids)
+  await pos.backend.rpc('rooms.save', { id: 1, name: 'Sauna 1', pricePerHour: 0, capacity: 6 })
+  await pos.backend.rpc('auth.logout')
   await pos.open()
   await pos.login('cashier')
-  await openRoom(pos, 'Sauna 1', 3)
+  await openRoom(pos, 'Sauna 2', 3)
+  // Oldindan olingan vaqt darhol hisoblanadi (3 × 60 000), lekin hech kim 1 daqiqa o'tirmagan — bekor qilish mumkin
+  expect(await wsTotal(pos)).toBe(180_000)
   await page.getByRole('button', { name: 'Sessiyani bekor qilish' }).click()
   await page.getByRole('button', { name: 'Ha, bekor qilish' }).click()
-  await expect(pos.toast("Sauna 1 bekor qilindi va bo'shatildi")).toBeVisible()
-  await expect(tile(pos, 'Sauna 1')).toHaveAttribute('aria-label', "Sauna 1 — bo'sh")
+  await expect(pos.toast("Sauna 2 bekor qilindi va bo'shatildi")).toBeVisible()
+  await expect(tile(pos, 'Sauna 2')).toHaveAttribute('aria-label', "Sauna 2 — bo'sh")
   expect(await pos.backend.rpcError('checkout.receipt', 1)).toBe('Sessiya bekor qilingan')
 
-  // 0 so'mlik to'lov (mehmon 1 daqiqadan kam qoldi)
+  // 0 so'mlik to'lov (bepul xona)
   await openRoom(pos, 'Sauna 1', 1)
-  await pos.setNow(pos.now + 50_000)
+  await pos.advance(30)
   const co = await startCheckout(pos)
   await co.getByRole('button', { name: "To'lash · 0 so'm" }).click()
   await finishReceipt(pos, 0)
@@ -255,14 +268,14 @@ test('Qaytarishdan keyin chegirma jami summadan oshmaydi (avtomatik kamayadi)', 
   await pos.login('admin')
   await openRoom(pos, 'Sauna 1', 1)
   const add = await openAdd(pos)
-  await addProduct(pos, add, 'Shashlik', 2) // 50 000, vaqt 0
+  await addProduct(pos, add, 'Shashlik', 2) // 2 × 25 000; vaqt: 1 soat olingan = 50 000
   await closeAdd(pos, add)
   const b = pos.backend
-  await b.rpc('sessions.setDiscount', 1, 40_000)
+  await b.rpc('sessions.setDiscount', 1, 90_000)
   const v = await b.rpc<View>('sessions.get', 1)
   const after = await b.rpc<View & { discount: number }>('lines.returnLine', v.lines[0].id, 1, '')
-  // gross 25 000 → chegirma 40 000 dan 25 000 ga tushadi, jami 0 (manfiy emas)
-  expect(after).toMatchObject({ discount: 25_000, total: 0 })
+  // gross 50 000 + 25 000 = 75 000 → chegirma 90 000 dan 75 000 ga tushadi, jami 0 (manfiy emas)
+  expect(after).toMatchObject({ discount: 75_000, total: 0 })
   await expect(line(pos, 'Shashlik')).toBeVisible()
 })
 

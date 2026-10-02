@@ -17,13 +17,13 @@ test('Ega: barcha ekranlar va sozlamalar bo\'limlari xatosiz ochiladi', async ({
   await addProduct(pos, add, 'Chips', 1)
   await closeAdd(pos, add)
   await pos.advance(15)
-  for (const s of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Xodimlar', 'Sozlamalar']) {
+  for (const s of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
     await pos.nav(s)
     await page.waitForTimeout(700)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)
     await expect(page.locator('.shell__main')).not.toContainText('tayyorlanmoqda')
   }
-  for (const sec of ['Xonalar', 'Chek', 'Xavfsizlik', 'Hisob-kitob', 'Zaxira', 'Haqida']) {
+  for (const sec of ['Xonalar', 'Chek', 'Xavfsizlik', 'Hisob-kitob', "Ko'rinish", 'Zaxira', 'Haqida']) {
     await page.locator('.set-nav').getByText(sec, { exact: true }).click()
     await page.waitForTimeout(700)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)

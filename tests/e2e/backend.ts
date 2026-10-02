@@ -10,12 +10,15 @@ import path from 'path'
 /** Playwright repo ildizidan ishga tushiriladi */
 export const ROOT = process.cwd()
 export const E2E_TZ = 'Asia/Tashkent'
-export const DATA_ROOT = path.join(os.tmpdir(), 'straus-e2e')
+export const DATA_ROOT = path.join(os.tmpdir(), 'delfin-e2e')
 
-export type Who = 'owner' | 'admin' | 'cashier' | 'provider'
+export type Who = 'owner' | 'admin' | 'cashier' | 'provider' | 'waiter1' | 'waiter2'
 
-export const PINS: Record<Who, string> = { owner: '1234', admin: '2222', cashier: '3333', provider: '4444' }
-export const NAMES: Record<Who, string> = { owner: 'Ega', admin: 'Administrator', cashier: 'Kassir', provider: 'Massajchi' }
+export const PINS: Record<Who, string> = { owner: '1234', admin: '2222', cashier: '3333', provider: '4444', waiter1: '5555', waiter2: '6666' }
+/** dev-server TEST_STAFF: ofitsiantlar — Sardor (10%), Bekzod (12%), rol 'waiter' */
+export const NAMES: Record<Who, string> = {
+  owner: 'Ega', admin: 'Administrator', cashier: 'Kassir', provider: 'Massajchi', waiter1: 'Sardor', waiter2: 'Bekzod'
+}
 
 export class Backend {
   proc: ChildProcess | null = null
@@ -37,7 +40,7 @@ export class Backend {
     if (reset) args.push('--reset')
     const p = spawn(tsx, args, {
       cwd: ROOT,
-      env: { ...process.env, PORT: String(this.port), STRAUS_DATA_DIR: this.dataDir, TZ: E2E_TZ, RESET: '' },
+      env: { ...process.env, PORT: String(this.port), DELFIN_DATA_DIR: this.dataDir, TZ: E2E_TZ, RESET: '' },
       stdio: ['ignore', 'pipe', 'pipe']
     })
     this.proc = p
@@ -92,7 +95,7 @@ export class Backend {
     return j
   }
 
-  /** Toza baza. setup=true → Ega/Admin/Kassir/Massajchi + standart xonalar/katalog. Server sessiyasi chiqarilgan holda qoladi. */
+  /** Toza baza. setup=true → Ega/Admin/Kassir/Massajchi/Sardor/Bekzod + standart xonalar/katalog. Server sessiyasi chiqarilgan holda qoladi. */
   async reset(setup = true): Promise<Record<Who, number> | null> {
     const r = await this.post<{ ids: Record<Who, number> | null }>('/__test/reset', { setup, login: null })
     return r.ids

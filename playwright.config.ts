@@ -52,7 +52,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${SERVER_PORT}/__test/state`,
       env: {
         PORT: String(SERVER_PORT),
-        STRAUS_DATA_DIR: path.join(os.tmpdir(), 'straus-e2e', 'default'),
+        DELFIN_DATA_DIR: path.join(os.tmpdir(), 'delfin-e2e', 'default'),
         TZ: 'Asia/Tashkent'
       },
       reuseExistingServer: false,
