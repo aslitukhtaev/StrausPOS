@@ -1,0 +1,52 @@
+# Windows o'rnatuvchisini qurish (NSIS, x64 + ia32). Qo'lda yoki teg (v*) bilan ishga tushadi.
+name: build-windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bog'liqliklar
+        run: npm ci
+
+      - name: Tur tekshiruvi
+        run: npm run typecheck
+
+      - name: Testlar (vitest)
+        run: npm test
+
+      - name: Moslik tekshiruvi (Chromium 108 / Node 16)
+        run: npm run check:compat
+
+      # Natija: StrausPOS-Setup-<v>.exe (universal: x64+ia32 avtomatik tanlaydi),
+      #         StrausPOS-Setup-<v>-x64.exe va StrausPOS-Setup-<v>-ia32.exe
+      - name: O'rnatuvchilarni qurish (x64 + ia32)
+        run: npm run dist
+        env:
+          # Kod imzosi yo'q (sertifikat qo'shilsa CSC_LINK / CSC_KEY_PASSWORD secrets orqali beriladi)
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Artefaktni yuklash
+        uses: actions/upload-artifact@v4
+        with:
+          name: StrausPOS-windows
+          path: |
+            release/*.exe
+            release/*.blockmap
+          if-no-files-found: error
+          retention-days: 30
