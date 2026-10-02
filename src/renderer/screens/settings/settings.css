@@ -380,7 +380,7 @@
 .set-bill__ex:last-child { border-bottom: 0; }
 .set-bill__ex-text { font-size: var(--fs-md); color: var(--text-2); }
 .set-bill__ex-text b { color: var(--text); font-weight: var(--fw-semibold); }
-.set-bill__ex-text b.t-danger { color: var(--danger); }
+.set-bill__ex-text b.t-danger { color: var(--danger-text); }
 .set-bill__ex-text b.t-success { color: var(--free); }
 .set-section__body > .set-bill { max-width: 1040px; }
 
@@ -404,3 +404,8 @@
 .set-theme__label { flex: 1; font-size: var(--fs-xl); font-weight: var(--fw-bold); }
 .set-theme__check { color: var(--accent); }
 .set-theme__desc { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.4; }
+.set-bill__head { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+@media (max-width: 1600px) {
+  .set-bill { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+  .set-bill__item { display: grid; grid-template-columns: 250px minmax(0, 1fr); align-items: center; gap: var(--sp-4); }
+}

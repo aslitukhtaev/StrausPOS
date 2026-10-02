@@ -108,7 +108,7 @@ export default function WaitersScreen() {
     <div className="wt">
       <PageHeader
         title="Ofitsiantlar"
-        icon="wallet"
+        icon="cash"
         subtitle={'Oylik hisob-kitob · ' + monthLabel(month)}
         actions={
           <Button variant="secondary" icon="printer" onClick={() => window.print()} disabled={!rows || rows.length === 0}>
@@ -129,9 +129,7 @@ export default function WaitersScreen() {
           <div className="wt-month__label" data-testid="wt-month">{monthLabel(month)}</div>
           <IconButton icon="chevronRight" label="Keyingi oy" size="lg" disabled={isFuture} onClick={() => setMonth((m) => shiftMonth(m, 1))} />
         </div>
-        {month !== nowMonth && (
-          <Button variant="ghost" icon="calendar" onClick={() => setMonth(nowMonth)}>Joriy oy</Button>
-        )}
+        <Button variant="ghost" icon="calendar" disabled={month === nowMonth} onClick={() => setMonth(nowMonth)}>Joriy oy</Button>
         {loading && rows && <Spinner size={24} />}
         <div className="wt-note">
           <Icon name="info" size={22} />
@@ -226,6 +224,7 @@ export default function WaitersScreen() {
                         <BalanceHint r={r} />
                       </td>
                       <td className="wt-table__tools">
+                        <div className="wt-tools">
                         {canPay && r.balance > 0 && (
                           <Button
                             variant="success"
@@ -240,6 +239,7 @@ export default function WaitersScreen() {
                           </Button>
                         )}
                         <Icon name="chevronRight" size={24} className="wt-row__chev" />
+                        </div>
                       </td>
                     </tr>
                   ))}

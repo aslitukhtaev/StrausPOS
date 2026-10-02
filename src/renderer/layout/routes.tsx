@@ -28,7 +28,7 @@ const META: Record<ScreenId, { label: string; icon: IconName; permission?: Permi
   bar: { label: 'Bar', icon: 'bar', permission: 'stock.manage' },
   debts: { label: 'Qarzlar', icon: 'debts', permission: 'debt.manage' },
   reports: { label: 'Hisobot', icon: 'reports', permission: 'reports.view' },
-  waiters: { label: 'Ofitsiantlar', icon: 'wallet', permission: 'reports.view' },
+  waiters: { label: 'Ofitsiantlar', icon: 'cash', permission: 'reports.view' },
   staff: { label: 'Xodimlar', icon: 'staff', permission: 'staff.manage' },
   settings: { label: 'Sozlamalar', icon: 'settings', permission: 'settings.manage' }
 }

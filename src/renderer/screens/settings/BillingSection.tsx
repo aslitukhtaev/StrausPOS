@@ -87,44 +87,55 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
       <div className="set-section__body">
         <div className="set-bill">
           <div className="set-bill__item">
-            <div className="set-bill__title"><Icon name="clock" size={22} /> Standart soat</div>
+            <div className="set-bill__head">
+              <div className="set-bill__title"><Icon name="clock" size={22} /> Standart soat</div>
+              <div className="set-bill__hint">Xona ochilganda har mehmonga shuncha vaqt tanlangan holda chiqadi</div>
+            </div>
             <Segmented
               block size="lg" value={d.defaultHours} onChange={(v) => set('defaultHours', v)}
               options={withCurrent(HOURS, settings.defaultHours).map((h) => ({ value: h, label: h + ' soat' }))}
             />
-            <div className="set-bill__hint">Xona ochilganda har mehmonga shuncha vaqt tanlangan holda chiqadi</div>
           </div>
           <div className="set-bill__item">
-            <div className="set-bill__title"><Icon name="plus" size={22} /> Oshib ketganda blok</div>
+            <div className="set-bill__head">
+              <div className="set-bill__title"><Icon name="plus" size={22} /> Oshib ketganda blok</div>
+              <div className="set-bill__hint">Olingan vaqtdan oshsa, har boshlangan blok to'liq qo'shiladi</div>
+            </div>
             <Segmented
               block size="lg" value={d.blockMinutes} onChange={(v) => set('blockMinutes', v)}
               options={withCurrent(BLOCKS, settings.blockMinutes).map((m) => ({ value: m, label: m === 60 ? '1 soat' : m + ' daqiqa' }))}
             />
-            <div className="set-bill__hint">Olingan vaqtdan oshsa, har boshlangan blok to'liq qo'shiladi</div>
           </div>
           <div className="set-bill__item">
-            <div className="set-bill__title"><Icon name="timer" size={22} /> Imtiyozli daqiqa</div>
+            <div className="set-bill__head">
+              <div className="set-bill__title"><Icon name="timer" size={22} /> Imtiyozli daqiqa</div>
+              <div className="set-bill__hint">
+                {d.graceMinutes === 0 ? "Qattiq: 1 daqiqa oshsa ham keyingi blok qo'shiladi" : d.graceMinutes + " daqiqagacha oshsa — qo'shimcha to'lov yo'q"}
+              </div>
+            </div>
             <Segmented
               block size="lg" value={d.graceMinutes} onChange={(v) => set('graceMinutes', v)}
               options={withCurrent(GRACE, settings.graceMinutes).map((m) => ({ value: m, label: m === 0 ? "Yo'q" : m + ' daq' }))}
             />
-            <div className="set-bill__hint">
-              {d.graceMinutes === 0 ? "Qattiq: 1 daqiqa oshsa ham keyingi blok qo'shiladi" : d.graceMinutes + " daqiqagacha oshsa — qo'shimcha to'lov yo'q"}
-            </div>
           </div>
           <div className="set-bill__item">
-            <div className="set-bill__title"><Icon name="alert" size={22} /> Ogohlantirish</div>
+            <div className="set-bill__head">
+              <div className="set-bill__title"><Icon name="alert" size={22} /> Ogohlantirish</div>
+              <div className="set-bill__hint">Vaqt tugashiga shuncha qolganda xona kartasi va taymer qizaradi</div>
+            </div>
             <Segmented
               block size="lg" value={d.warnBeforeMinutes} onChange={(v) => set('warnBeforeMinutes', v)}
-              options={withCurrent(WARN, settings.warnBeforeMinutes).map((m) => ({ value: m, label: m + ' daq qolganda' }))}
+              options={withCurrent(WARN, settings.warnBeforeMinutes).map((m) => ({ value: m, label: m + ' daqiqa' }))}
             />
-            <div className="set-bill__hint">Vaqt tugashiga shuncha qolganda xona kartasi va taymer qizaradi</div>
           </div>
           <div className="set-bill__item is-wide">
-            <div className="set-bill__title"><Icon name="cash" size={22} /> Vaqt summasini yaxlitlash (so'm)</div>
+            <div className="set-bill__head">
+              <div className="set-bill__title"><Icon name="cash" size={22} /> Yaxlitlash (so'm)</div>
+              <div className="set-bill__hint">Vaqt summasi shu songa yaxlitlanadi</div>
+            </div>
             <Segmented
               block size="lg" value={d.roundTo} onChange={(v) => set('roundTo', v)}
-              options={withCurrent(ROUND, settings.roundTo).map((r) => ({ value: r, label: r === 1 ? 'Yaxlitlamaslik' : formatMoney(r) }))}
+              options={withCurrent(ROUND, settings.roundTo).map((r) => ({ value: r, label: r === 1 ? "Yo'q" : formatMoney(r) }))}
             />
           </div>
         </div>

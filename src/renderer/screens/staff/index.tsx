@@ -181,7 +181,7 @@ export default function StaffScreen() {
                           PIN
                         </Button>
                         {s.isWaiter && canReports && (
-                          <Button variant="secondary" size="sm" icon="wallet" onClick={() => go('waiters', { staffId: s.id })}>
+                          <Button variant="secondary" size="sm" icon="cash" onClick={() => go('waiters', { staffId: s.id })}>
                             Hisob
                           </Button>
                         )}
@@ -352,22 +352,17 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
           </Field>
           {isMe && <div className="subtle">O'z lavozimingizni o'zgartira olmaysiz.</div>}
           <Switch
-            checked={isProvider}
-            onChange={setIsProvider}
-            label="Xizmat ko'rsatuvchi"
-            description="Massaj kabi xizmatlarda xodim sifatida tanlanadi"
-          />
-          <Switch
             checked={waiterOn}
             onChange={setIsWaiter}
             disabled={role === 'waiter'}
             label="Ofitsiant (xonaga biriktiriladi)"
-            description={role === 'waiter' ? "Ofitsiant lavozimida doim yoqilgan" : 'Xona ochilganda tanlanadi va bar savdosidan foiz oladi'}
+            description={role === 'waiter' ? 'Ofitsiant lavozimida doim yoqilgan' : 'Xona ochilganda tanlanadi va bar savdosidan foiz oladi'}
             data-testid="staff-waiter-switch"
           />
           {waiterOn && (
             <div className="staff-pct">
-              <Field label="Ofitsiant foizi" required error={tried ? pctErr : null} hint="Faqat bar mahsulotlaridan; xizmatlar va xona vaqti kirmaydi">
+              <Field as="div" label="Ofitsiant foizi" required error={tried ? pctErr : null} hint="Faqat bar mahsulotlaridan; xizmatlar va xona vaqti kirmaydi">
+                <div className="staff-pct__row">
                 <Input
                   size="lg"
                   inputMode="decimal"
@@ -377,8 +372,8 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
                   suffix="%"
                   onChange={(e) => onPctInput(e.target.value)}
                   data-testid="staff-pct"
+                  aria-label="Ofitsiant foizi"
                 />
-              </Field>
               <div className="staff-pct__presets" role="group" aria-label="Tezkor foiz">
                 {PCT_PRESETS.map((p) => (
                   <button
@@ -391,13 +386,21 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
                   </button>
                 ))}
               </div>
+                </div>
+              </Field>
               {pct > 0 && pct <= 100 && (
                 <div className="staff-pct__example subtle">
-                  Misol: xonada 200 000 so'mlik bar mahsuloti sotilsa — haq {formatMoney(Math.round(200000 * pct / 100))} so'm
+                  Misol: xonada <b>200 000 so'mlik</b> bar mahsuloti sotilsa — haq <b>{formatMoney(Math.round(200000 * pct / 100))} so'm</b>
                 </div>
               )}
             </div>
           )}
+          <Switch
+            checked={isProvider}
+            onChange={setIsProvider}
+            label="Xizmat ko'rsatuvchi"
+            description="Massaj kabi xizmatlarda xodim sifatida tanlanadi"
+          />
           <Switch
             checked={active}
             onChange={setActive}
