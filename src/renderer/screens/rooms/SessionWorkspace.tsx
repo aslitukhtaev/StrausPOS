@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GuestView, LineView, ReceiptData, SessionView } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
+import { useApp } from '@/store/app'
 import {
   Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, Timer, confirmDialog, cx, formatClock,
   formatMoney, getNow, isAnyModalOpen, toast
@@ -37,6 +38,8 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   onBackRef.current = onBack
 
   const canManage = useCan('session.manage')
+  // Vaqtincha: yangi mehmonga standart soat (tanlash UI keyingi bosqichda)
+  const defaultHours = useApp((s) => (s.settings ? s.settings.defaultHours : 1))
   const canPay = useCan('session.pay')
   const canReturn = useCan('line.return')
   const canDiscount = useCan('discount.apply')
@@ -247,7 +250,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
                 </Button>
                 <Button
                   icon="userPlus"
-                  onClick={() => void run('addGuest', () => api.sessions.addGuest(view.session.id))}
+                  onClick={() => void run('addGuest', () => api.sessions.addGuest(view.session.id, Math.max(1, defaultHours) * 60))}
                   disabled={capFull || (busy != null && busy !== 'addGuest')}
                   loading={busy === 'addGuest'}
                   title={capFull ? `Xona sig'imi ${room.capacity} kishi` : undefined}

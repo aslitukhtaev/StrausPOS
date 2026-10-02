@@ -4,19 +4,19 @@
  *   <Badge tone="accent">VIP</Badge>
  *   <Badge tone="danger" icon="alert">Kam qoldi</Badge>
  *   <StatusPill status="free" />              // "Bo'sh" (yashil)
- *   <StatusPill status="busy" size="lg" />    // "Band" (amber)
+ *   <StatusPill status="busy" size="lg" />    // "Band" (moviy/feruza)
  *   <StatusPill status="ending">10 daqiqa</StatusPill>  // matnni almashtirish
  *
- * Badge tone: 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+ * Badge tone: 'neutral' | 'accent' | 'success' | 'busy' (band — moviy) | 'warning' (amber) | 'danger' | 'info'
  * StatusPill status → rang va standart matn:
- *   free "Bo'sh" (yashil) · busy "Band" (amber) · ending "Tugayapti" (qizil) · debt "Qarz" (qizil)
- *   paused "Pauza" (kulrang) · running "Ishlayapti" (yashil, puls) · finished "Tugadi" (kulrang) · closed "Yopilgan"
+ *   free "Bo'sh" (yashil) · busy "Band" (moviy) · ending "Tugayapti" (qizil) · debt "Qarz" (qizil)
+ *   paused "Pauza" (amber) · running "Ishlayapti" (yashil, puls) · finished "Tugadi" (kulrang) · closed "Yopilgan"
  */
 import type { ReactNode } from 'react'
 import { cx } from './cx'
 import { Icon, type IconName } from './Icon'
 
-export type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+export type Tone = 'neutral' | 'accent' | 'success' | 'busy' | 'warning' | 'danger' | 'info'
 
 export interface BadgeProps {
   tone?: Tone
@@ -39,10 +39,10 @@ export type Status = 'free' | 'busy' | 'ending' | 'debt' | 'paused' | 'running' 
 
 const STATUS: Record<Status, { tone: Tone; label: string; pulse?: boolean }> = {
   free: { tone: 'success', label: "Bo'sh" },
-  busy: { tone: 'warning', label: 'Band' },
+  busy: { tone: 'busy', label: 'Band' },
   ending: { tone: 'danger', label: 'Tugayapti', pulse: true },
   debt: { tone: 'danger', label: 'Qarz' },
-  paused: { tone: 'neutral', label: 'Pauza' },
+  paused: { tone: 'warning', label: 'Pauza' },
   running: { tone: 'success', label: 'Ishlayapti', pulse: true },
   finished: { tone: 'neutral', label: 'Tugadi' },
   closed: { tone: 'neutral', label: 'Yopilgan' }

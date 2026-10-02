@@ -1,4 +1,4 @@
-/* StrausPOS — global uslublar (reset, tipografiya, yordamchi klasslar). Chrome 108 ga mos. */
+/* Delfin Sauna — global uslublar (reset, tipografiya, yordamchi klasslar). Chrome 108 ga mos. */
 *,
 *::before,
 *::after {
@@ -14,11 +14,13 @@ body,
 
 html {
   -webkit-text-size-adjust: 100%;
-  color-scheme: dark;
+  /* color-scheme — tokens.css da (data-theme bo'yicha) */
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--water-light);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
   font-size: var(--fs-md);
@@ -96,8 +98,9 @@ a { color: var(--accent); }
 .t-semibold { font-weight: var(--fw-semibold); }
 .t-accent { color: var(--accent); }
 .t-success { color: var(--free); }
-.t-warning { color: var(--busy); }
-.t-danger { color: var(--danger); }
+.t-warning { color: var(--warning); }
+.t-busy { color: var(--busy); }
+.t-danger { color: var(--danger-text); }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .row { display: flex; align-items: center; gap: var(--sp-3); }

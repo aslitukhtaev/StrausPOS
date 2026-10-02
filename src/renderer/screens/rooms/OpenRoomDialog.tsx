@@ -5,19 +5,22 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Room, SessionView } from '@shared/types'
 import { api } from '@/api'
+import { useApp } from '@/store/app'
 import { Button, Modal, Stepper, cx, formatMoney, toast } from '@/ui'
 
 export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClose: () => void; onOpened: (v: SessionView) => void }) {
   const cap = Math.max(1, room.capacity)
   const [count, setCount] = useState(Math.min(2, cap))
   const [busy, setBusy] = useState(false)
+  // Vaqtincha: standart soat (soat tanlash UI keyingi bosqichda)
+  const defaultHours = useApp((s) => (s.settings ? s.settings.defaultHours : 1))
   const submitRef = useRef<() => void>(() => undefined)
 
   const submit = async () => {
     if (busy) return
     setBusy(true)
     try {
-      const v = await api.sessions.open(room.id, count)
+      const v = await api.sessions.open(room.id, count, Math.max(1, defaultHours) * 60, null)
       onOpened(v)
     } catch (e) {
       toast.error(e)

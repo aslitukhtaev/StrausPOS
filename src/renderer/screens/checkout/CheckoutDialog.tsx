@@ -67,6 +67,8 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
   const canPay = useCan('session.pay')
   const canDebt = useCan('debt.manage')
   const roundTo = useApp((s) => (s.settings ? s.settings.roundTo : null))
+  const blockMinutes = useApp((s) => (s.settings ? s.settings.blockMinutes : 60))
+  const graceMinutes = useApp((s) => (s.settings ? s.settings.graceMinutes : 0))
   const now = useNow()
 
   const [view, setView] = useState<SessionView | null>(null)
@@ -119,10 +121,10 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
     const guests = view.guests.map((g) => ({
       ...g,
       elapsedMs: guestElapsedMs(g.intervals, t),
-      timeAmount: guestTimeAmount(g.intervals, t, roundTo)
+      timeAmount: guestTimeAmount(g.intervals, g.paidMinutes, t, { roundTo, blockMinutes, graceMinutes })
     }))
     return { guests, ...computeTotals(guests, view.lines, view.session.discount) }
-  }, [view, running, tick, roundTo])
+  }, [view, running, tick, roundTo, blockMinutes, graceMinutes])
 
   const total = live ? live.total : 0
 
@@ -306,7 +308,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
       className="checkout-modal"
       title={title}
       subtitle={'Ochilgan: ' + formatClock(view.session.openedAt) + ' · ' + guests.length + ' mehmon'}
-      headerExtra={running ? <Badge tone="warning" icon="clock">Vaqt hisoblanmoqda</Badge> : undefined}
+      headerExtra={running ? <Badge tone="busy" icon="clock">Vaqt hisoblanmoqda</Badge> : undefined}
       footer={
         <div className="checkout-foot">
           <div className={cx('checkout-foot__status', err ? (softErr ? 'is-soft' : 'is-err') : 'is-ok')}>

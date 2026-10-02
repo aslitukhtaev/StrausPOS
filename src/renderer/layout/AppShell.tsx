@@ -1,5 +1,5 @@
 /**
- * Ilova qobig'i: chapda navigatsiya, tepada biznes nomi / soat / xodim / Qulflash, o'rtada joriy ekran.
+ * Ilova qobig'i: chapda logotip + navigatsiya, tepada biznes nomi / soat / rejim (quyosh/oy) / xodim / Qulflash, o'rtada joriy ekran.
  * Ekran `.shell__main` ichida to'liq balandlikda chiziladi (o'zi skrollni boshqaradi; standart padding bor).
  */
 import { useMemo } from 'react'
@@ -8,9 +8,26 @@ import { useAuth } from '../store/auth'
 import { useApp } from '../store/app'
 import { useNav } from '../store/nav'
 import { useNow } from '../store/clock'
-import { Avatar, Button, ErrorBoundary, Icon, formatClock, formatDate, cx } from '../ui'
+import { Avatar, Button, ErrorBoundary, Icon, IconButton, Logo, formatClock, formatDate, cx } from '../ui'
 import { SCREENS, screenAllowed } from './routes'
 import { useAutoLock } from './useAutoLock'
+
+/** Kunduzgi ↔ tungi tezkor almashtirgich */
+function ThemeToggle() {
+  const theme = useApp((s) => s.theme)
+  const toggle = useApp((s) => s.toggleTheme)
+  const toLight = theme === 'dark'
+  return (
+    <IconButton
+      icon={toLight ? 'sun' : 'moon'}
+      label={toLight ? 'Kunduzgi rejim' : 'Tungi rejim'}
+      variant="ghost"
+      className="topbar__theme"
+      data-testid="theme-toggle"
+      onClick={() => void toggle()}
+    />
+  )
+}
 
 function Clock() {
   const now = useNow()
@@ -38,13 +55,8 @@ export function AppShell() {
   return (
     <div className="shell">
       <aside className="shell__side">
-        <div className="side__brand" title="StrausPOS">
-          <span className="side__logo">
-            <Icon name="flame" size={26} strokeWidth={2.2} />
-          </span>
-          <span className="side__brandtext">
-            Straus<b>POS</b>
-          </span>
+        <div className="side__brand" title="Delfin Sauna">
+          <Logo size={44} variant="full" />
         </div>
         <nav className="side__nav">
           {visible.map((d) => (
@@ -65,11 +77,12 @@ export function AppShell() {
 
       <header className="shell__top">
         <div className="topbar__biz">
-          <div className="topbar__bizname ellipsis">{businessName || 'StrausPOS'}</div>
+          <div className="topbar__bizname ellipsis">{businessName || 'Delfin Sauna'}</div>
           {active && <div className="topbar__crumb">{active.label}</div>}
         </div>
         <div className="spacer" />
         <Clock />
+        <ThemeToggle />
         <div className="topbar__sep" />
         {staff && (
           <div className="topbar__user">

@@ -12,7 +12,7 @@
 }
 .rooms-board__sumlabel { font-size: var(--fs-xs); color: var(--text-2); }
 .rooms-board__offline {
-  display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: #ff7b83;
+  display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--danger-text);
   padding: 8px 12px; border-radius: var(--r-full); background: var(--danger-soft);
 }
 
@@ -24,8 +24,8 @@
 }
 
 .rooms-tile { position: relative; overflow: hidden; min-height: 268px; display: flex; flex-direction: column; border-width: 1.5px; }
-.rooms-tile__bar { height: 6px; flex: none; background: var(--free); }
-.rooms-tile--busy .rooms-tile__bar { background: var(--busy); }
+.rooms-tile__bar { height: 6px; flex: none; background: var(--free-fill); }
+.rooms-tile--busy .rooms-tile__bar { background: var(--busy-fill); }
 .rooms-tile--alert .rooms-tile__bar { background: var(--danger); }
 .rooms-tile__inner { flex: 1 1 auto; display: flex; flex-direction: column; padding: 18px 22px 20px; gap: 10px; }
 .rooms-tile__top { display: flex; align-items: flex-start; gap: 12px; }
@@ -49,7 +49,7 @@
 }
 .rooms-tile__play {
   flex: none; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: var(--free); color: #06291a; box-shadow: 0 6px 18px rgba(60, 207, 142, 0.25);
+  background: var(--free-fill); color: var(--free-ink); box-shadow: var(--free-shadow);
 }
 .rooms-tile__freetitle { display: block; font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--free); }
 .rooms-tile__freehint { display: block; font-size: var(--fs-sm); color: var(--text-2); margin-top: 2px; }
@@ -85,7 +85,7 @@
 .rooms-open__n:hover { background: var(--surface-3); border-color: var(--line-strong); }
 .rooms-open__n:active { transform: scale(0.97); }
 .rooms-open__n:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.rooms-open__n.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); box-shadow: var(--accent-glow); }
+.rooms-open__n.is-active { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-ink); box-shadow: var(--accent-glow); }
 .rooms-open__stepper { display: flex; justify-content: center; }
 .rooms-open__hint { font-size: var(--fs-sm); color: var(--text-3); }
 
@@ -97,11 +97,11 @@
 .rooms-ws__head {
   display: flex; align-items: center; gap: 18px;
   padding: 14px 22px 14px 14px; border-radius: var(--r-xl);
-  background: linear-gradient(90deg, rgba(245, 165, 36, 0.12), rgba(245, 165, 36, 0) 55%), var(--surface);
+  background: linear-gradient(90deg, var(--busy-soft), transparent 55%), var(--surface);
   border: 1.5px solid var(--busy-line); box-shadow: var(--shadow-1);
 }
 .rooms-ws--alert .rooms-ws__head {
-  background: linear-gradient(90deg, rgba(242, 85, 95, 0.13), rgba(242, 85, 95, 0) 55%), var(--surface);
+  background: linear-gradient(90deg, var(--danger-soft), transparent 55%), var(--surface);
   border-color: var(--danger-line);
 }
 .rooms-ws__back { flex: none; }
@@ -138,9 +138,9 @@
 .rooms-guest {
   display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px;
   border-radius: var(--r-lg); background: var(--surface); border: 1.5px solid var(--line-soft); box-shadow: var(--inset-hi);
-  border-left: 5px solid var(--free);
+  border-left: 5px solid var(--free-fill);
 }
-.rooms-guest--paused { border-left-color: var(--paused); background: var(--surface); }
+.rooms-guest--paused { border-left-color: var(--warning-fill); background: var(--surface); }
 .rooms-guest--finished { border-left-color: var(--line-strong); background: var(--bg-elev); }
 .rooms-guest__head { display: flex; align-items: center; gap: 10px; }
 .rooms-guest__name {
@@ -191,7 +191,7 @@
 .rooms-line__who { color: var(--text-3); }
 .rooms-line__who.is-guest { color: var(--text-2); font-weight: var(--fw-semibold); }
 .rooms-line__prov { display: inline-flex; align-items: center; gap: 4px; color: var(--info); }
-.rooms-line__ret { color: #ff7b83; font-weight: var(--fw-semibold); }
+.rooms-line__ret { color: var(--danger-text); font-weight: var(--fw-semibold); }
 .rooms-line .ui-money { white-space: nowrap; }
 .rooms-line__x.ui-btn--sm { width: 48px; }
 .rooms-line__xph { width: 48px; }
@@ -259,12 +259,12 @@
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--r-full);
   background: var(--surface); color: var(--text-2); font-size: var(--fs-xs); font-weight: var(--fw-semibold); white-space: nowrap;
 }
-.rooms-tilebtn__stock.is-low { background: var(--busy-soft); color: var(--busy); }
-.rooms-tilebtn__stock.is-out { background: var(--danger-soft); color: #ff7b83; }
+.rooms-tilebtn__stock.is-low { background: var(--warning-soft); color: var(--warning); }
+.rooms-tilebtn__stock.is-out { background: var(--danger-soft); color: var(--danger-text); }
 .rooms-tilebtn__count {
   position: absolute; top: 10px; right: 10px; min-width: 36px; height: 30px; padding: 0 8px; border-radius: var(--r-full);
   display: flex; align-items: center; justify-content: center;
-  background: var(--accent); color: var(--accent-ink); font-size: var(--fs-sm); font-weight: var(--fw-bold);
+  background: var(--accent-fill); color: var(--accent-ink); font-size: var(--fs-sm); font-weight: var(--fw-bold);
 }
 .rooms-tilebtn--service .rooms-tilebtn__foot .ui-money { color: var(--info); }
 
@@ -286,7 +286,7 @@
   background: var(--surface-2); border: 1.5px solid var(--line);
 }
 .rooms-disc__value.is-invalid { border-color: var(--danger-line); }
-.rooms-disc__err { text-align: center; color: #ff7b83; font-size: var(--fs-sm); margin-top: -6px; }
+.rooms-disc__err { text-align: center; color: var(--danger-text); font-size: var(--fs-sm); margin-top: -6px; }
 
 .rooms-move { display: flex; flex-direction: column; gap: 16px; }
 .rooms-move__list { display: flex; flex-direction: column; gap: 10px; }
@@ -304,14 +304,14 @@
   grid-area: radio; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line-strong);
   display: flex; align-items: center; justify-content: center; color: var(--accent-ink);
 }
-.rooms-move__item.is-active .rooms-move__radio { background: var(--accent); border-color: var(--accent); }
+.rooms-move__item.is-active .rooms-move__radio { background: var(--accent-fill); border-color: var(--accent-fill); }
 .rooms-move__name { grid-area: name; font-size: var(--fs-lg); font-weight: var(--fw-bold); }
 .rooms-move__cap { grid-area: cap; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-3); }
-.rooms-move__cap em { font-style: normal; color: #ff7b83; font-weight: var(--fw-semibold); }
+.rooms-move__cap em { font-style: normal; color: var(--danger-text); font-weight: var(--fw-semibold); }
 .rooms-move__price { grid-area: price; display: flex; align-items: baseline; gap: 6px; }
 .rooms-move__per { font-size: var(--fs-sm); color: var(--text-3); }
 .rooms-move__diff { margin-left: 8px; padding: 2px 8px; border-radius: var(--r-full); font-size: var(--fs-xs); font-weight: var(--fw-bold); }
-.rooms-move__diff.is-up { background: var(--busy-soft); color: var(--busy); }
+.rooms-move__diff.is-up { background: var(--warning-soft); color: var(--warning); }
 .rooms-move__diff.is-down { background: var(--free-soft); color: var(--free); }
 
 .rooms-note {

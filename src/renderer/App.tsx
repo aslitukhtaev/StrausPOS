@@ -7,7 +7,7 @@ import { startClock } from './store/clock'
 import { AppShell } from './layout/AppShell'
 import LockScreen from './screens/Lock'
 import SetupScreen from './screens/Setup'
-import { Button, ConfirmHost, EmptyState, Icon, Spinner, ToastViewport } from './ui'
+import { Button, ConfirmHost, EmptyState, Logo, Spinner, ToastViewport } from './ui'
 import Gallery from './ui/Gallery'
 
 const SHOW_GALLERY = new URLSearchParams(location.search).has('gallery')
@@ -15,9 +15,7 @@ const SHOW_GALLERY = new URLSearchParams(location.search).has('gallery')
 function Boot() {
   return (
     <div className="boot">
-      <span className="boot__logo">
-        <Icon name="flame" size={44} strokeWidth={2} />
-      </span>
+      <Logo size={88} className="boot__logo" />
       <Spinner size={32} />
     </div>
   )

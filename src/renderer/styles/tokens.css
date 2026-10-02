@@ -1,63 +1,16 @@
 /*
- * StrausPOS — dizayn tokenlari (yagona manba).
- * Qorong'i premium sauna uslubi: to'q ko'k-grafit fon, issiq oltin aksent.
+ * Delfin Sauna — dizayn tokenlari (yagona manba).
+ * Ranglar basseyn suvidan: yorqin aqua/feruza, oq ko'pik, chuqur dengiz ko'ki, delfin kumushi.
+ * Ikki rejim: <html data-theme="light|dark"> (store/app.ts qo'yadi). data-theme yo'q bo'lsa — tungi.
  * Chrome 108 cheklovi: color-mix / oklch / :has / nesting YO'Q — faqat oddiy hex/rgba.
  * Ekranlar ranglarni HECH QACHON qattiq yozmaydi — faqat shu o'zgaruvchilar.
+ *
+ * Matn/fill farqi: `--accent`, `--free`, `--busy`, `--warning`, `--danger-text` — MATN va ikonka uchun (AA kontrast);
+ * `--*-fill` — to'liq bo'yalgan yuzalar (tugma, chiziq, nuqta) uchun, ustidagi matn `--*-ink`.
  */
+
+/* ───────────── Rejimga bog'liq bo'lmagan tokenlar ───────────── */
 :root {
-  /* ── Fon va sirtlar (pastdan yuqoriga) ── */
-  --bg: #0b1019;              /* ilova foni */
-  --bg-elev: #0f1522;         /* chap panel / tepa panel */
-  --surface: #151c2b;         /* karta */
-  --surface-2: #1b2436;       /* karta ichidagi blok, input */
-  --surface-3: #232e44;       /* hover / bosilgan */
-  --surface-4: #2c3852;       /* faol segment */
-  --overlay: rgba(4, 7, 13, 0.72);
-
-  /* ── Chiziqlar ── */
-  --line: #253049;
-  --line-soft: #1d2639;
-  --line-strong: #36446a;
-
-  /* ── Matn ── */
-  --text: #eef1f7;
-  --text-2: #b4bdd0;          /* ikkilamchi */
-  --text-3: #8591aa;          /* izoh, yorliq */
-  --text-disabled: #5b6680;
-
-  /* ── Aksent: issiq oltin ── */
-  --accent: #e3b15a;
-  --accent-hover: #efc072;
-  --accent-press: #cf9d47;
-  --accent-ink: #1d1406;      /* oltin ustidagi matn */
-  --accent-soft: rgba(227, 177, 90, 0.14);
-  --accent-line: rgba(227, 177, 90, 0.42);
-  --accent-glow: 0 0 0 1px rgba(227, 177, 90, 0.35), 0 8px 28px rgba(227, 177, 90, 0.16);
-
-  /* ── Holat ranglari (xonalar) ── */
-  --free: #3ccf8e;            /* bo'sh */
-  --free-soft: rgba(60, 207, 142, 0.14);
-  --free-line: rgba(60, 207, 142, 0.45);
-  --busy: #f5a524;            /* band */
-  --busy-soft: rgba(245, 165, 36, 0.15);
-  --busy-line: rgba(245, 165, 36, 0.5);
-  --danger: #f2555f;          /* tugayapti / qarz / xato */
-  --danger-hover: #ff6a73;
-  --danger-press: #d9434d;
-  --danger-soft: rgba(242, 85, 95, 0.15);
-  --danger-line: rgba(242, 85, 95, 0.5);
-  --info: #5aa7ff;
-  --info-soft: rgba(90, 167, 255, 0.14);
-  --info-line: rgba(90, 167, 255, 0.45);
-  --paused: #9aa6c0;          /* pauzadagi mehmon */
-  --paused-soft: rgba(154, 166, 192, 0.14);
-
-  /* Semantik taxalluslar */
-  --success: var(--free);
-  --success-soft: var(--free-soft);
-  --warning: var(--busy);
-  --warning-soft: var(--busy-soft);
-
   /* ── Shrift ── Windows 7 da ham bor: Segoe UI. Tashqi shrift YO'Q (offline). */
   --font: "Segoe UI", "Segoe UI Variable", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-num: "Segoe UI", system-ui, Roboto, Arial, sans-serif;
@@ -101,13 +54,6 @@
   --r-xl: 24px;
   --r-full: 999px;
 
-  /* ── Soyalar ── */
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-2: 0 6px 18px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-3: 0 18px 48px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
-  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  --focus-ring: 0 0 0 3px rgba(227, 177, 90, 0.55);
-
   /* ── Joylashuv ── */
   --sidebar-w: 212px;
   --topbar-h: 76px;
@@ -115,6 +61,244 @@
 
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --dur: 140ms;
+
+  /* ── Fon "suv" qatlamlari: rasm va o'lcham ro'yxati mos bo'lishi shart (2 ta yorug'lik + kaustika) ── */
+  --water-image: var(--water-light), var(--water-caustics);
+  --water-size: 100% 100%, 100% 100%, 240px 160px;
+
+  /* ── Brend (logotip) — ikkala rejimda bir xil ── */
+  --brand-1: #67e8f9;   /* yuza yorug'i */
+  --brand-2: #06b6d4;   /* basseyn feruzasi */
+  --brand-3: #0369a1;   /* chuqurlik */
+  --brand-ink: #ffffff; /* delfin / ko'pik */
+
+  /* ── Qog'oz (chek oldindan ko'rish) — rejimdan qat'i nazar oq ── */
+  --paper: #ffffff;
+  --paper-ink: #111111;
+  --paper-muted: #555555;
+  --paper-error: #a00000;
+  /* Chop etish (hisobot) — kulrang shkala */
+  --print-line: #999999;
+  --print-head: #eeeeee;
+  --print-bar: #444444;
+  --print-grid: #aaaaaa;
+  --print-track: #dddddd;
+}
+
+/* ───────────── TUNGI rejim (standart): chuqur dengiz ───────────── */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Fon va sirtlar (pastdan yuqoriga) */
+  --bg: #031a2c;              /* ilova foni — tungi dengiz */
+  --bg-elev: #04223a;         /* chap panel / tepa panel */
+  --surface: #072c48;         /* karta */
+  --surface-2: #0a3555;       /* karta ichidagi blok, input */
+  --surface-3: #0e4066;       /* hover / bosilgan */
+  --surface-4: #144d78;       /* faol segment */
+  --overlay: rgba(1, 10, 20, 0.72);
+  --panel-glass: rgba(4, 34, 58, 0.92);
+
+  /* Chiziqlar */
+  --line: #124568;
+  --line-soft: #0c3655;
+  --line-strong: #1d5c88;
+
+  /* Matn (ko'pik oq → delfin kumushi) */
+  --text: #ecf8fd;
+  --text-2: #b0cddd;
+  --text-3: #85a9bf;
+  --text-disabled: #557b94;
+
+  /* Aksent: yorqin aqua */
+  --accent: #22d3ee;
+  --accent-fill: #22d3ee;
+  --accent-hover: #67e8f9;
+  --accent-press: #06b6d4;
+  --accent-ink: #022233;      /* aqua ustidagi matn */
+  --accent-soft: rgba(34, 211, 238, 0.13);
+  --accent-line: rgba(34, 211, 238, 0.42);
+  --accent-glow: 0 0 0 1px rgba(34, 211, 238, 0.4), 0 8px 28px rgba(34, 211, 238, 0.18);
+  --accent-shadow: 0 6px 20px rgba(34, 211, 238, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --accent-grad: linear-gradient(180deg, #4fe0f5 0%, #1cc6e3 100%);
+
+  /* Holat: bo'sh = yashil */
+  --free: #34d399;
+  --free-fill: #2fc58b;
+  --free-hover: #45d79d;
+  --free-press: #25ad79;
+  --free-ink: #032417;
+  --free-soft: rgba(52, 211, 153, 0.14);
+  --free-line: rgba(52, 211, 153, 0.45);
+  --free-shadow: 0 6px 18px rgba(52, 211, 153, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+
+  /* Holat: band = moviy/feruza (suv) */
+  --busy: #38bdf8;
+  --busy-fill: #38bdf8;
+  --busy-soft: rgba(56, 189, 248, 0.15);
+  --busy-line: rgba(56, 189, 248, 0.5);
+
+  /* Holat: tugayapti / oshdi / qarz / xato = qizil */
+  --danger: #f87171;
+  --danger-text: #fca5a5;
+  --danger-hover: #fb8a8a;
+  --danger-press: #ef5b5b;
+  --danger-ink: #ffffff;
+  --danger-soft: rgba(248, 113, 113, 0.15);
+  --danger-soft-2: rgba(248, 113, 113, 0.26);
+  --danger-line: rgba(248, 113, 113, 0.5);
+
+  /* Ogohlantirish va pauza = amber */
+  --warning: #fbbf24;
+  --warning-fill: #f59e0b;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+  --warning-line: rgba(251, 191, 36, 0.5);
+  --paused: #fbbf24;
+  --paused-soft: rgba(251, 191, 36, 0.14);
+
+  /* Ma'lumot (xizmat, karta to'lovi) — binafsha-moviy, aksentdan farqlanadi */
+  --info: #9bb8ff;
+  --info-soft: rgba(155, 184, 255, 0.12);
+  --info-line: rgba(155, 184, 255, 0.4);
+
+  /* Semantik taxallus */
+  --success: var(--free);
+  --success-soft: var(--free-soft);
+
+  /* Soyalar */
+  --shadow-1: 0 1px 2px rgba(0, 8, 16, 0.4);
+  --shadow-2: 0 8px 22px rgba(0, 10, 22, 0.42), 0 1px 2px rgba(0, 8, 16, 0.3);
+  --shadow-3: 0 20px 52px rgba(0, 8, 18, 0.6), 0 2px 6px rgba(0, 8, 16, 0.35);
+  --shadow-key: 0 2px 0 rgba(0, 8, 16, 0.3);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --focus-ring: 0 0 0 3px rgba(34, 211, 238, 0.6);
+  --hover-tint: rgba(125, 211, 252, 0.05);
+  --row-danger: linear-gradient(90deg, rgba(248, 113, 113, 0.13), rgba(248, 113, 113, 0.02) 60%);
+
+  /* Fon "suv" bezagi: nozik kaustika chiziqlari + chuqurlik nurlari (statik, animatsiyasiz) */
+  --water-caustics: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Cg fill='none' stroke='%237dd3fc' stroke-opacity='0.045' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M-10 30 C 20 12 45 48 80 28 S 140 10 170 34 S 220 50 250 26'/%3E%3Cpath d='M-10 92 C 25 74 50 112 90 90 S 150 70 180 96 S 225 110 250 88'/%3E%3Cpath d='M30 140 C 60 124 80 156 115 138 S 170 122 200 146'/%3E%3C/g%3E%3C/svg%3E");
+  --water-light:
+    radial-gradient(ellipse 70% 55% at 15% -10%, rgba(34, 211, 238, 0.13), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 110%, rgba(3, 105, 161, 0.28), transparent 70%);
+  --brand-panel-bg:
+    radial-gradient(ellipse 90% 55% at 20% 110%, rgba(34, 211, 238, 0.24), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 90% -10%, rgba(56, 189, 248, 0.16), transparent 60%),
+    linear-gradient(170deg, #06304f 0%, #04223a 55%, #021626 100%);
+  --brand-glow: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.16), transparent 60%);
+  --brand-panel-text: #ecf8fd;
+  --brand-panel-text-2: #b0cddd;
+  --brand-panel-accent: #22d3ee;
+  --brand-panel-line: #0c3655;
+
+  --avatar-1: #22d3ee;
+  --avatar-2: #7aa7ff;
+  --avatar-3: #34d399;
+  --avatar-4: #c4a1ff;
+  --avatar-5: #ff9f7a;
+  --avatar-6: #fbbf24;
+  --avatar-7: #f9a8d4;
+  --avatar-8: #a3d977;
+}
+
+/* ───────────── KUNDUZGI rejim: yorug' oq-moviy, ko'pik oq kartalar ───────────── */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #e9f6fb;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f8fb;
+  --surface-3: #e1f0f7;
+  --surface-4: #cfe7f2;
+  --overlay: rgba(3, 30, 52, 0.42);
+  --panel-glass: rgba(255, 255, 255, 0.9);
+
+  --line: #c9dfea;
+  --line-soft: #deecf3;
+  --line-strong: #a1c3d6;
+
+  --text: #062a40;
+  --text-2: #2f5268;
+  --text-3: #52718a;
+  --text-disabled: #93aebf;
+
+  --accent: #0e7490;          /* matn: oq ustida 5.4:1 */
+  --accent-fill: #06b6d4;     /* tugma: ustida to'q ko'k matn 7:1 */
+  --accent-hover: #22c4e0;
+  --accent-press: #0aa3c0;
+  --accent-ink: #022233;
+  --accent-soft: rgba(6, 182, 212, 0.12);
+  --accent-line: rgba(8, 145, 178, 0.45);
+  --accent-glow: 0 0 0 1px rgba(8, 145, 178, 0.45), 0 8px 24px rgba(6, 182, 212, 0.22);
+  --accent-shadow: 0 6px 18px rgba(6, 182, 212, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  --accent-grad: linear-gradient(180deg, #2fd0ea 0%, #06b6d4 100%);
+
+  --free: #15803d;
+  --free-fill: #22c55e;
+  --free-hover: #2ed36b;
+  --free-press: #1aa94f;
+  --free-ink: #04240f;
+  --free-soft: rgba(34, 197, 94, 0.13);
+  --free-line: rgba(21, 128, 61, 0.4);
+  --free-shadow: 0 6px 16px rgba(34, 197, 94, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+
+  --busy: #0369a1;
+  --busy-fill: #0ea5e9;
+  --busy-soft: rgba(14, 165, 233, 0.12);
+  --busy-line: rgba(3, 105, 161, 0.4);
+
+  --danger: #dc2626;
+  --danger-text: #b91c1c;
+  --danger-hover: #e53b3b;
+  --danger-press: #c41f1f;
+  --danger-ink: #ffffff;
+  --danger-soft: rgba(220, 38, 38, 0.1);
+  --danger-soft-2: rgba(220, 38, 38, 0.18);
+  --danger-line: rgba(220, 38, 38, 0.42);
+
+  --warning: #b45309;
+  --warning-fill: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.14);
+  --warning-line: rgba(180, 83, 9, 0.4);
+  --paused: #b45309;
+  --paused-soft: rgba(245, 158, 11, 0.14);
+
+  --info: #1d4ed8;
+  --info-soft: rgba(37, 99, 235, 0.07);
+  --info-line: rgba(29, 78, 216, 0.3);
+
+  --shadow-1: 0 1px 2px rgba(6, 50, 80, 0.08), 0 1px 1px rgba(6, 50, 80, 0.04);
+  --shadow-2: 0 8px 22px rgba(6, 60, 95, 0.12), 0 1px 3px rgba(6, 50, 80, 0.08);
+  --shadow-3: 0 22px 54px rgba(4, 40, 70, 0.22), 0 2px 8px rgba(4, 40, 70, 0.1);
+  --shadow-key: 0 2px 0 rgba(6, 60, 95, 0.1);
+  --inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --focus-ring: 0 0 0 3px rgba(6, 182, 212, 0.5);
+  --hover-tint: rgba(6, 182, 212, 0.05);
+  --row-danger: linear-gradient(90deg, rgba(220, 38, 38, 0.09), rgba(220, 38, 38, 0.01) 60%);
+
+  --water-caustics: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Cg fill='none' stroke='%2306b6d4' stroke-opacity='0.08' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M-10 30 C 20 12 45 48 80 28 S 140 10 170 34 S 220 50 250 26'/%3E%3Cpath d='M-10 92 C 25 74 50 112 90 90 S 150 70 180 96 S 225 110 250 88'/%3E%3Cpath d='M30 140 C 60 124 80 156 115 138 S 170 122 200 146'/%3E%3C/g%3E%3C/svg%3E");
+  --water-light:
+    radial-gradient(ellipse 70% 55% at 10% -10%, rgba(103, 232, 249, 0.35), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 100% 110%, rgba(56, 189, 248, 0.22), transparent 70%);
+  --brand-panel-bg:
+    radial-gradient(ellipse 90% 55% at 20% 110%, rgba(255, 255, 255, 0.35), transparent 65%),
+    radial-gradient(ellipse 70% 50% at 90% -10%, rgba(165, 243, 252, 0.55), transparent 60%),
+    linear-gradient(165deg, #22c4e0 0%, #0891b2 55%, #0369a1 100%);
+  --brand-glow: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.22), transparent 60%);
+  --brand-panel-text: #ffffff;
+  --brand-panel-text-2: #e3f8fd;
+  --brand-panel-accent: #ffffff;
+  --brand-panel-line: rgba(3, 105, 161, 0.35);
+
+  --avatar-1: #0e7490;
+  --avatar-2: #1d4ed8;
+  --avatar-3: #15803d;
+  --avatar-4: #7c3aed;
+  --avatar-5: #c2410c;
+  --avatar-6: #a16207;
+  --avatar-7: #be185d;
+  --avatar-8: #4d7c0f;
 }
 
 @media (min-width: 1600px) {

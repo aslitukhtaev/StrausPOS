@@ -16,11 +16,12 @@ const PIN_MIN = 4
 const PIN_MAX = 6
 
 const ROLES: Role[] = ['owner', 'admin', 'cashier']
-const ROLE_TONE: Record<Role, 'accent' | 'info' | 'neutral'> = { owner: 'accent', admin: 'info', cashier: 'neutral' }
+const ROLE_TONE: Record<Role, 'accent' | 'info' | 'neutral'> = { owner: 'accent', admin: 'info', cashier: 'neutral', waiter: 'neutral' }
 const ROLE_HINT: Record<Role, string> = {
   owner: "Hamma narsa, shu jumladan xodimlar, sozlamalar va zaxira",
   admin: "Kundalik boshqaruv: bar, hisobot, qaytarish, chegirma",
-  cashier: "Xonalarni ochish, vaqt, to'lov va qarz"
+  cashier: "Xonalarni ochish, vaqt, to'lov va qarz",
+  waiter: "Xonani ochish va bar buyurtmalari (to'lovsiz)"
 }
 
 const PERM_LABELS: { perm: Permission; label: string; hint: string }[] = [
@@ -255,7 +256,7 @@ function EditDialog({ target, isMe, onClose, onSaved }: {
     if (nameErr || pinErr || busy) return
     setBusy(true)
     try {
-      await api.staff.save({ ...(cur ?? {}), name: name.trim(), role, pin: cur ? '' : pin, isProvider, active })
+      await api.staff.save({ ...(cur ?? {}), name: name.trim(), role, pin: cur ? '' : pin, isProvider, isWaiter: cur?.isWaiter ?? false, commissionPct: cur?.commissionPct ?? 0, active })
       toast.success(cur ? 'Saqlandi' : name.trim() + " qo'shildi")
       onSaved()
     } catch (e) {

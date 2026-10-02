@@ -33,8 +33,8 @@ jobs:
       - name: Moslik tekshiruvi (Chromium 108 / Node 16)
         run: npm run check:compat
 
-      # Natija: StrausPOS-Setup-<v>.exe (universal: x64+ia32 avtomatik tanlaydi),
-      #         StrausPOS-Setup-<v>-x64.exe va StrausPOS-Setup-<v>-ia32.exe
+      # Natija: DelfinSauna-Setup-<v>.exe (universal: x64+ia32 avtomatik tanlaydi),
+      #         DelfinSauna-Setup-<v>-x64.exe va DelfinSauna-Setup-<v>-ia32.exe
       - name: O'rnatuvchilarni qurish (x64 + ia32)
         run: npm run dist
         env:
@@ -44,7 +44,7 @@ jobs:
       - name: Artefaktni yuklash
         uses: actions/upload-artifact@v4
         with:
-          name: StrausPOS-windows
+          name: DelfinSauna-windows
           path: |
             release/*.exe
             release/*.blockmap

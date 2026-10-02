@@ -46,7 +46,7 @@
 .rep-svg__axis { stroke: var(--line-strong); stroke-width: 1.5; }
 .rep-svg__tick { fill: var(--text-3); font-size: 13px; font-family: var(--font); }
 .rep-svg__val { fill: var(--text-2); font-size: 13px; font-weight: 600; font-family: var(--font); }
-.rep-svg__bar { fill: var(--accent); opacity: 0.88; }
+.rep-svg__bar { fill: var(--accent-fill); opacity: 0.88; }
 .rep-svg__bar.is-active { opacity: 1; }
 .rep-days__hover { color: var(--text-2); font-size: var(--fs-sm); margin-top: var(--sp-2); }
 
@@ -56,7 +56,7 @@
 .rep-bars__name { flex: 1; font-weight: var(--fw-medium); min-width: 0; }
 .rep-bars__extra { color: var(--text-3); font-size: var(--fs-sm); }
 .rep-bars__track { height: 12px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
-.rep-bars__fill { height: 100%; border-radius: var(--r-full); background: var(--accent); }
+.rep-bars__fill { height: 100%; border-radius: var(--r-full); background: var(--accent-fill); }
 
 /* jadvallar */
 .rep-table .nowrap { white-space: nowrap; }
@@ -65,23 +65,23 @@
 
 /* chop etish */
 @media print {
-  html, body, #root { background: #fff !important; color: #000 !important; height: auto !important; overflow: visible !important; }
-  .shell { display: block !important; height: auto !important; background: #fff !important; }
+  html, body, #root { background: var(--paper) !important; color: var(--paper-ink) !important; height: auto !important; overflow: visible !important; }
+  .shell { display: block !important; height: auto !important; background: var(--paper) !important; }
   .shell__side, .shell__top, .ui-toasts, .ui-modal-root, .ui-pagehead__actions, .rep-period { display: none !important; }
   .shell__main { overflow: visible !important; padding: 0 !important; animation: none !important; }
-  .rep { gap: 12px; color: #000; }
-  .rep * { color: #000 !important; box-shadow: none !important; }
-  .rep .ui-card { background: #fff !important; border: 1px solid #999 !important; break-inside: avoid; }
+  .rep { gap: 12px; color: var(--paper-ink); }
+  .rep * { color: var(--paper-ink) !important; box-shadow: none !important; }
+  .rep .ui-card { background: var(--paper) !important; border: 1px solid var(--print-line) !important; break-inside: avoid; }
   .rep-print-head { display: block; font-size: 14px; margin-bottom: 4px; }
   .rep-print-head__biz { font-size: 22px; font-weight: 700; }
-  .rep-table th { background: #eee !important; }
+  .rep-table th { background: var(--print-head) !important; }
   .rep-kpis { grid-template-columns: repeat(3, 1fr); }
   .rep-kpi--main { grid-row: auto; grid-column: 1 / -1; }
   .rep-row, .rep-row--pay { grid-template-columns: 1fr; }
-  .rep-svg__bar { fill: #444 !important; }
-  .rep-svg__grid, .rep-svg__axis { stroke: #aaa !important; }
-  .rep-svg__tick, .rep-svg__val { fill: #000 !important; }
-  .rep-bars__track { background: #ddd !important; }
-  .rep-bars__fill { background: #444 !important; }
+  .rep-svg__bar { fill: var(--print-bar) !important; }
+  .rep-svg__grid, .rep-svg__axis { stroke: var(--print-grid) !important; }
+  .rep-svg__tick, .rep-svg__val { fill: var(--paper-ink) !important; }
+  .rep-bars__track { background: var(--print-track) !important; }
+  .rep-bars__fill { background: var(--print-bar) !important; }
   .rep-stack__seg { filter: grayscale(1); }
 }

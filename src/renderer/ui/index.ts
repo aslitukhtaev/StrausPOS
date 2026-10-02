@@ -1,5 +1,5 @@
 /**
- * StrausPOS UI kutubxonasi — ekranlar FAQAT shu yerdan import qiladi:
+ * Delfin Sauna UI kutubxonasi — ekranlar FAQAT shu yerdan import qiladi:
  *   import { Button, Modal, Money, toast, confirmDialog, useNow } from '@/ui'
  * To'liq API jadvali: src/renderer/ui/README.md
  */
@@ -11,6 +11,7 @@ export { Spinner } from './Spinner'
 export { Card, type CardProps, type CardTone } from './Card'
 export { Badge, StatusPill, type BadgeProps, type StatusPillProps, type Status, type Tone } from './Badge'
 export { Avatar } from './Avatar'
+export { Logo, DOLPHIN_PATH, type LogoProps } from './Logo'
 export { Modal, isAnyModalOpen, type ModalProps } from './Modal'
 export { ConfirmDialog, ConfirmHost, type ConfirmDialogProps } from './ConfirmDialog'
 export { ToastViewport } from './Toast'

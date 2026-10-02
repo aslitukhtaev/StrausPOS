@@ -133,7 +133,7 @@ export function RoomsSection() {
                 <span className="c num">{r.capacity} kishi</span>
                 <span className="set-rooms__badges">
                   {busy.has(r.id) ? (
-                    <Badge tone="warning">Band</Badge>
+                    <Badge tone="busy">Band</Badge>
                   ) : r.active ? (
                     <Badge tone="success">Faol</Badge>
                   ) : (

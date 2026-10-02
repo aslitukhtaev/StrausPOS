@@ -5,7 +5,7 @@
  *   <Button variant="danger" loading={busy}>O'chirish</Button>
  *   <Button block>To'liq kenglik</Button>
  *
- * variant: 'primary' (oltin, asosiy amal) | 'secondary' (standart) | 'danger' (qizil, xavfli)
+ * variant: 'primary' (aqua, asosiy amal) | 'secondary' (standart) | 'danger' (qizil, xavfli)
  *          | 'success' (yashil, to'lov/tasdiq) | 'ghost' (fonsiz, ikkinchi darajali)
  * size:    'sm' 48px | 'md' 56px (standart) | 'lg' 68px | 'xl' 84px
  * loading: spinner ko'rsatadi va bosishni bloklaydi.

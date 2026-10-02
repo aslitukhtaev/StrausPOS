@@ -1,4 +1,4 @@
-/* StrausPOS — ilova qobig'i (layout/AppShell). */
+/* Delfin Sauna — ilova qobig'i (layout/AppShell). */
 
 .boot {
   height: 100%;
@@ -8,13 +8,9 @@
   justify-content: center;
   gap: 28px;
   color: var(--accent);
-  background: radial-gradient(ellipse at 50% 40%, rgba(227, 177, 90, 0.08), transparent 60%), var(--bg);
+  background: var(--water-light), var(--bg);
 }
-.boot__logo {
-  display: flex; align-items: center; justify-content: center;
-  width: 88px; height: 88px; border-radius: 26px;
-  background: var(--accent-soft); border: 1px solid var(--accent-line);
-}
+.boot__logo .ui-logo__mark { border-radius: 26px; box-shadow: var(--accent-glow); }
 
 .shell {
   display: grid;
@@ -22,7 +18,10 @@
   grid-template-rows: var(--topbar-h) minmax(0, 1fr);
   grid-template-areas: 'side top' 'side main';
   height: 100%;
-  background: var(--bg);
+  background-color: var(--bg);
+  /* Suv bezagi: yorug'lik + nozik kaustika chiziqlari (statik) */
+  background-image: var(--water-image);
+  background-size: var(--water-size);
 }
 
 /* ── Chap navigatsiya ── */
@@ -31,7 +30,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-elev);
+  background: var(--panel-glass);
   border-right: 1px solid var(--line-soft);
 }
 .side__brand {
@@ -39,19 +38,12 @@
   align-items: center;
   gap: 10px;
   height: var(--topbar-h);
-  padding: 0 16px;
+  padding: 0 14px;
   flex: none;
   border-bottom: 1px solid var(--line-soft);
 }
-.side__logo {
-  display: flex; align-items: center; justify-content: center; flex: none;
-  width: 44px; height: 44px; border-radius: 13px;
-  background: linear-gradient(160deg, #f1c878, #c8913c);
-  color: #2a1a04;
-  box-shadow: 0 6px 16px rgba(227, 177, 90, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-.side__brandtext { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: var(--fw-semibold); letter-spacing: 0.01em; color: var(--text); }
-.side__brandtext b { color: var(--accent); font-weight: var(--fw-bold); }
+.side__brand .ui-logo { min-width: 0; }
+.side__brand .ui-logo__mark { border-radius: 12px; box-shadow: var(--accent-shadow); }
 
 .side__nav {
   flex: 1 1 auto;
@@ -81,8 +73,8 @@
 .side__item:hover { background: var(--surface); color: var(--text); }
 .side__item:active { background: var(--surface-2); }
 .side__item.is-active {
-  background: linear-gradient(90deg, rgba(227, 177, 90, 0.16), rgba(227, 177, 90, 0.04));
-  border-color: rgba(227, 177, 90, 0.22);
+  background: linear-gradient(90deg, var(--accent-soft), transparent);
+  border-color: var(--accent-line);
   color: var(--text);
 }
 .side__item.is-active::before {
@@ -93,7 +85,7 @@
   bottom: 14px;
   width: 4px;
   border-radius: 0 4px 4px 0;
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 .side__item.is-active .ui-icon { color: var(--accent); }
 .side__foot {
@@ -115,7 +107,7 @@
   align-items: center;
   gap: 20px;
   padding: 0 var(--page-pad);
-  background: var(--bg-elev);
+  background: var(--panel-glass);
   border-bottom: 1px solid var(--line-soft);
   min-width: 0;
 }
@@ -131,6 +123,8 @@
 .topbar__username { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
 .topbar__role { font-size: var(--fs-sm); color: var(--accent); }
 .topbar__lock { flex: none; }
+.topbar__theme { flex: none; color: var(--accent); }
+.topbar__theme:hover:not(:disabled) { color: var(--accent); }
 
 /* ── Asosiy maydon ── */
 .shell__main {

@@ -96,7 +96,7 @@ export default function SetupScreen() {
                 <p className="auth__lead">Keling, dasturni sizning biznesingizga moslaymiz.</p>
               </div>
               <Field label="Biznes nomi" error={bizErr} hint="Chekda va ekranda ko'rinadi">
-                <Input size="lg" icon="rooms" value={biz} onChange={(e) => setBiz(e.target.value)} placeholder="Masalan: Straus Sauna" autoFocus maxLength={60} invalid={!!bizErr} />
+                <Input size="lg" icon="rooms" value={biz} onChange={(e) => setBiz(e.target.value)} placeholder="Masalan: Delfin Sauna" autoFocus maxLength={60} invalid={!!bizErr} />
               </Field>
               <Field label="Egasining ismi" error={ownerErr}>
                 <Input size="lg" icon="user" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Ism Familiya" maxLength={60} invalid={!!ownerErr} />

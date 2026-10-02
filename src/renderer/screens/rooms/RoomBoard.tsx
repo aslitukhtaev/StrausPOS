@@ -10,7 +10,7 @@ import {
   Button, Card, EmptyState, Icon, IconButton, Money, PageHeader, Spinner, StatusPill, Timer, cx, formatClock, formatMoney,
   getNow, toast, useNow
 } from '@/ui'
-import { alertLabel, liveTotals, roomTone, useRoundTo, type LiveTotals } from './live'
+import { alertLabel, liveTotals, roomTone, useBillingOptions, type LiveTotals } from './live'
 import { OpenRoomDialog } from './OpenRoomDialog'
 
 const REFRESH_MS = 10_000
@@ -53,12 +53,12 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
   }, [load])
 
   const now = useNow()
-  const roundTo = useRoundTo()
+  const billing = useBillingOptions()
   const lives = useMemo(() => {
     const m = new Map<number, LiveTotals>()
-    if (data) for (const c of data.cards) if (c.session) m.set(c.room.id, liveTotals(c.session, data.at, now, roundTo))
+    if (data) for (const c of data.cards) if (c.session) m.set(c.room.id, liveTotals(c.session, data.at, now, billing))
     return m
-  }, [data, now, roundTo])
+  }, [data, now, billing])
 
   const stats = useMemo(() => {
     let busy = 0
@@ -167,7 +167,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
 function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | null; onClick: () => void }) {
   const { room, session } = card
   const tone = roomTone(live)
-  const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'warning' : 'danger'
+  const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'busy' : 'danger'
   const people = live ? live.running + live.paused : 0
   return (
     <Card

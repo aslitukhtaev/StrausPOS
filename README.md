@@ -1,8 +1,8 @@
-# StrausPOS
+# Delfin Sauna
 
 Sauna, hammom va shunga o'xshash bizneslar uchun **oflayn desktop POS**: xonalar va mehmonlar vaqti (soatbay hisob),
 bar/mahsulotlar, xizmatlar, to'lov (naqd/karta/aralash/qarz), chek chop etish, qarzlar, xodimlar va hisobotlar.
-Internet kerak emas — barcha ma'lumotlar shu kompyuterda (`%APPDATA%\StrausPOS\straus.db`).
+Internet kerak emas — barcha ma'lumotlar shu kompyuterda (`%APPDATA%\DelfinSauna\delfin.db`).
 
 Til: o'zbekcha (lotin). Pul: butun so'm.
 

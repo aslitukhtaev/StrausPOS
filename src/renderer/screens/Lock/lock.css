@@ -3,7 +3,9 @@
   display: grid;
   grid-template-columns: minmax(380px, 40%) minmax(0, 1fr);
   height: 100%;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--water-image);
+  background-size: var(--water-size);
 }
 
 /* ── Brend paneli ── */
@@ -14,11 +16,9 @@
   justify-content: space-between;
   padding: 40px 48px;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 90% 60% at 20% 110%, rgba(227, 140, 60, 0.22), transparent 65%),
-    radial-gradient(ellipse 70% 50% at 90% -10%, rgba(90, 120, 200, 0.14), transparent 60%),
-    linear-gradient(170deg, #121a2b 0%, #0d1320 55%, #120f14 100%);
-  border-right: 1px solid var(--line-soft);
+  color: var(--brand-panel-text);
+  background: var(--brand-panel-bg);
+  border-right: 1px solid var(--brand-panel-line);
 }
 .brand__glow {
   position: absolute;
@@ -26,38 +26,43 @@
   right: -20%;
   bottom: -40%;
   height: 70%;
-  background: radial-gradient(ellipse at center, rgba(227, 177, 90, 0.16), transparent 60%);
+  background: var(--brand-glow);
+  pointer-events: none;
+}
+/* Katta delfin siluet — fon bezagi */
+.brand__art {
+  position: absolute;
+  right: -90px;
+  bottom: -40px;
+  color: var(--brand-panel-text);
+  opacity: 0.07;
   pointer-events: none;
 }
 .brand__top { position: relative; display: flex; align-items: center; gap: 14px; }
-.brand__logo {
-  display: flex; align-items: center; justify-content: center;
-  width: 60px; height: 60px; border-radius: 18px;
-  background: linear-gradient(160deg, #f1c878, #c8913c);
-  color: #2a1a04;
-  box-shadow: 0 10px 30px rgba(227, 177, 90, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-.brand__product { font-size: var(--fs-xl); font-weight: var(--fw-semibold); letter-spacing: 0.01em; }
-.brand__product b { color: var(--accent); }
+.brand__logo .ui-logo__mark { border-radius: 17px; box-shadow: var(--shadow-2); }
+.brand__logo .ui-logo__text { color: var(--brand-panel-text); }
+.brand__logo .ui-logo__text b { color: var(--brand-panel-accent); }
+.brand__top .spacer { flex: 1 1 auto; }
+.brand__theme.ui-btn { --btn-fg: var(--brand-panel-text); --btn-bg-hover: var(--hover-tint); }
 .brand__center { position: relative; }
 .brand__time {
   font-size: 112px;
   font-weight: 300;
   line-height: 1;
   letter-spacing: -0.03em;
-  color: var(--text);
+  color: var(--brand-panel-text);
 }
-.brand__date { margin-top: 14px; font-size: var(--fs-xl); color: var(--text-2); }
+.brand__date { margin-top: 14px; font-size: var(--fs-xl); color: var(--brand-panel-text-2); }
 .brand__bottom { position: relative; }
 .brand__biz {
   font-size: var(--fs-2xl);
   font-weight: var(--fw-bold);
-  color: var(--accent);
+  color: var(--brand-panel-accent);
   line-height: 1.15;
   margin-bottom: 10px;
   overflow-wrap: anywhere;
 }
-.brand__foot { font-size: var(--fs-sm); color: var(--text-3); }
+.brand__foot { font-size: var(--fs-sm); color: var(--brand-panel-text-2); }
 
 /* ── O'ng panel ── */
 .auth__panel {
@@ -155,7 +160,7 @@
   margin: 8px 0 14px;
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
-  color: #ff7b83;
+  color: var(--danger-text);
   opacity: 0;
   transition: opacity var(--dur) ease;
 }
@@ -183,15 +188,15 @@
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
 }
-.setup__step.is-active { border-color: var(--accent); color: var(--text); }
-.setup__step.is-done { border-color: rgba(227, 177, 90, 0.5); color: var(--text-2); }
+.setup__step.is-active { border-color: var(--accent-fill); color: var(--text); }
+.setup__step.is-done { border-color: var(--accent-line); color: var(--text-2); }
 .setup__stepnum {
   display: flex; align-items: center; justify-content: center; flex: none;
   width: 32px; height: 32px; border-radius: 50%;
   background: var(--surface-2); border: 1px solid var(--line);
   font-size: var(--fs-sm); font-weight: var(--fw-bold);
 }
-.setup__step.is-active .setup__stepnum { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.setup__step.is-active .setup__stepnum { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-ink); }
 .setup__step.is-done .setup__stepnum { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 .setup__body { display: flex; flex-direction: column; gap: 22px; animation: ui-fade-in 180ms ease-out; }
 .setup__body .ui-btn--xl { margin-top: 10px; }

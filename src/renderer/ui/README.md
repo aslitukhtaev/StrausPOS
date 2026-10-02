@@ -1,4 +1,4 @@
-# StrausPOS UI — ekran agentlari uchun qo'llanma
+# Delfin Sauna UI — ekran agentlari uchun qo'llanma
 
 Egasi: **ui-architect**. Ekran agentlari bu papkadagi fayllarni O'ZGARTIRMAYDI — faqat import qiladi.
 Yangi komponent/ikon/token kerak bo'lsa: hisobotda "UI TAKLIF: ..." deb yozing.
@@ -102,7 +102,7 @@ Avtomatik qulf: `settings.lockEnabled && autoLockMinutes > 0` bo'lsa, hech narsa
 | Fon/sirt | `--bg` `--bg-elev` `--surface` `--surface-2` `--surface-3` `--surface-4` `--overlay` |
 | Chiziq | `--line-soft` `--line` `--line-strong` |
 | Matn | `--text` `--text-2` (ikkilamchi) `--text-3` (izoh) `--text-disabled` |
-| Aksent (oltin) | `--accent` `--accent-hover` `--accent-press` `--accent-ink` (oltin ustidagi matn) `--accent-soft` `--accent-line` `--accent-glow` |
+| Aksent (aqua) | `--accent` `--accent-hover` `--accent-press` `--accent-fill` (to'liq bo'yalgan yuza) `--accent-ink` (aqua ustidagi matn) `--accent-soft` `--accent-line` `--accent-glow` |
 | Holat | bo'sh `--free` `--free-soft` `--free-line` · band `--busy` `--busy-soft` `--busy-line` · tugayapti/qarz/xato `--danger` `--danger-soft` `--danger-line` · `--info*` · pauza `--paused` `--paused-soft` · taxalluslar `--success` `--warning` |
 | Shrift | `--font` (Segoe UI → tizim), `--fs-xs` 15 · `--fs-sm` 16 · **`--fs-md` 18 (asosiy)** · `--fs-lg` 21 · `--fs-xl` 26 · `--fs-2xl` 32 · `--fs-3xl` 42 · `--fs-4xl` 56; `--fw-regular/medium/semibold/bold` |
 | O'lcham | `--h-sm` 48 · `--h-md` 56 · `--h-lg` 68 · `--h-xl` 84; bo'shliq `--sp-1..12` (4..48); radius `--r-sm` 10 · `--r-md` 14 · `--r-lg` 18 · `--r-xl` 24 · `--r-full` |

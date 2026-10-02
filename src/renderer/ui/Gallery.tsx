@@ -21,7 +21,7 @@ export default function Gallery() {
       <PageHeader
         icon="sparkles"
         title="UI to'plami"
-        subtitle="StrausPOS komponentlari"
+        subtitle="Delfin Sauna komponentlari"
         actions={<Button variant="primary" icon="plus">Asosiy amal</Button>}
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 20 }}>

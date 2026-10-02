@@ -7,11 +7,15 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
-    <meta name="color-scheme" content="dark" />
-    <link rel="icon" href="data:," />
-    <title>StrausPOS</title>
+    <meta name="color-scheme" content="dark light" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Delfin Sauna</title>
     <style>
-      html, body { background: #0b1019; margin: 0; }
+      /* CSS yuklanguncha "oq chaqnash" bo'lmasin (tokens.css: --bg) */
+      html, body { background: #031a2c; margin: 0; }
+      @media (prefers-color-scheme: light) { html, body { background: #e9f6fb; } }
+      html[data-theme='dark'], html[data-theme='dark'] body { background: #031a2c; }
+      html[data-theme='light'], html[data-theme='light'] body { background: #e9f6fb; }
     </style>
   </head>
   <body>

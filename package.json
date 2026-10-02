@@ -1,10 +1,10 @@
 {
-  "name": "straus-pos",
-  "productName": "StrausPOS",
+  "name": "delfin-sauna",
+  "productName": "Delfin Sauna",
   "version": "0.1.0",
-  "description": "Sauna va shunga o'xshash bizneslar uchun offline POS",
+  "description": "Delfin Sauna — sauna va dam olish maskanlari uchun offline kassa (POS) dasturi",
   "main": "out/main/index.cjs",
-  "author": "StrausPOS",
+  "author": "Delfin Sauna",
   "scripts": {
     "dev": "electron-vite dev",
     "dev:web": "vite --config vite.web.config.ts",
@@ -44,9 +44,9 @@
   },
   "type": "module",
   "build": {
-    "appId": "uz.straus.pos",
-    "productName": "StrausPOS",
-    "copyright": "© StrausPOS",
+    "appId": "uz.delfin.sauna",
+    "productName": "Delfin Sauna",
+    "copyright": "© Delfin Sauna",
     "electronVersion": "22.3.27",
     "directories": {
       "output": "release",
@@ -76,7 +76,7 @@
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "artifactName": "DelfinSauna-${version}-${arch}.${ext}",
       "signAndEditExecutable": true,
       "verifyUpdateCodeSignature": false
     },
@@ -87,11 +87,11 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "StrausPOS",
+      "shortcutName": "Delfin Sauna",
       "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+      "artifactName": "DelfinSauna-Setup-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [

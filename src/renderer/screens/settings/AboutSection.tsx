@@ -1,4 +1,4 @@
-import { Icon, type IconName } from '@/ui'
+import { Icon, Logo, type IconName } from '@/ui'
 import { SectionHead } from './common'
 
 /** Dastur versiyasi (package.json dan o'qilmaydi — qo'lda yangilanadi). */
@@ -13,7 +13,7 @@ const FACTS: { icon: IconName; title: string; text: string }[] = [
   {
     icon: 'database',
     title: "Ma'lumotlar joyi",
-    text: "Baza bitta faylda: %APPDATA%\\StrausPOS\\straus.db. Har o'zgarishdan keyin darhol diskka yoziladi, chiroq o'chsa ham yo'qolmaydi."
+    text: "Baza bitta faylda: %APPDATA%\\DelfinSauna\\delfin.db. Har o'zgarishdan keyin darhol diskka yoziladi, chiroq o'chsa ham yo'qolmaydi."
   },
   {
     icon: 'download',
@@ -28,11 +28,9 @@ export function AboutSection() {
       <SectionHead icon="info" title="Dastur haqida" />
       <div className="set-section__body">
         <div className="set-about">
-          <div className="set-about__logo">
-            <Icon name="flame" size={44} />
-          </div>
+          <Logo size={72} className="set-about__logo" />
           <div>
-            <div className="set-about__name">StrausPOS</div>
+            <div className="set-about__name">Delfin Sauna</div>
             <div className="set-about__tag">Sauna va dam olish maskanlari uchun kassa dasturi</div>
           </div>
           <div className="set-about__ver" data-testid="app-version">

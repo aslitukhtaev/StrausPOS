@@ -56,7 +56,7 @@ function rangeLabel(r: ReportRange): string {
 }
 
 const METHODS = [
-  { key: 'cash', label: 'Naqd', color: 'var(--free)', icon: 'cash' },
+  { key: 'cash', label: 'Naqd', color: 'var(--free-fill)', icon: 'cash' },
   { key: 'card', label: 'Karta', color: 'var(--info)', icon: 'card' },
   { key: 'debt', label: 'Qarz', color: 'var(--danger)', icon: 'wallet' }
 ] as const
@@ -129,7 +129,7 @@ export default function ReportsScreen() {
       />
 
       <div className="rep-print-head">
-        <div className="rep-print-head__biz">{businessName || 'StrausPOS'}</div>
+        <div className="rep-print-head__biz">{businessName || 'Delfin Sauna'}</div>
         <div>Savdo hisoboti: {rangeLabel(range)}</div>
         <div>Chop etildi: {formatDateTime(getNow())}</div>
       </div>

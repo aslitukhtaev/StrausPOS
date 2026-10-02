@@ -58,7 +58,7 @@
   bottom: 14px;
   width: 4px;
   border-radius: 0 4px 4px 0;
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 .set-nav__icon {
   flex: none;
@@ -82,7 +82,7 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--warning);
+  background: var(--warning-fill);
 }
 
 /* ── O'ng: bo'lim ── */
@@ -159,7 +159,7 @@
 }
 .set-savebar__msg .ui-icon { color: var(--success); }
 .set-savebar.is-dirty .set-savebar__msg { color: var(--text); font-weight: var(--fw-medium); }
-.set-savebar__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning); }
+.set-savebar__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning-fill); }
 .set-savebar .ui-btn--primary { min-width: 180px; }
 
 /* Guruhlar */
@@ -194,7 +194,7 @@
 }
 .set-note b { color: var(--text); }
 .set-note__icon { flex: none; color: var(--info); margin-top: 1px; }
-.set-note--warning { border-color: var(--busy-line); background: var(--busy-soft); }
+.set-note--warning { border-color: var(--warning-line); background: var(--warning-soft); }
 .set-note--warning .set-note__icon { color: var(--warning); }
 .set-note--danger { border-color: var(--danger-line); background: var(--danger-soft); }
 .set-note--danger .set-note__icon { color: var(--danger); }
@@ -258,13 +258,13 @@
   justify-content: center;
   padding: 14px 10px 18px;
   border-radius: 4px;
-  background: #fff;
+  background: var(--paper);
   box-shadow: var(--shadow-2);
 }
-.set-preview__frame { display: block; border: 0; background: #fff; }
+.set-preview__frame { display: block; border: 0; background: var(--paper); }
 .set-preview__holder { display: flex; justify-content: center; max-width: 100%; }
 .set-preview__ext.checkout-paper { padding: 0; background: transparent; overflow: visible; }
-.set-preview__err { color: #a00; padding: 16px; max-width: 280px; font-size: var(--fs-sm); }
+.set-preview__err { color: var(--paper-error); padding: 16px; max-width: 280px; font-size: var(--fs-sm); }
 .set-preview .set-note { align-self: stretch; }
 
 /* ── Hisob-kitob misoli ── */
@@ -336,11 +336,8 @@
   background: var(--surface-2);
   border: 1px solid var(--line-soft);
 }
-.set-about__logo {
-  display: flex; align-items: center; justify-content: center; flex: none;
-  width: 80px; height: 80px; border-radius: var(--r-lg);
-  background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line);
-}
+.set-about__logo { flex: none; }
+.set-about__logo .ui-logo__mark { border-radius: 18px; box-shadow: var(--accent-shadow); }
 .set-about__name { font-size: var(--fs-2xl); font-weight: var(--fw-bold); }
 .set-about__tag { color: var(--text-2); font-size: var(--fs-md); }
 .set-about__ver { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; font-size: var(--fs-xl); font-weight: var(--fw-bold); }

@@ -5,7 +5,7 @@
  */
 import { useMemo } from 'react'
 import type { GuestView, SessionView } from '@shared/types'
-import { buildGuestView, computeTotals, guestElapsedMs } from '@shared/billing'
+import { DEFAULT_BILLING, buildGuestView, computeTotals, guestElapsedMs, type BillingOptions } from '@shared/billing'
 import { useNow } from '@/ui'
 import { useApp } from '@/store/app'
 
@@ -27,14 +27,18 @@ export interface LiveTotals {
   anyRunning: boolean
 }
 
-export function useRoundTo(): number {
-  return useApp((s) => (s.settings ? s.settings.roundTo : 1000))
+/** Sozlamalardagi hisob-kitob parametrlari (roundTo / blockMinutes / graceMinutes) — barqaror obyekt */
+export function useBillingOptions(): BillingOptions {
+  const roundTo = useApp((s) => (s.settings ? s.settings.roundTo : DEFAULT_BILLING.roundTo))
+  const blockMinutes = useApp((s) => (s.settings ? s.settings.blockMinutes : DEFAULT_BILLING.blockMinutes))
+  const graceMinutes = useApp((s) => (s.settings ? s.settings.graceMinutes : DEFAULT_BILLING.graceMinutes))
+  return useMemo(() => ({ roundTo, blockMinutes, graceMinutes }), [roundTo, blockMinutes, graceMinutes])
 }
 
-export function liveTotals(view: SessionView, anchor: number, now: number, roundTo: number): LiveTotals {
+export function liveTotals(view: SessionView, anchor: number, now: number, opts: BillingOptions): LiveTotals {
   // Yopilgan sessiya — server qiymatlari muzlagan
   const t = view.session.status === 'closed' ? view.computedAt : view.computedAt + Math.max(0, now - anchor)
-  const guests = view.guests.map((g) => buildGuestView(g, view.lines, t, roundTo))
+  const guests = view.guests.map((g) => buildGuestView(g, view.lines, t, opts))
   const totals = computeTotals(guests, view.lines, view.session.discount)
   let running = 0
   let paused = 0
@@ -65,8 +69,8 @@ export function liveTotals(view: SessionView, anchor: number, now: number, round
 
 export function useLive(view: SessionView | null, anchor: number): LiveTotals | null {
   const now = useNow()
-  const roundTo = useRoundTo()
-  return useMemo(() => (view ? liveTotals(view, anchor, now, roundTo) : null), [view, anchor, now, roundTo])
+  const opts = useBillingOptions()
+  return useMemo(() => (view ? liveTotals(view, anchor, now, opts) : null), [view, anchor, now, opts])
 }
 
 /** Xona holati (rang) — bo'sh / band / qizil (hamma vaqt to'xtagan yoki to'lov kutilmoqda) */

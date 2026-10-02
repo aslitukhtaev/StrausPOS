@@ -6,13 +6,13 @@
  *   <Card interactive onClick={...}>Bosiladigan karta (button sifatida)</Card>
  *
  * padding: 'none' | 'sm' (12) | 'md' (20, standart) | 'lg' (28)
- * tone: 'default' | 'raised' (ochroq) | 'accent' | 'success' | 'warning' | 'danger' — chap chegara/fon tusi
+ * tone: 'default' | 'raised' (ochroq) | 'accent' | 'success' | 'busy' (band xona) | 'warning' | 'danger' — chap chegara/fon tusi
  * interactive: hover/press effekti, klaviatura bilan bosiladi (role=button).
  */
 import type { HTMLAttributes, KeyboardEvent, ReactNode } from 'react'
 import { cx } from './cx'
 
-export type CardTone = 'default' | 'raised' | 'accent' | 'success' | 'warning' | 'danger'
+export type CardTone = 'default' | 'raised' | 'accent' | 'success' | 'busy' | 'warning' | 'danger'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
   title?: ReactNode

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { TimeInterval } from '@shared/types'
-import { guestTimeAmount, guestTimeRaw } from '@shared/billing'
+import { billedMinutes, formatHours, guestTimeAmount, guestTimeRaw } from '@shared/billing'
 import { Money, Segmented, formatMoney } from '@/ui'
 import { Note, SaveBar, SectionHead, useReportDirty, type SectionProps } from './common'
 
 const ROUND_OPTIONS = [1, 100, 500, 1000, 5000]
-const EX_MIN = 97 // 1 soat 37 daqiqa
-const EX_RATE = 70_000
+const EX_MIN = 97 // 1 soat 37 daqiqa o'tirdi
+const EX_PAID = 60 // 1 soat olingan
+const EX_RATE = 73_300
 const EX_INTERVALS: TimeInterval[] = [{ roomId: 0, rate: EX_RATE, start: 0, end: EX_MIN * 60_000 }]
 const EX_NOW = EX_MIN * 60_000
 
@@ -28,8 +29,10 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
   const dirty = roundTo !== settings.roundTo
   useReportDirty(dirty, onDirty)
 
-  const raw = guestTimeRaw(EX_INTERVALS, EX_NOW)
-  const rounded = guestTimeAmount(EX_INTERVALS, EX_NOW, roundTo)
+  const rule = { blockMinutes: settings.blockMinutes, graceMinutes: settings.graceMinutes }
+  const billed = billedMinutes(EX_NOW, EX_PAID, rule)
+  const raw = guestTimeRaw(EX_INTERVALS, billed, EX_NOW)
+  const rounded = guestTimeAmount(EX_INTERVALS, EX_PAID, EX_NOW, { roundTo, ...rule })
 
   const onSave = async () => {
     setSaving(true)
@@ -52,14 +55,14 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
         <div className="set-example" data-testid="round-example">
           <div className="set-example__title">Misol</div>
           <div className="set-example__formula">
-            <span className="num">1 soat 37 daqiqa</span>
+            <span className="num">{formatHours(EX_PAID)} olingan, 1 soat 37 daq o'tirdi → {formatHours(billed)}</span>
             <span className="set-example__op">×</span>
             <Money value={EX_RATE} size="lg" />
             <span className="set-example__unit">/ soat</span>
           </div>
           <div className="set-example__steps">
             <div className="set-example__step">
-              <span className="muted">Aniq hisob: 97 daq × {formatMoney(EX_RATE)} / 60</span>
+              <span className="muted">Aniq hisob: {billed} daq × {formatMoney(EX_RATE)} / 60</span>
               <span className="num">≈ {rawText(raw)} so'm</span>
             </div>
             <div className="set-example__step is-result">
@@ -70,7 +73,8 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
         </div>
 
         <Note>
-          Har bir mehmonning vaqti alohida hisoblanadi: to'liq daqiqalar × xona narxi / 60, keyin shu qiymatga
+          Har bir mehmonning vaqti alohida hisoblanadi: olingan vaqt to'liq to'lanadi, oshib ketsa har boshlangan
+          blok ({formatHours(settings.blockMinutes)}) qo'shiladi. Summa xona narxi / 60 × daqiqa, keyin shu qiymatga
           eng yaqin songa yaxlitlanadi (yarmidan yuqorisi — tepaga). Mahsulot va xizmat narxlari yaxlitlanmaydi.
           Saqlangach ochiq hisoblar ham yangi qoida bilan ko'rsatiladi; yopilgan (to'langan) cheklar o'zgarmaydi.
         </Note>
