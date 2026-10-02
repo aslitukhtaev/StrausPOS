@@ -4,9 +4,10 @@
  */
 import { useState } from 'react'
 import {
-  Badge, Button, Card, EmptyState, Field, Icon, ICON_NAMES, IconButton, Input, Modal, Money, MoneyInput, Numpad,
+  Badge, Button, Card, EmptyState, Field, Icon, ICON_NAMES, IconButton, Input, Logo, Modal, Money, MoneyInput, Numpad,
   PageHeader, PinDots, Segmented, Select, StatusPill, Stepper, Tabs, Timer, confirmDialog, toast
 } from './index'
+import { useApp } from '../store/app'
 
 export default function Gallery() {
   const [tab, setTab] = useState('a')
@@ -22,9 +23,31 @@ export default function Gallery() {
         icon="sparkles"
         title="UI to'plami"
         subtitle="Delfin Sauna komponentlari"
-        actions={<Button variant="primary" icon="plus">Asosiy amal</Button>}
+        actions={
+          <>
+            <Button icon="sun" onClick={() => void useApp.getState().toggleTheme()}>Rejim</Button>
+            <Button variant="primary" icon="plus">Asosiy amal</Button>
+          </>
+        }
       />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(520px, 1fr))', gap: 20 }}>
+        <Card title="Logotip" subtitle="mark / full / glyph">
+          <div className="row" style={{ flexWrap: 'wrap', gap: 24 }}>
+            <Logo size={72} />
+            <Logo size={44} variant="full" />
+            <Logo size={24} />
+            <span className="t-accent"><Logo size={64} variant="glyph" /></span>
+          </div>
+        </Card>
+        <Card title="Holat ranglari" subtitle="bo'sh / band / tugayapti / pauza">
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <StatusPill status="free" size="lg" />
+            <StatusPill status="busy" size="lg" />
+            <StatusPill status="ending" size="lg" />
+            <StatusPill status="paused" size="lg" />
+            <Badge tone="info">Xizmat</Badge>
+          </div>
+        </Card>
         <Card title="Tugmalar" subtitle="primary / secondary / success / danger / ghost">
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <Button variant="primary" icon="play">Ochish</Button>

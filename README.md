@@ -4,7 +4,12 @@ Sauna, hammom va shunga o'xshash bizneslar uchun **oflayn desktop POS**: xonalar
 bar/mahsulotlar, xizmatlar, to'lov (naqd/karta/aralash/qarz), chek chop etish, qarzlar, xodimlar va hisobotlar.
 Internet kerak emas — barcha ma'lumotlar shu kompyuterda (`%APPDATA%\DelfinSauna\delfin.db`).
 
-Til: o'zbekcha (lotin). Pul: butun so'm.
+Til: o'zbekcha (lotin). Pul: butun so'm. Interfeys: kunduzgi va tungi rejim (tepa paneldagi quyosh/oy tugmasi).
+
+| Tungi rejim | Kunduzgi rejim |
+|---|---|
+| ![Xonalar — tungi](docs/screenshots/rooms-dark.png) | ![Xonalar — kunduzgi](docs/screenshots/rooms-light.png) |
+| ![Qulf — tungi](docs/screenshots/lock-dark.png) | ![Qulf — kunduzgi](docs/screenshots/lock-light.png) |
 
 ## Texnologiya
 - **Electron 22.3.27** (Chromium 108, Node 16.17) — Windows 7/8/8.1 va 32-bit uchun ataylab tanlangan, ko'tarilmaydi.

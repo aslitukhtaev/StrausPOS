@@ -55,12 +55,16 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
         <div className="set-example" data-testid="round-example">
           <div className="set-example__title">Misol</div>
           <div className="set-example__formula">
-            <span className="num">{formatHours(EX_PAID)} olingan, 1 soat 37 daq o'tirdi → {formatHours(billed)}</span>
+            <span className="num">{formatHours(billed)}</span>
             <span className="set-example__op">×</span>
             <Money value={EX_RATE} size="lg" />
             <span className="set-example__unit">/ soat</span>
           </div>
           <div className="set-example__steps">
+            <div className="set-example__step">
+              <span className="muted">{formatHours(EX_PAID)} olingan, 1 soat 37 daq o'tirdi</span>
+              <span className="num">→ {formatHours(billed)}</span>
+            </div>
             <div className="set-example__step">
               <span className="muted">Aniq hisob: {billed} daq × {formatMoney(EX_RATE)} / 60</span>
               <span className="num">≈ {rawText(raw)} so'm</span>

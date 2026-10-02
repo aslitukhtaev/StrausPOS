@@ -40,10 +40,11 @@ import { guestElapsedMs, guestTimeAmount } from '@shared/billing'
 |---|---|---|
 | `Button` | `variant`: `primary` \| `secondary`(std) \| `success` \| `danger` \| `ghost`; `size`: `sm` 48 \| `md` 56(std) \| `lg` 68 \| `xl` 84; `icon`, `iconRight`, `block`, `loading`, `disabled` + barcha `<button>` atributlari | `primary` = oltin, ekranda bitta asosiy amal. `success` = to'lov/tasdiq. `danger` = yumshoq qizil; qattiq qizil uchun `className="is-solid"` |
 | `IconButton` | `icon`, **`label`** (majburiy, tooltip+aria), `variant`, `size`, `badge?`, `loading` | Kvadrat |
-| `Card` | `title?`, `subtitle?`, `actions?`, `padding`: `none`\|`sm`\|`md`(std)\|`lg`; `tone`: `default`\|`raised`\|`accent`\|`success`\|`warning`\|`danger`; `interactive`, `selected`, `disabled`, `onClick` | `interactive` → role=button, Enter/Space bilan bosiladi. Xona kartalari: `tone="success"` (bo'sh) / `"warning"` (band) / `"danger"` (tugayapti/qarz) |
-| `Badge` | `tone`: `neutral`\|`accent`\|`success`\|`warning`\|`danger`\|`info`; `size`: `sm`\|`md`\|`lg`; `icon?` | Kichik yorliq |
+| `Card` | `title?`, `subtitle?`, `actions?`, `padding`: `none`\|`sm`\|`md`(std)\|`lg`; `tone`: `default`\|`raised`\|`accent`\|`success`\|`busy`\|`warning`\|`danger`; `interactive`, `selected`, `disabled`, `onClick` | `interactive` → role=button, Enter/Space bilan bosiladi. Xona kartalari: `tone="success"` (bo'sh) / `"busy"` (band, moviy) / `"danger"` (tugayapti/qarz) |
+| `Badge` | `tone`: `neutral`\|`accent`\|`success`\|`busy`\|`warning`\|`danger`\|`info`; `size`: `sm`\|`md`\|`lg`; `icon?` | Kichik yorliq |
 | `StatusPill` | `status`: `free`\|`busy`\|`ending`\|`debt`\|`paused`\|`running`\|`finished`\|`closed`; `size`; `children?` (matnni almashtiradi) | Rangli nuqta + "Bo'sh/Band/Tugayapti/Qarz/Pauza/Ishlayapti/Tugadi/Yopilgan" |
-| `Avatar` | `name`, `size` (px) | Bosh harflar, ismdan barqaror rang |
+| `Avatar` | `name`, `size` (px) | Bosh harflar, ismdan barqaror rang (`--avatar-1..8`) |
+| `Logo` | `size` (44), `variant`: `mark` (std, gradient belgi) \| `full` (belgi + "Delfin Sauna") \| `glyph` (faqat delfin, currentColor) | Brend. Ilova ikonkasi `scripts/make-icon.py` — shu shakl |
 | `Modal` | `open`, `onClose`, `title?`, `subtitle?`, `headerExtra?`, `footer?`, `size`: `sm` 520\|`md` 620(std)\|`lg` 840\|`xl` 1100\|`full`; `dismissible` (std true), `flush` | Portal. Esc/fon bosish yopadi (`dismissible={false}` — o'chiriladi). Fokus tuzog'i; `data-autofocus` atributli element birinchi fokus oladi. Tana o'zi skroll qiladi, footer doim ko'rinadi |
 | `ConfirmDialog` | `open`, `title`, `message?`, `confirmText`, `cancelText`, `danger`, `icon?`, `onConfirm` (async bo'lishi mumkin), `onCancel`, `onDone?` | `onConfirm` xato bersa — toast.error, oyna ochiq qoladi |
 | `confirmDialog(opts)` | `{ title, message?, confirmText?, cancelText?, danger?, icon? }` → `Promise<boolean>` | Imperativ: `if (await confirmDialog({title:'O\'chirasizmi?', danger:true})) …` |
@@ -97,20 +98,26 @@ Avtomatik qulf: `settings.lockEnabled && autoLockMinutes > 0` bo'lsa, hech narsa
 
 ## 6. Dizayn tokenlari (`styles/tokens.css`)
 
+**Ikki rejim**: `<html data-theme="light|dark">` — `store/app.ts` qo'yadi (`AppSettings.theme`, `auto` = tizim; login'dan oldin
+localStorage keshi). Tepa paneldagi quyosh/oy tugmasi: `useApp.getState().toggleTheme()`. Ekranlar rejimni bilishi SHART EMAS —
+faqat tokenlardan foydalaning, ikkala rejim avtomatik ishlaydi. **Matn uchun** `--accent` `--free` `--busy` `--warning` `--danger-text`;
+**to'liq bo'yalgan yuza** (tugma, chiziq, nuqta) uchun `--*-fill` (+ ustidagi matn `--accent-ink` / `--free-ink`).
+
 | Guruh | Tokenlar |
 |---|---|
 | Fon/sirt | `--bg` `--bg-elev` `--surface` `--surface-2` `--surface-3` `--surface-4` `--overlay` |
 | Chiziq | `--line-soft` `--line` `--line-strong` |
 | Matn | `--text` `--text-2` (ikkilamchi) `--text-3` (izoh) `--text-disabled` |
 | Aksent (aqua) | `--accent` `--accent-hover` `--accent-press` `--accent-fill` (to'liq bo'yalgan yuza) `--accent-ink` (aqua ustidagi matn) `--accent-soft` `--accent-line` `--accent-glow` |
-| Holat | bo'sh `--free` `--free-soft` `--free-line` · band `--busy` `--busy-soft` `--busy-line` · tugayapti/qarz/xato `--danger` `--danger-soft` `--danger-line` · `--info*` · pauza `--paused` `--paused-soft` · taxalluslar `--success` `--warning` |
+| Holat | bo'sh (yashil) `--free` `--free-fill` `--free-soft` `--free-line` · band (moviy) `--busy` `--busy-fill` `--busy-soft` `--busy-line` · tugayapti/oshdi/qarz/xato (qizil) `--danger` `--danger-text` `--danger-soft` `--danger-line` · ogohlantirish/pauza (amber) `--warning` `--warning-fill` `--warning-soft` `--warning-line` `--paused` · `--info*` · taxallus `--success` |
+| Suv/brend | `--water-image` + `--water-size` (fon bezagi), `--brand-1/2/3` `--brand-ink` (logotip), `--brand-panel-*` (qulf ekrani paneli), `--paper*` (chek qog'ozi), `--print-*` |
 | Shrift | `--font` (Segoe UI → tizim), `--fs-xs` 15 · `--fs-sm` 16 · **`--fs-md` 18 (asosiy)** · `--fs-lg` 21 · `--fs-xl` 26 · `--fs-2xl` 32 · `--fs-3xl` 42 · `--fs-4xl` 56; `--fw-regular/medium/semibold/bold` |
 | O'lcham | `--h-sm` 48 · `--h-md` 56 · `--h-lg` 68 · `--h-xl` 84; bo'shliq `--sp-1..12` (4..48); radius `--r-sm` 10 · `--r-md` 14 · `--r-lg` 18 · `--r-xl` 24 · `--r-full` |
-| Soya | `--shadow-1` `--shadow-2` `--shadow-3` `--inset-hi` `--focus-ring` |
+| Soya | `--shadow-1` `--shadow-2` `--shadow-3` `--shadow-key` `--inset-hi` `--focus-ring` `--accent-shadow` `--free-shadow` · hover fon `--hover-tint` |
 | Layout | `--sidebar-w` `--topbar-h` `--page-pad` |
 
 Global yordamchi klasslar (`global.css`): `.num` (tabular raqam), `.muted` `.subtle`, `.t-xs…t-2xl`, `.t-bold`,
-`.t-accent/.t-success/.t-warning/.t-danger`, `.row` `.col` `.grow` `.spacer` `.scroll` `.ellipsis` `.sr-only`.
+`.t-accent/.t-success/.t-busy/.t-warning/.t-danger`, `.row` `.col` `.grow` `.spacer` `.scroll` `.ellipsis` `.sr-only`.
 
 ## 7. Qoidalar (majburiy)
 
