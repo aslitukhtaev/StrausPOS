@@ -131,6 +131,7 @@ export interface PosApi {
     sessions(staffId: Id, month: string): Promise<WaiterSessionRow[]>
     /** Ofitsiantga pul berildi (oylik hisob-kitob). Ruxsat: staff.manage */
     payout(staffId: Id, month: string, amount: number, note: string): Promise<WaiterPayout>
+    /** Ruxsat: reports.view */
     payouts(staffId: Id, month: string): Promise<WaiterPayout[]>
   }
 

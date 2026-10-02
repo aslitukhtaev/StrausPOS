@@ -6,7 +6,7 @@ Sauna/shunga o'xshash bizneslar uchun **offline desktop POS**. Til: o'zbekcha (l
 Mijozlarda Windows 7/8/8.1 (va 32-bit) bo'lishi mumkin, shuning uchun:
 - **Electron 22.3.27** (Chromium 108, Node 16) — o'zgartirilmaydi. O'rnatuvchi x64 + ia32.
 - **React 18**, zustand, Vite 7 (build target chrome108/node16).
-- DB: **sql.js** (WASM SQLite, native modul YO'Q). Fayl: `app.getPath('userData')/straus.db`. Har mutatsiyadan keyin
+- DB: **sql.js** (WASM SQLite, native modul YO'Q). Fayl: `app.getPath('userData')/delfin.db`. Har mutatsiyadan keyin
   atomik yoziladi (temp fayl + rename). Node 16 da ishlaydigan kod yozing (`structuredClone` YO'Q, `Array.prototype.at` bor, `fetch` main'da yo'q).
 - **CSS faqat Chrome 108 darajasida**: `:has()`, CSS nesting, `color-mix()`, `oklch()`, subgrid, `text-wrap:balance`,
   `@starting-style`, `100svh/lvh` ISHLATILMAYDI. Flex/grid, custom properties, `clamp()`, `aspect-ratio`, `gap`, `@container` (105+) mumkin.
@@ -44,6 +44,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
   Foiz biriktirish paytida sessiyada muzlatiladi, to'lov paytida haq sessiyaga yoziladi. Oylik hisob: `waiters.monthly`,
   berilgan pullar `waiters.payout`.
 - Guruh uchun bitta chek.
+- Bekor qilish: biror mehmon ≥1 daqiqa o'tirgan bo'lsa faqat `discount.apply` ruxsati bilan (xato ochilgan xonani kassir darhol bekor qila oladi).
 
 ## Dizayn tamoyillari
 Brend: **Delfin Sauna**, logotip — delfin. Ranglar rasmdagi suvdan: yorqin moviy-feruza (aqua/cyan), oq ko'pik,
