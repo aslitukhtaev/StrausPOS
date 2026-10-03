@@ -8,6 +8,8 @@ import { api } from '../../api'
 import { useApp } from '../../store/app'
 import { Avatar, Button, EmptyState, Icon, Numpad, PinDots, Spinner, errorMessage } from '../../ui'
 import { BrandPanel } from './BrandPanel'
+import { ViewerConnect } from '../Setup/ViewerConnect'
+import '../Setup/setup.css'
 import './lock.css'
 
 const PIN_MAX = 6
@@ -23,6 +25,7 @@ export default function LockScreen() {
   const [error, setError] = useState<string | null>(null)
   const [shake, setShake] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [toViewer, setToViewer] = useState(false)
 
   const load = () => {
     setLoadError(null)
@@ -77,6 +80,19 @@ export default function LockScreen() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [selected, staff])
+
+  if (toViewer) {
+    return (
+      <div className="auth">
+        <BrandPanel businessName={businessName} footer="Faqat ko'rish rejimiga o'tkazish" />
+        <section className="auth__panel">
+          <div className="setup">
+            <ViewerConnect onBack={() => setToViewer(false)} />
+          </div>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div className="auth">
@@ -153,6 +169,11 @@ export default function LockScreen() {
               </Button>
             )}
           </div>
+        )}
+        {!selected && (
+          <button type="button" className="lock-viewerlink" onClick={() => setToViewer(true)} data-testid="lock-to-viewer">
+            <Icon name="eye" size={18} /> Bu kompyuterni ko'rish rejimiga o'tkazish
+          </button>
         )}
       </section>
     </div>

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GuestView, LineView, ReceiptData, SessionView } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
+import { useApp } from '@/store/app'
 import { MS_MIN, formatCountdown, formatHours } from '@shared/billing'
 import {
   Avatar, Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, confirmDialog, cx, formatClock,
@@ -22,6 +23,7 @@ import { DiscountDialog, MoveRoomDialog, RenameGuestDialog, ReturnLineDialog } f
 import { CheckoutDialog } from './checkoutModule'
 
 const POLL_MS = 15_000
+const VIEWER_POLL_MS = 3_000
 
 type DialogState =
   | { kind: 'rename'; guest: GuestView }
@@ -42,11 +44,13 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   const onBackRef = useRef(onBack)
   onBackRef.current = onBack
 
-  const canManage = useCan('session.manage')
+  // Ko'ruvchi kompyuter: faqat ko'rish — hech qanday o'zgartirish tugmasi yo'q
+  const readOnly = useApp((st) => st.readOnly)
+  const canManage = useCan('session.manage') && !readOnly
   const warnMs = useWarnMs()
-  const canPay = useCan('session.pay')
-  const canReturn = useCan('line.return')
-  const canDiscount = useCan('discount.apply')
+  const canPay = useCan('session.pay') && !readOnly
+  const canReturn = useCan('line.return') && !readOnly
+  const canDiscount = useCan('discount.apply') && !readOnly
 
   const setView = useCallback((v: SessionView) => {
     setState({ view: v, at: getNow() })
@@ -73,9 +77,9 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
     void load()
     const id = setInterval(() => {
       if (!isAnyModalOpen()) void load()
-    }, POLL_MS)
+    }, readOnly ? VIEWER_POLL_MS : POLL_MS)
     return () => clearInterval(id)
-  }, [load])
+  }, [load, readOnly])
 
   // Esc — xonalarga qaytish (modal ochiq bo'lmasa); "+" — qo'shish paneli
   useEffect(() => {

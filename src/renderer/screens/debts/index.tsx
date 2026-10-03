@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Debt } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
+import { useApp } from '@/store/app'
 import { Avatar, Badge, Button, DataRow, DataTable, EmptyState, Input, Money, PageHeader, Spinner, Tabs, cx, formatDateShort, formatPhone, toast } from '@/ui'
 import { PayDialog } from './PayDialog'
 import { HistoryDialog } from './HistoryDialog'
@@ -15,7 +16,8 @@ export const remaining = (d: Debt) => Math.max(0, d.amount - d.paid)
 const DEBT_COLS = 'minmax(0, 1.6fr) 112px 116px 116px 136px 280px'
 
 export default function DebtsScreen() {
-  const canManage = useCan('debt.manage')
+  const readOnly = useApp((st) => st.readOnly)
+  const canManage = useCan('debt.manage') && !readOnly
   const [tab, setTab] = useState<Tab>('open')
   const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)

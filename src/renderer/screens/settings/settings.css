@@ -409,3 +409,54 @@
   .set-bill { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
   .set-bill__item { display: grid; grid-template-columns: 250px minmax(0, 1fr); align-items: center; gap: var(--sp-4); }
 }
+
+/* ── Tarmoq ── */
+.net-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+.net-card__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.net-card__cell--code { border-color: var(--accent-line); background: var(--accent-soft); }
+.net-card__label { font-size: var(--fs-sm); color: var(--text-3); font-weight: var(--fw-semibold); }
+.net-card__addr { font-size: var(--fs-2xl); font-weight: var(--fw-bold); color: var(--text); line-height: 1.15; }
+.net-card__port { font-size: var(--fs-md); color: var(--text-2); }
+.net-card__warn { display: flex; align-items: center; gap: 8px; color: var(--warning); font-weight: var(--fw-semibold); }
+.net-card__code {
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-4xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  line-height: 1.05;
+}
+.net-card__gap { display: inline-block; width: 18px; }
+.net-empty { color: var(--text-3); font-size: var(--fs-md); padding: var(--sp-3) 0; }
+.net-viewers { display: flex; flex-direction: column; gap: var(--sp-2); }
+.net-viewer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.net-viewer__dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--text-disabled); }
+.net-viewer__dot.is-on { background: var(--free); box-shadow: 0 0 0 4px var(--free-soft); }
+.net-viewer__name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
+.net-viewer__ip { flex: none; font-size: var(--fs-md); }
+.net-viewer__seen { flex: none; width: 150px; text-align: right; font-size: var(--fs-sm); color: var(--text-3); }

@@ -1,0 +1,121 @@
+/* Setup tanlovi + ko'ruvchi ulanish oqimi (ViewerConnect) */
+.setup-choice {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  min-height: 112px;
+  padding: 20px 22px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text-2);
+  text-align: left;
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  touch-action: manipulation;
+}
+.setup-choice:hover { border-color: var(--accent-line); background: var(--surface-2); }
+.setup-choice:active { background: var(--surface-3); }
+.setup-choice__icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.setup-choice--viewer .setup-choice__icon { background: var(--info-soft); color: var(--info); }
+.setup-choice__text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.setup-choice__title { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--text); }
+.setup-choice__desc { font-size: var(--fs-md); color: var(--text-2); line-height: var(--lh); }
+
+.vc .auth__head { margin-bottom: 4px; }
+.vc-list { display: flex; flex-direction: column; gap: 10px; }
+.vc-searching, .vc-none {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 18px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  color: var(--text-2);
+  font-size: var(--fs-md);
+}
+.vc-searching { color: var(--accent); }
+.vc-none { border-color: var(--warning-line); background: var(--warning-soft); line-height: var(--lh); }
+.vc-none .ui-icon { flex: none; color: var(--warning); }
+.vc-server {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 84px;
+  padding: 12px 18px;
+  border: 1.5px solid var(--accent-line);
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-align: left;
+  touch-action: manipulation;
+}
+.vc-server:hover { background: var(--surface-2); }
+.vc-server__icon { flex: none; display: flex; }
+.vc-server__text { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vc-server__name { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--text); }
+.vc-server__host { font-size: var(--fs-md); color: var(--text-2); }
+.vc-manual { display: grid; grid-template-columns: minmax(0, 1fr) 130px; gap: 14px; align-items: start; }
+.vc-manual__go { grid-column: 1 / -1; }
+.vc-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-bottom: 16px;
+  padding: 8px 16px;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.vc-target__host { color: var(--text-2); font-weight: var(--fw-medium); }
+.vc-code { display: flex; gap: 10px; margin-bottom: 6px; }
+.vc-code.is-shake { animation: ui-shake 360ms ease-in-out; }
+.vc-code__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 68px;
+  border: 2px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+}
+.vc-code__cell.is-cur { border-color: var(--accent); box-shadow: var(--focus-ring); }
+.vc-code.is-error .vc-code__cell { border-color: var(--danger-line); }
+.vc-busy { display: flex; align-items: center; gap: 10px; color: var(--accent); margin: 10px 0; font-size: var(--fs-md); }
+
+.lock-viewerlink {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+  touch-action: manipulation;
+}
+.lock-viewerlink:hover { color: var(--accent); background: var(--surface); }

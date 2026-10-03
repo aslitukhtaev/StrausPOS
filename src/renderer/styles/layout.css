@@ -136,3 +136,63 @@
   padding: var(--page-pad);
   animation: ui-fade-in 160ms ease-out;
 }
+
+/* ── Ko'ruvchi (faqat ko'rish) rejimi ── */
+.shell--banner {
+  grid-template-rows: var(--topbar-h) auto minmax(0, 1fr);
+  grid-template-areas: 'side top' 'side banner' 'side main';
+}
+.shell__banner {
+  grid-area: banner;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px var(--page-pad);
+  background: var(--danger-soft-2);
+  border-bottom: 1px solid var(--danger-line);
+  color: var(--danger-text);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+}
+.shell__bannertext { flex: 1 1 auto; min-width: 0; }
+.shell__bannerhint { flex: none; font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-2); }
+.shell__banner .ui-icon { flex: none; animation: viewer-pulse 1.6s ease-in-out infinite; }
+
+.topbar__viewer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  height: 56px;
+  padding: 0 18px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.topbar__viewer .ui-icon { flex: none; }
+.topbar__viewertext { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.topbar__viewerlabel { flex: none; font-size: var(--fs-lg); font-weight: var(--fw-bold); }
+.topbar__viewername { font-size: var(--fs-lg); font-weight: var(--fw-semibold); color: var(--text); max-width: 340px; }
+.topbar__viewername::before { content: '·'; margin-right: 8px; color: var(--text-3); }
+.topbar__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--free);
+  box-shadow: 0 0 0 4px var(--free-soft);
+}
+.topbar__dottext { flex: none; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--free); }
+.topbar__viewer.is-off { border-color: var(--danger-line); background: var(--danger-soft); }
+.topbar__viewer.is-off .topbar__dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); animation: viewer-pulse 1.2s ease-in-out infinite; }
+.topbar__viewer.is-off .topbar__dottext { color: var(--danger-text); }
+.side__foot--viewer { padding: 12px; }
+.side__foot--viewer .ui-btn { font-size: var(--fs-sm); padding-left: 10px; padding-right: 10px; }
+
+@keyframes viewer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.side__foot--viewer .ui-btn { height: auto; min-height: 56px; white-space: normal; line-height: 1.2; text-align: left; }

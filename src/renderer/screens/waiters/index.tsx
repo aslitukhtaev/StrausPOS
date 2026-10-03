@@ -50,7 +50,8 @@ function BalanceHint({ r }: { r: { balance: number; commission: number } }) {
 
 export default function WaitersScreen() {
   const businessName = useApp((s) => s.businessName)
-  const canPay = useCan('staff.manage')
+  const readOnly = useApp((st) => st.readOnly)
+  const canPay = useCan('staff.manage') && !readOnly
   const params = useNav((s) => s.params)
   const [month, setMonth] = useState(currentMonth)
   const [rows, setRows] = useState<WaiterMonthRow[] | null>(null)

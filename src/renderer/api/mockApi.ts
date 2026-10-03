@@ -5,12 +5,14 @@
  *   ?mock=1      — tayyor ma'lumot: Aziz (Ega, PIN 1234), Dilnoza (Admin, 1111), Jasur (Kassir, 0000), Malika (Kassir/masseuse, 2222),
  *                Bekzod (Ofitsiant 10%, 3333)
  *   ?mock=empty  — birinchi ishga tushirish (Setup ekrani)
+ *   &viewer=1    — ko'ruvchi (faqat ko'rish) rejimi: connection.info().mode='viewer', bitta band xona bilan
+ *   &offline=1   — ko'ruvchida aloqa uzilgan holat (connection.info().connected=false, board xato)
  *
  * Qo'llab-quvvatlanadi: auth.*, settings.*, system.now, rooms.list/board, staff.list, waiters.list, catalog.categories/products/services,
  * debts.list. Qolganlari "Mock rejimida mavjud emas" xatosini beradi.
  */
 import type { PosApi } from '@shared/api'
-import type { AppSettings, Permission, Product, ProductCategory, Room, RoomCard, ServiceItem, Staff } from '@shared/types'
+import type { AppSettings, ConnectionInfo, NetworkStatus, Permission, SessionView, Product, ProductCategory, Room, RoomCard, ServiceItem, Staff } from '@shared/types'
 import { ROLE_PERMISSIONS } from '@shared/permissions'
 
 const delay = <T>(v: T, ms = 120): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms))
@@ -41,7 +43,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'uz'
 }
 
-export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
+export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline?: boolean } = {}): PosApi {
+  let viewer = !!opts.viewer
+  let offline = !!opts.offline
   let staff: Staff[] = opts.empty
     ? []
     : [
@@ -80,6 +84,43 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
     { id: 2, name: 'Venik bilan bug\'lash', price: 80000, durationMin: 20, active: true }
   ]
 
+  let net: NetworkStatus = {
+    enabled: false,
+    port: 47321,
+    code: '482913',
+    addresses: ['192.168.1.10'],
+    viewers: [{ ip: '192.168.1.24', name: 'TEPA-KOMPYUTER', lastSeen: Date.now() - 4000 }]
+  }
+  const conn = (): ConnectionInfo =>
+    viewer ? { mode: 'viewer', host: '192.168.1.10', port: 47321, connected: !offline } : { mode: 'main', host: null, port: null, connected: true }
+  const online = () => {
+    if (offline) throw new Error("Asosiy kompyuter bilan aloqa yo'q")
+  }
+
+  // Ko'ruvchi mock uchun bitta band xona (VIP-1): 2 mehmon, 1 qator
+  const busyView = (): SessionView => {
+    const now = Date.now()
+    const start = now - 47 * 60_000
+    const room = rooms[2]
+    const g = (id: number, label: string, st: number) => ({
+      id, sessionId: 1, label, state: 'running' as const, paidMinutes: 60,
+      intervals: [{ roomId: room.id, rate: room.pricePerHour, start: st, end: null }],
+      elapsedMs: now - st, timeAmount: room.pricePerHour, remainingMs: 60 * 60_000 - (now - st), billedMinutes: 60,
+      runningRate: room.pricePerHour, linesAmount: 0
+    })
+    const guests = [g(1, 'Mehmon 1', start), g(2, 'Mehmon 2', now - 52 * 60_000)]
+    const lines = [{
+      id: 1, sessionId: 1, guestId: null, kind: 'product' as const, refId: 1, name: 'Coca-Cola 0.5', unitPrice: 8000, qty: 2,
+      returnedQty: 0, providerId: null, createdAt: now - 30 * 60_000, createdBy: 1, activeQty: 2, amount: 16000, providerName: null
+    }]
+    const timeTotal = guests.length * room.pricePerHour
+    return {
+      session: { id: 1, roomId: room.id, status: 'open', openedAt: start, closedAt: null, openedBy: 1, discount: 0, note: '', waiterId: 5, waiterPct: 10 },
+      room: clone(room), waiterName: 'Bekzod Aliyev', guests, lines, computedAt: now,
+      timeTotal, linesTotal: 16000, discount: 0, total: timeTotal + 16000, paid: 0, due: timeTotal + 16000, payments: []
+    } as unknown as SessionView
+  }
+
   const session = () => (current ? { staff: clone(current), permissions: ROLE_PERMISSIONS[current.role].slice() as Permission[] } : null)
   const needAuth = () => {
     if (!current) throw new Error('Avval tizimga kiring')
@@ -99,7 +140,12 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
         current = null
         return delay(undefined)
       },
-      current: () => delay(session()),
+      current: () =>
+        delay(
+          viewer
+            ? { staff: { id: 0, name: "Ko'ruvchi", role: 'cashier', active: true, isProvider: false, isWaiter: false, commissionPct: 0 } as Staff, permissions: ['reports.view'] as Permission[] }
+            : session()
+        ),
       needsSetup: () => delay(staff.length === 0),
       setupOwner: (name, pin, businessName) => {
         if (staff.length > 0) return fail("Ega allaqachon yaratilgan")
@@ -125,7 +171,51 @@ export function createMockApi(opts: { empty?: boolean } = {}): PosApi {
     },
     rooms: {
       list: () => delay(clone(rooms)),
-      board: () => delay(rooms.map((room): RoomCard => ({ room: clone(room), session: null, guestsActive: 0, currentTotal: 0 })))
+      board: () => {
+        online()
+        return delay(
+          rooms.map((room): RoomCard => {
+            if (viewer && room.id === 3) {
+              const v = busyView()
+              return { room: clone(room), session: v, guestsActive: v.guests.length, currentTotal: v.total }
+            }
+            return { room: clone(room), session: null, guestsActive: 0, currentTotal: 0 }
+          })
+        )
+      }
+    },
+    sessions: {
+      get: () => {
+        online()
+        return delay(busyView())
+      }
+    },
+    network: {
+      status: () => delay(clone(net)),
+      setEnabled: (enabled) => {
+        net = { ...net, enabled }
+        return delay(clone(net), 300)
+      },
+      regenerateCode: () => {
+        net = { ...net, code: String(100000 + Math.floor(Math.random() * 900000)), viewers: [] }
+        return delay(clone(net), 300)
+      }
+    },
+    connection: {
+      info: () => delay(conn(), 40),
+      discover: () =>
+        delay([{ host: '192.168.1.10', port: 47321, name: 'Delfin Sauna' }, { host: '192.168.1.15', port: 47321, name: 'Delfin Sauna (2-filial)' }], 1500),
+      connectViewer: (host, _port, code) => {
+        if (!host.trim()) return fail('Manzilni kiriting')
+        if (code !== '482913') return fail("Kod noto'g'ri. Asosiy kompyuterdagi Sozlamalar → Tarmoq bo'limidagi kodni kiriting.", 700)
+        viewer = true
+        return delay(undefined, 700)
+      },
+      disconnect: () => {
+        viewer = false
+        offline = false
+        return delay(undefined, 200)
+      }
     },
     staff: {
       list: () => delay(clone(staff))

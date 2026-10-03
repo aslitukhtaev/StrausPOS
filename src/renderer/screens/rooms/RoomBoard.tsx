@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import type { RoomCard } from '@shared/types'
 import { formatCountdown, formatHours } from '@shared/billing'
 import { useCan } from '@/store/auth'
+import { useApp } from '@/store/app'
 import {
   Button, Card, EmptyState, Icon, IconButton, Money, PageHeader, Spinner, StatusPill, cx, formatMoney, toast, useNow
 } from '@/ui'
@@ -19,7 +20,8 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
   const loadError = useBoard((s) => s.error)
   const [refreshing, setRefreshing] = useState(false)
   const [opening, setOpening] = useState<RoomCard | null>(null)
-  const canOpen = useCan('session.open')
+  const readOnly = useApp((st) => st.readOnly)
+  const canOpen = useCan('session.open') && !readOnly
   const data = cards ? { cards, at } : null
   const load = async (manual = false) => {
     if (manual) setRefreshing(true)
@@ -56,6 +58,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
       onOpenSession(c.session.session.id)
       return
     }
+    if (readOnly) return // ko'ruvchi: bo'sh xona bosilmaydi
     if (!canOpen) {
       toast.warning("Xonani ochishga ruxsatingiz yo'q")
       return
@@ -89,7 +92,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
     body = (
       <div className="rooms-grid">
         {data.cards.map((c) => (
-          <RoomTile key={c.room.id} card={c} live={lives.get(c.room.id) ?? null} onClick={() => onCardClick(c)} />
+          <RoomTile key={c.room.id} card={c} live={lives.get(c.room.id) ?? null} readOnly={readOnly} onClick={() => onCardClick(c)} />
         ))}
       </div>
     )
@@ -115,7 +118,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
                 <Money value={stats.total} size="xl" tone="accent" />
               </div>
             )}
-            {loadError && data && (
+            {loadError && data && !readOnly && (
               <span className="rooms-board__offline" title={loadError}>
                 <Icon name="alert" size={18} /> Aloqa yo'q
               </span>
@@ -144,7 +147,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
   )
 }
 
-function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | null; onClick: () => void }) {
+function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: LiveTotals | null; readOnly: boolean; onClick: () => void }) {
   const { room, session } = card
   const tone = roomTone(live)
   const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'busy' : tone === 'warn' ? 'warning' : 'danger'
@@ -153,11 +156,11 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
   const left = live ? live.minRemainingMs : null
   return (
     <Card
-      interactive
+      interactive={!(readOnly && !session)}
       tone={cardTone}
       padding="none"
       className={cx('rooms-tile', 'rooms-tile--' + tone)}
-      onClick={onClick}
+      onClick={readOnly && !session ? undefined : onClick}
       aria-label={room.name + (session ? ' — band' : " — bo'sh")}
       data-room={room.name}
     >
@@ -182,15 +185,27 @@ function RoomTile({ card, live, onClick }: { card: RoomCard; live: LiveTotals | 
         </div>
 
         {!session || !live ? (
-          <div className="rooms-tile__free">
-            <span className="rooms-tile__play">
-              <Icon name="play" size={30} strokeWidth={2.4} />
-            </span>
-            <span>
-              <span className="rooms-tile__freetitle">Xonani ochish</span>
-              <span className="rooms-tile__freehint">Bosing: mehmonlar, vaqt, ofitsiant</span>
-            </span>
-          </div>
+          readOnly ? (
+            <div className="rooms-tile__free is-readonly">
+              <span className="rooms-tile__play">
+                <Icon name="check" size={30} strokeWidth={2.4} />
+              </span>
+              <span>
+                <span className="rooms-tile__freetitle">Bo'sh</span>
+                <span className="rooms-tile__freehint">Mehmon yo'q</span>
+              </span>
+            </div>
+          ) : (
+            <div className="rooms-tile__free">
+              <span className="rooms-tile__play">
+                <Icon name="play" size={30} strokeWidth={2.4} />
+              </span>
+              <span>
+                <span className="rooms-tile__freetitle">Xonani ochish</span>
+                <span className="rooms-tile__freehint">Bosing: mehmonlar, vaqt, ofitsiant</span>
+              </span>
+            </div>
+          )
         ) : (
           <>
             <div className="rooms-tile__live">

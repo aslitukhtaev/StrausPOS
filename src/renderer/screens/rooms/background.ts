@@ -5,16 +5,18 @@
  */
 import { useEffect } from 'react'
 import { isAnyModalOpen } from '@/ui'
-import { REFRESH_MS, useBoard } from './boardStore'
+import { REFRESH_MS, VIEWER_REFRESH_MS, useBoard } from './boardStore'
+import { useApp } from '@/store/app'
 import { useTimeAlerts } from './useTimeAlerts'
 
 export function useRoomsBackground(): void {
+  const readOnly = useApp((s) => s.readOnly)
   useEffect(() => {
     void useBoard.getState().load()
     const id = setInterval(() => {
       if (!isAnyModalOpen() || useBoard.getState().cards == null) void useBoard.getState().load()
-    }, REFRESH_MS)
+    }, readOnly ? VIEWER_REFRESH_MS : REFRESH_MS)
     return () => clearInterval(id)
-  }, [])
+  }, [readOnly])
   useTimeAlerts()
 }

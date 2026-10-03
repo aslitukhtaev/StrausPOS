@@ -1,12 +1,15 @@
 /**
- * Birinchi ishga tushirish: biznes nomi + ega ismi → PIN → PIN tasdig'i → ega yaratiladi va avtomatik kirish.
+ * Birinchi ishga tushirish: avval tanlov — [Yangi biznes (asosiy kompyuter)] / [Asosiy kompyuterga ulanish (faqat ko'rish)].
+ * Yangi biznes: biznes nomi + ega ismi → PIN → PIN tasdig'i → ega yaratiladi va avtomatik kirish.
  */
 import { useState } from 'react'
 import { api } from '../../api'
 import { useApp } from '../../store/app'
 import { Button, Field, Icon, Input, Numpad, PinDots, cx, errorMessage, toast } from '../../ui'
 import { BrandPanel } from '../Lock/BrandPanel'
+import { ViewerConnect } from './ViewerConnect'
 import '../Lock/lock.css'
+import './setup.css'
 
 type Step = 0 | 1 | 2
 const STEPS = ['Biznes', 'PIN kod', 'Tasdiqlash']
@@ -14,6 +17,46 @@ const PIN_MIN = 4
 const PIN_MAX = 6
 
 export default function SetupScreen() {
+  const [kind, setKind] = useState<'choose' | 'owner' | 'viewer'>('choose')
+  if (kind === 'owner') return <OwnerSetup onBack={() => setKind('choose')} />
+  return (
+    <div className="auth">
+      <BrandPanel businessName="" footer={kind === 'viewer' ? "Faqat ko'rish · ma'lumotlar asosiy kompyuterda" : 'Birinchi sozlash · bir daqiqa vaqt oladi'} />
+      <section className="auth__panel">
+        <div className="setup">
+          {kind === 'viewer' ? (
+            <ViewerConnect onBack={() => setKind('choose')} />
+          ) : (
+            <div className="setup__body" key="choose">
+              <div className="auth__head">
+                <h1>Xush kelibsiz!</h1>
+                <p className="auth__lead">Bu kompyuter qanday ishlatiladi?</p>
+              </div>
+              <button type="button" className="setup-choice" onClick={() => setKind('owner')} data-testid="setup-owner">
+                <span className="setup-choice__icon"><Icon name="rooms" size={34} /></span>
+                <span className="setup-choice__text">
+                  <span className="setup-choice__title">Yangi biznes</span>
+                  <span className="setup-choice__desc">Asosiy kompyuter — kassa shu yerda, ma'lumotlar shu kompyuterda saqlanadi</span>
+                </span>
+                <Icon name="chevronRight" size={30} />
+              </button>
+              <button type="button" className="setup-choice setup-choice--viewer" onClick={() => setKind('viewer')} data-testid="setup-viewer">
+                <span className="setup-choice__icon"><Icon name="eye" size={34} /></span>
+                <span className="setup-choice__text">
+                  <span className="setup-choice__title">Asosiy kompyuterga ulanish</span>
+                  <span className="setup-choice__desc">Faqat ko'rish — Wi-Fi orqali xonalar, hisobot va qarzlarni kuzatish</span>
+                </span>
+                <Icon name="chevronRight" size={30} />
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function OwnerSetup({ onBack }: { onBack: () => void }) {
   const enter = useApp((s) => s.enter)
   const setupDone = useApp((s) => s.setupDone)
   const [step, setStep] = useState<Step>(0)
@@ -103,6 +146,9 @@ export default function SetupScreen() {
               </Field>
               <Button type="submit" variant="primary" size="xl" iconRight="arrowRight" block>
                 Davom etish
+              </Button>
+              <Button variant="ghost" icon="arrowLeft" onClick={onBack}>
+                Orqaga
               </Button>
             </form>
           )}

@@ -12,9 +12,15 @@
  *   useApp.getState().toggleTheme()                   // tepa paneldagi quyosh/oy tugmasi
  *   useApp.getState().setThemePref('auto')            // Sozlamalar ekrani uchun (faqat lokal qo'llash)
  * `<html data-theme>` shu store tomonidan qo'yiladi. Login'dan oldin — localStorage keshi.
+ *
+ * Tarmoq rejimi (boot'da `connection.info()`):
+ *   const readOnly = useApp((s) => s.readOnly)        // true = ko'ruvchi kompyuter: HECH QANDAY o'zgartirish tugmasi yo'q
+ *   const connected = useApp((s) => s.connected)      // ko'ruvchida asosiy kompyuter bilan aloqa
+ *   useApp.getState().setConnected(false)             // rpc xatosida (banner + qayta ulanish)
+ * Ko'ruvchida login/qulf/Setup yo'q — to'g'ridan-to'g'ri qobiq; ruxsatlar faqat ['reports.view'].
  */
 import { create } from 'zustand'
-import type { AppSettings, Permission, Staff } from '@shared/types'
+import type { AppMode, AppSettings, Permission, Staff } from '@shared/types'
 import { getApi } from '../api'
 import { useAuth } from './auth'
 import { useNav } from './nav'
@@ -76,8 +82,20 @@ function readCachedName(): string {
   return lsGet(BN_KEY) || lsGet(LEGACY_BN_KEY) || ''
 }
 
+/** Ko'ruvchi rejimidagi ruxsatlar — faqat ko'rish (server ham shuni beradi; UI uchun qat'iy) */
+const VIEWER_PERMISSIONS: Permission[] = ['reports.view']
+const VIEWER_STAFF: Staff = { id: 0, name: "Ko'ruvchi", role: 'cashier', active: true, isProvider: false, isWaiter: false, commissionPct: 0 }
+
 interface AppState {
   phase: Phase
+  /** 'main' = asosiy kompyuter (baza shu yerda), 'viewer' = faqat ko'rish */
+  mode: AppMode
+  readOnly: boolean
+  /** Ko'ruvchida asosiy kompyuter bilan aloqa (asosiyda doim true) */
+  connected: boolean
+  /** Ko'ruvchi: asosiy kompyuter manzili */
+  host: string | null
+  setConnected(c: boolean): void
   bootError: string | null
   settings: AppSettings | null
   /** Biznes nomi (sozlamalardan; qulf ekranida keshdan) */
@@ -94,6 +112,8 @@ interface AppState {
   reloadSettings(): Promise<void>
   setSettings(s: AppSettings): void
   /** Kirish muvaffaqiyatli bo'lgandan keyin (Lock/Setup ekranlari chaqiradi) */
+  /** Ko'ruvchi rejimida qobiqqa kirish (login'siz) */
+  enterViewer(): Promise<void>
   enter(session: { staff: Staff; permissions: Permission[] }): void
   lock(): Promise<void>
   /** Setup tugagach */
@@ -105,6 +125,13 @@ applyTheme(resolveTheme(startPref))
 
 export const useApp = create<AppState>((set, get) => ({
   phase: 'boot',
+  mode: 'main',
+  readOnly: false,
+  connected: true,
+  host: null,
+  setConnected(c) {
+    if (get().connected !== c) set({ connected: c })
+  },
   bootError: null,
   settings: null,
   businessName: readCachedName(),
@@ -139,6 +166,18 @@ export const useApp = create<AppState>((set, get) => ({
     const api = getApi()
     set({ phase: 'boot', bootError: null })
     try {
+      let info = null
+      try {
+        info = await api.connection.info()
+      } catch {
+        info = null // eski backend — asosiy rejim
+      }
+      if (info && info.mode === 'viewer') {
+        set({ mode: 'viewer', readOnly: true, connected: info.connected, host: info.host })
+        await get().enterViewer()
+        return
+      }
+      set({ mode: 'main', readOnly: false, connected: true, host: null })
       void syncClock(() => api.system.now())
       if (await api.auth.needsSetup()) {
         set({ phase: 'setup' })
@@ -173,6 +212,23 @@ export const useApp = create<AppState>((set, get) => ({
     get().setThemePref(pref)
   },
 
+  async enterViewer() {
+    const api = getApi()
+    // Login yo'q: aloqa bo'lmasa ham qobiq ochiladi (banner + qayta ulanish)
+    void syncClock(() => api.system.now()).catch(() => undefined)
+    let staff = VIEWER_STAFF
+    try {
+      const cur = await api.auth.current()
+      if (cur) staff = cur.staff
+      void get().reloadSettings()
+    } catch {
+      get().setConnected(false)
+    }
+    useAuth.getState().set({ staff, permissions: VIEWER_PERMISSIONS.slice() })
+    useNav.getState().go('rooms')
+    set({ phase: 'shell' })
+  },
+
   enter(session) {
     useAuth.getState().set(session)
     // Har bir kirishda bosh ekran — Xonalar
@@ -182,6 +238,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async lock() {
+    if (get().readOnly) return // ko'ruvchida qulf yo'q
     try {
       await getApi().auth.logout()
     } catch {

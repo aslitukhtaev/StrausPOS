@@ -7,8 +7,11 @@ import { create } from 'zustand'
 import type { RoomCard, SessionView } from '@shared/types'
 import { api } from '@/api'
 import { getNow, toast } from '@/ui'
+import { useApp } from '@/store/app'
 
 export const REFRESH_MS = 10_000
+/** Ko'ruvchi kompyuterda tezroq (faqat ko'radi — har 3 soniya) */
+export const VIEWER_REFRESH_MS = 3_000
 
 interface BoardState {
   cards: RoomCard[] | null
@@ -29,7 +32,14 @@ export const useBoard = create<BoardState>((set, get) => ({
     try {
       const cards = await api.rooms.board()
       set({ cards, at: getNow(), error: null, failStreak: 0 })
+      if (useApp.getState().readOnly) useApp.getState().setConnected(true)
     } catch (e) {
+      if (useApp.getState().readOnly) {
+        // Ko'ruvchida aloqa uzilishi — toast emas, butun eni bo'ylab banner (AppShell)
+        useApp.getState().setConnected(false)
+        set({ error: e instanceof Error ? e.message : String(e), failStreak: get().failStreak + 1 })
+        return
+      }
       const streak = get().failStreak + 1
       set({ error: e instanceof Error ? e.message : String(e), failStreak: streak })
       // Fon yangilanishida xatoni faqat bir marta ko'rsatamiz (spam bo'lmasin)
