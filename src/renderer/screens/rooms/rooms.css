@@ -467,6 +467,9 @@
   .rooms-guest__state { display: none; }
   .rooms-guest--finished .rooms-guest__state { display: inline; }
   .rooms-guest__countdown { font-size: 36px; }
+  /* Tor ekranda "oshdi" pastdagi izohda yoziladi — taymer tugmalarga urilmasin */
+  .rooms-guest__countdown small { display: none; }
+  .rooms-guest--over .rooms-guest__countdown { font-size: 32px; }
   .rooms-guest__progress { grid-area: bar; height: 6px; }
   .rooms-guest__overnote { grid-area: note; }
   .rooms-guest__money { grid-area: money; justify-content: flex-end; gap: 14px; }

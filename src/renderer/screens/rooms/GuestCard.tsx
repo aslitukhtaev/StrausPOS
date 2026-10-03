@@ -61,7 +61,7 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
       </div>
       {extra > 0 && (
         <div className="rooms-guest__overnote">
-          <Icon name="alert" size={16} /> Keyingi {formatHours(extra)} hisoblandi
+          <Icon name="alert" size={16} /> Vaqt oshdi · Keyingi {formatHours(extra)} hisoblandi
         </div>
       )}
 
@@ -74,7 +74,7 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
           </span>
           {g.linesAmount > 0 && (
             <span className="rooms-guest__extra ellipsis">
-              + bar <b className="num">{formatMoney(g.linesAmount)}</b>
+              + buyurtma <b className="num">{formatMoney(g.linesAmount)}</b>
             </span>
           )}
         </div>
