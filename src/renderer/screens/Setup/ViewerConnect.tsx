@@ -4,7 +4,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { DiscoveredServer } from '@shared/types'
-import { api } from '../../api'
+import { api, apiKind } from '../../api'
 import { useApp } from '../../store/app'
 import { Button, Field, Icon, Input, Numpad, Spinner, cx, errorMessage, toast } from '../../ui'
 
@@ -71,7 +71,8 @@ export function ViewerConnect({ onBack }: { onBack: () => void }) {
       await api.connection.connectViewer(target.host, target.port, value)
       toast.success('Ulandi', { description: (target.name || target.host) + ' — faqat ko\'rish rejimi' })
       // Electron ilovani o'zi qayta yuklaydi; brauzer/mock uchun qayta boot
-      void useApp.getState().boot()
+      if (apiKind() === 'mock') void useApp.getState().boot()
+      else location.reload()
     } catch (e) {
       setError(errorMessage(e))
       setShake((n) => n + 1)

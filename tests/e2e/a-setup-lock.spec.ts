@@ -11,6 +11,10 @@ test('Setup: biznes va ega → PIN tasdig\'i → avtomatik kirish → qulf → P
   await expect(page).toHaveTitle('Delfin Sauna')
   await expect(page.getByRole('img', { name: 'Delfin Sauna' }).first()).toBeVisible()
 
+  // Tanlov: yangi biznes (asosiy kompyuter) / asosiy kompyuterga ulanish (faqat ko'rish)
+  await expect(page.getByTestId('setup-viewer')).toBeVisible()
+  await page.getByTestId('setup-owner').click()
+
   // Bo'sh maydonlar bilan davom etib bo'lmaydi
   await page.getByRole('button', { name: 'Davom etish' }).click()
   await expect(page.getByText('Biznes nomini kiriting')).toBeVisible()

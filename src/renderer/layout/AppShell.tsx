@@ -8,7 +8,7 @@ import { useAuth } from '../store/auth'
 import { useApp } from '../store/app'
 import { useNav } from '../store/nav'
 import { useNow } from '../store/clock'
-import { api } from '../api'
+import { api, apiKind } from '../api'
 import { Avatar, Button, ErrorBoundary, Icon, IconButton, Logo, confirmDialog, errorMessage, formatClock, formatDate, cx, toast } from '../ui'
 import { SCREENS, screenAllowed, type ScreenId } from './routes'
 import { useAutoLock } from './useAutoLock'
@@ -45,7 +45,8 @@ async function changeConnection() {
   try {
     await api.connection.disconnect()
     toast.success('Ulanish uzildi')
-    void useApp.getState().boot()
+    if (apiKind() === 'mock') void useApp.getState().boot()
+    else location.reload()
   } catch (e) {
     toast.error(errorMessage(e))
   }
