@@ -170,8 +170,10 @@ describe('xona almashtirish', () => {
     expect(gv1.intervals[0]).toMatchObject({ roomId: rooms.s1, rate: 50_000, end: clock.t })
     expect(gv1.intervals[1]).toMatchObject({ roomId: rooms.vip, rate: 100_000, end: null })
     expect(gv1.runningRate).toBe(100_000)
-    // pauzadagi mehmonning oralig'i o'zgarmaydi
-    expect(v.guests.find((g) => g.id === g2.id)!.intervals).toHaveLength(1)
+    // pauzadagi mehmonga yangi xona narxi bilan 0 uzunlikdagi oraliq qo'shiladi (qolgan vaqt yangi narxda)
+    const pausedIvs = v.guests.find((g) => g.id === g2.id)!.intervals
+    expect(pausedIvs).toHaveLength(2)
+    expect(pausedIvs[1]).toMatchObject({ roomId: rooms.vip, rate: 100_000, start: clock.t, end: clock.t })
     // Qolgan (oldindan olingan) 60 daqiqa darhol yangi narxda: 60×50k + 60×100k
     expect(gv1.timeAmount).toBe(150_000)
 

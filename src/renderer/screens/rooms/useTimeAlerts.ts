@@ -65,7 +65,9 @@ export function useTimeAlerts(): void {
         if (phase !== 'warn' && phase !== 'over') continue
         // Butun olingan vaqt ogohlantirish oynasidan qisqa bo'lsa (masalan 10 daq) — "tugayapti" darhol chiqmasin
         if (phase === 'warn' && g.paidMinutes * 60_000 <= warnMs) continue
-        const key = [c.session.session.id, g.id, phase, g.paidMinutes, phase === 'over' ? g.billedMinutes : 0].join(':')
+        // Har oshgan blok uchun bitta ogohlantirish (aynan 0 da va keyingi soniyada ikki marta chiqmasin)
+        const overIdx = Math.max(1, Math.ceil((g.billedMinutes - g.paidMinutes) / Math.max(1, opts.blockMinutes)))
+        const key = [c.session.session.id, g.id, phase, g.paidMinutes, phase === 'over' ? overIdx : 0].join(':')
         if (fired.has(key)) continue
         fired.add(key)
         const name = `${c.room.name}: ${g.label}`

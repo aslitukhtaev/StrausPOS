@@ -791,6 +791,13 @@ export class PosService implements PosApi {
           this.closeIntervals(g.id, now)
           this.openInterval(g.id, target.id, target.price_per_hour, now)
         }
+        // Pauzadagi mehmonlar: qolgan oldindan olingan vaqti yangi xona narxida hisoblansin —
+        // yangi narx bilan 0 uzunlikdagi interval (billing qoldiqni oxirgi interval tarifi bilan hisoblaydi)
+        const paused = this.db.all<GuestRow>("SELECT * FROM guests WHERE session_id=? AND state='paused'", [s.id])
+        for (const g of paused) {
+          this.openInterval(g.id, target.id, target.price_per_hour, now)
+          this.closeIntervals(g.id, now)
+        }
         this.db.run('UPDATE sessions SET room_id=? WHERE id=?', [target.id, s.id])
       })
       return this.view(s.id)
@@ -1293,6 +1300,7 @@ export class PosService implements PosApi {
     payout: async (staffId, month, amount, note) => {
       const me = this.need('staff.manage')
       const r = monthRange(month)
+      if (r.from > this.now()) fail("Kelajak oy uchun pul berib bo'lmaydi")
       const st = isInt(staffId) ? this.staffRow(staffId) : undefined
       if (!st) fail('Xodim topilmadi')
       const hasSessions = (this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM sessions WHERE waiter_id=?', [st.id])?.n ?? 0) > 0
