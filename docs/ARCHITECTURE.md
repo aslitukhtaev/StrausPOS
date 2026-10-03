@@ -46,6 +46,18 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - Guruh uchun bitta chek.
 - Bekor qilish: biror mehmon ≥1 daqiqa o'tirgan bo'lsa faqat `discount.apply` ruxsati bilan (xato ochilgan xonani kassir darhol bekor qila oladi).
 
+## Tarmoq: ikkinchi kompyuter — FAQAT KO'RISH
+- Asosiy kompyuter (baza shu yerda) Sozlamalar → Tarmoq'da ruxsat bersa, Electron main LAN'da HTTP server ochadi
+  (standart port 47321) va UDP broadcast orqali o'zini e'lon qiladi. Har so'rov `X-Delfin-Code` (6 raqamli kod) bilan.
+- Server faqat O'QISH metodlarini bajaradi (qat'iy allowlist: rooms.board/list, sessions.get, catalog.* ro'yxatlari,
+  debts.list/payments, reports.*, waiters.monthly/sessions/payouts/list, settings.get, system.now/receiptHtml, staff.list).
+  Ular alohida PosService konteksti (sintetik ko'ruvchi, ruxsat: reports.view) bilan, asosiy kompyuterdagi login
+  holatiga TA'SIR QILMASDAN bajariladi. Har qanday yozish rad etiladi — xavfsizlik serverda, UI'da emas.
+- Ko'ruvchi kompyuter: o'sha ilova, `connection.connectViewer` bilan rejim lokal konfiguratsiyaga (`userData/connection.json`)
+  yoziladi; main jarayon DB ochmaydi, IPC chaqiruvlarini HTTP orqali asosiyga yo'naltiradi (Node 16: `http` moduli).
+  UI `readOnly` rejimida: login yo'q, barcha o'zgartirish tugmalari yashirin, tepada "Faqat ko'rish · <asosiy nomi>" belgisi,
+  aloqa uzilsa aniq banner va avtomatik qayta ulanish.
+
 ## Dizayn tamoyillari
 Brend: **Delfin Sauna**, logotip — delfin. Ranglar rasmdagi suvdan: yorqin moviy-feruza (aqua/cyan), oq ko'pik,
 chuqur dengiz ko'ki. **Ikki rejim**: kunduzgi (yorug', oq-moviy) va tungi (chuqur dengiz). `data-theme` = light|dark,

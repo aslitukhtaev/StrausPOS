@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, NetworkStatus, DiscoveredServer, ConnectionInfo
 } from './types'
 import type { Permission } from './types'
 
@@ -133,6 +133,30 @@ export interface PosApi {
     payout(staffId: Id, month: string, amount: number, note: string): Promise<WaiterPayout>
     /** Ruxsat: reports.view */
     payouts(staffId: Id, month: string): Promise<WaiterPayout[]>
+  }
+
+  // ── Tarmoq (asosiy kompyuterda): ko'ruvchi kompyuterlarga ruxsat. Ruxsat: settings.manage ──
+  network: {
+    status(): Promise<NetworkStatus>
+    setEnabled(enabled: boolean): Promise<NetworkStatus>
+    /** Yangi ulanish kodi — eski kod bilan ulangan ko'ruvchilar uziladi */
+    regenerateCode(): Promise<NetworkStatus>
+  }
+
+  /**
+   * Ulanish rejimi (har bir kompyuterning o'zida, login talab qilmaydi; DB'da emas, lokal konfiguratsiyada saqlanadi).
+   * Ko'ruvchi rejimida PosApi'ning faqat O'QISH metodlari ishlaydi (server allowlist), qolganlari
+   * "Bu kompyuter faqat ko'rish rejimida" xatosini beradi. Ko'ruvchida login yo'q: auth.current() sintetik
+   * {name: "Ko'ruvchi"} xodimni va faqat ['reports.view'] ruxsatini qaytaradi.
+   */
+  connection: {
+    info(): Promise<ConnectionInfo>
+    /** Wi-Fi'dagi asosiy kompyuterlarni qidirish (UDP broadcast, ~2 soniya) */
+    discover(): Promise<DiscoveredServer[]>
+    /** Ko'ruvchi rejimiga o'tish: manzil + kod tekshiriladi, saqlanadi, ilova qayta yuklanadi */
+    connectViewer(host: string, port: number, code: string): Promise<void>
+    /** Ko'ruvchi rejimidan chiqish (asosiy rejimga qaytish) */
+    disconnect(): Promise<void>
   }
 
   // ── Sozlamalar / hisobot / zaxira ──

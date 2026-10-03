@@ -363,3 +363,35 @@ export interface WaiterSessionRow {
   pct: number
   commission: number
 }
+
+// ───────────── Tarmoq: ikkinchi kompyuter "faqat ko'rish" rejimida ─────────────
+/** Asosiy kompyuter (baza shu yerda) yoki ko'ruvchi (Wi-Fi orqali asosiyga ulangan, faqat o'qiydi) */
+export type AppMode = 'main' | 'viewer'
+
+export interface NetworkStatus {
+  /** Ko'ruvchi kompyuterlarga ruxsat berilganmi */
+  enabled: boolean
+  port: number
+  /** Ulanish kodi (6 raqam) — ko'ruvchi kompyuterda bir marta kiritiladi */
+  code: string
+  /** Shu kompyuterning Wi-Fi/LAN manzillari (masalan 192.168.1.10) */
+  addresses: string[]
+  /** Oxirgi 2 daqiqada so'rov yuborgan ko'ruvchilar */
+  viewers: { ip: string; name: string; lastSeen: number }[]
+}
+
+export interface DiscoveredServer {
+  host: string
+  port: number
+  /** Biznes nomi */
+  name: string
+}
+
+export interface ConnectionInfo {
+  mode: AppMode
+  /** viewer rejimida: asosiy kompyuter manzili */
+  host: string | null
+  port: number | null
+  /** viewer rejimida: hozir aloqa bormi */
+  connected: boolean
+}
