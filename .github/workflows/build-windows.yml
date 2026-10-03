@@ -7,7 +7,7 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write  # Release yaratish uchun
 
 jobs:
   build:
@@ -50,3 +50,20 @@ jobs:
             release/*.blockmap
           if-no-files-found: error
           retention-days: 30
+
+      # Yuklab olish uchun to'g'ridan-to'g'ri havola: GitHub Releases (har ishga tushishda yangilanadi)
+      - name: Release (yuklab olish havolasi)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
+          name: Delfin Sauna ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v0.1.0' }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            Delfin Sauna — Windows o'rnatuvchilari.
+            - **DelfinSauna-Setup-…-x64.exe** — 64-bitli Windows (7/8/10/11)
+            - **DelfinSauna-Setup-…-ia32.exe** — 32-bitli eski Windows
+            - **DelfinSauna-Setup-….exe** — universal (o'zi tanlaydi, kattaroq)
+            Windows 7 uchun SP1 va yangilanishlar kerak: docs/WINDOWS.md
+          files: |
+            release/*.exe
