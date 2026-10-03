@@ -17,6 +17,15 @@
  *                        {"now": null} — haqiqiy soatga qaytadi. Javob: {"now": hozirgi vaqt}
  *   GET  /__test/state   → {"now", "frozen", "file"}
  * Login holati: bitta umumiy sessiya (server jarayonida bitta joriy xodim).
+ *
+ * Tarmoq ("faqat ko'rish" ikkinchi kompyuter):
+ *   --lan [--code 123456]   → LAN serverni ham ko'taradi (network.setEnabled(true)): http://0.0.0.0:47321 (LAN_PORT env),
+ *                             UDP qidiruv 47322 (DISCOVERY_PORT env). --code berilsa ulanish kodi shu bo'ladi.
+ *   --viewer-of http://host:47321 --code 123456
+ *                           → KO'RUVCHI rejimi: baza ochilmaydi, /rpc so'rovlari Electron'dagi kabi ko'ruvchi proksisidan
+ *                             o'tadi (auth.current = sintetik "Ko'ruvchi", allowlist'dagi o'qishlar asosiyga, qolgani
+ *                             "Bu kompyuter faqat ko'rish rejimida"). connection.connectViewer/disconnect ham ishlaydi
+ *                             (jarayon ichida rejim almashadi; brauzer sahifasini UI o'zi qayta yuklaydi).
  */
 import http from 'http'
 import fs from 'fs'
@@ -25,6 +34,12 @@ import { PosService } from '../electron/main/PosService'
 import type { PosHost } from '../electron/main/PosService'
 import { invokeApi, parseMethod } from '../electron/main/apiMethods'
 import { writeFileAtomic } from '../electron/main/db'
+import type { PosApi } from '../src/shared/api'
+import { NetworkManager } from '../electron/main/lan/network'
+import { setClientVersion } from '../electron/main/lan/client'
+import { DEFAULT_LAN_PORT, DISCOVERY_PORT, isValidCode } from '../electron/main/lan/protocol'
+import { createConnectionController, createViewerMode, writeConnectionConfig } from '../electron/main/lan/viewer'
+import type { ConnectionConfig } from '../electron/main/lan/viewer'
 
 const PORT = Number(process.env.PORT || 5174)
 const DATA_DIR = path.resolve(process.env.DELFIN_DATA_DIR || process.env.STRAUS_DATA_DIR || './dev-data')
@@ -69,6 +84,66 @@ const host: PosHost = {
 }
 
 let service: PosService
+/** /rpc shu API'ga boradi: asosiy rejimda service, ko'ruvchi rejimida proksi */
+let current: PosApi | null = null
+let mode: 'main' | 'viewer' = 'main'
+
+const ARGV = process.argv.slice(2)
+function argValue(name: string): string | null {
+  const i = ARGV.indexOf(name)
+  return i >= 0 && i + 1 < ARGV.length ? ARGV[i + 1] : null
+}
+const VERSION = (() => {
+  try {
+    return String((JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8')) as { version?: string }).version || '0.0.0')
+  } catch {
+    return '0.0.0'
+  }
+})()
+setClientVersion(VERSION)
+const CONN_FILE = path.join(DATA_DIR, 'connection.json')
+const LAN_PORT = Number(process.env.LAN_PORT || DEFAULT_LAN_PORT)
+const UDP_PORT = Number(process.env.DISCOVERY_PORT || DISCOVERY_PORT)
+
+const connection = createConnectionController({
+  file: CONN_FILE,
+  onChange: (cfg) => applyMode(cfg),
+  discoverOpts: { port: UDP_PORT }
+})
+
+let network: NetworkManager | null = null
+function ensureNetwork(): NetworkManager {
+  if (!network) {
+    network = new NetworkManager({
+      store: { load: () => service.readKv('network'), save: (j) => service.writeKv('network', j) },
+      viewerApi: () => service.forViewer(),
+      name: () => service.businessName(),
+      version: VERSION,
+      clock,
+      discoveryPort: UDP_PORT
+    })
+  }
+  return network
+}
+host.network = {
+  status: () => ensureNetwork().status(),
+  setEnabled: (on) => ensureNetwork().setEnabled(on),
+  regenerateCode: () => ensureNetwork().regenerateCode()
+}
+host.connection = connection
+
+async function applyMode(cfg: ConnectionConfig): Promise<void> {
+  if (cfg.mode === 'viewer') {
+    mode = 'viewer'
+    current = createViewerMode(cfg, { file: CONN_FILE, onChange: (c) => applyMode(c), discoverOpts: { port: UDP_PORT } }).api
+    console.log(`[dev-server] KO'RUVCHI rejimi → http://${cfg.host}:${cfg.port}`)
+  } else {
+    mode = 'main'
+    if (!service) await open(false)
+    current = service
+    console.log('[dev-server] asosiy rejim')
+  }
+}
 
 function removeDbFiles(): void {
   for (const f of fs.existsSync(DATA_DIR) ? fs.readdirSync(DATA_DIR) : []) {
@@ -81,6 +156,7 @@ async function open(reset: boolean): Promise<void> {
   if (service) service.db.close()
   if (reset) removeDbFiles()
   service = await PosService.create({ file: DB_FILE, clock, host })
+  if (mode === 'main') current = service
 }
 
 async function setupStaff(login: keyof typeof TEST_STAFF | null): Promise<Record<string, number>> {
@@ -156,14 +232,18 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const body = (await readBody(req)) as Record<string, unknown>
 
   if (url.pathname === '/rpc') {
-    if (url.searchParams.get('reset') === '1') await serial(() => open(true))
+    if (url.searchParams.get('reset') === '1' && mode === 'main') await serial(() => open(true))
     const m = parseMethod(body.method)
     if (!m) return send(res, 400, { error: "Noma'lum amal: " + String(body.method) })
     const args = Array.isArray(body.args) ? body.args : []
-    const result = await serial(() => invokeApi(service, m.group, m.method, args))
+    const api = current
+    if (!api) return send(res, 503, { error: 'Server tayyor emas' })
+    const result = await serial(() => invokeApi(api, m.group, m.method, args))
     // Uint8Array (bo'lmaydi) va undefined → null
     return send(res, 200, { result: result === undefined ? null : result })
   }
+
+  if (url.pathname.startsWith('/__test/') && mode === 'viewer') return send(res, 400, { error: "Ko'ruvchi rejimida mavjud emas" })
 
   if (url.pathname === '/__test/reset') {
     const ids = await serial(async () => {
@@ -186,11 +266,34 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 }
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2)
+  const args = ARGV
   const reset = args.includes('--reset') || process.env.RESET === '1'
   const demo = args.includes('--demo')
-  await open(reset || demo)
-  if (demo) await setupStaff(null)
+  const viewerOf = argValue('--viewer-of')
+  const code = argValue('--code')
+  if (viewerOf) {
+    const u = new URL(viewerOf)
+    if (!isValidCode(code)) throw new Error('--viewer-of uchun --code 6 raqam kerak')
+    const cfg: ConnectionConfig = { mode: 'viewer', host: u.hostname, port: Number(u.port || DEFAULT_LAN_PORT), code }
+    writeConnectionConfig(CONN_FILE, cfg)
+    await applyMode(cfg)
+  } else {
+    writeConnectionConfig(CONN_FILE, { mode: 'main', host: null, port: null, code: null })
+    await open(reset || demo)
+    if (demo) await setupStaff(null)
+    if (args.includes('--lan')) {
+      if (code !== null) {
+        if (!isValidCode(code)) throw new Error('--code 6 raqam bo‘lishi kerak')
+        service.writeKv('network', JSON.stringify({ enabled: true, port: LAN_PORT, code }))
+      } else {
+        const prev = service.readKv('network')
+        const j = prev ? (JSON.parse(prev) as Record<string, unknown>) : {}
+        service.writeKv('network', JSON.stringify({ ...j, port: LAN_PORT }))
+      }
+      const st = await ensureNetwork().setEnabled(true)
+      console.log(`[dev-server] LAN server: http://0.0.0.0:${st.port}  kod: ${st.code}  manzillar: ${st.addresses.join(', ') || '-'}  (UDP ${UDP_PORT})`)
+    }
+  }
 
   const server = http.createServer((req, res) => {
     handle(req, res).catch((e: unknown) => {
@@ -200,7 +303,7 @@ async function main(): Promise<void> {
     })
   })
   server.listen(PORT, () => {
-    console.log(`[dev-server] http://localhost:${PORT}/rpc  baza: ${DB_FILE}${reset || demo ? ' (toza)' : ''}`)
+    console.log(`[dev-server] http://localhost:${PORT}/rpc  ${mode === 'viewer' ? "(ko'ruvchi, baza yo'q)" : 'baza: ' + DB_FILE + (reset || demo ? ' (toza)' : '')}`)
     if (demo)
       console.log('[dev-server] demo xodimlar: Ega 1234, Administrator 2222, Kassir 3333, Massajchi 4444, ofitsiantlar: Sardor 5555 (10%), Bekzod 6666 (12%)')
   })

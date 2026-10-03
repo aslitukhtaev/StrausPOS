@@ -10,9 +10,15 @@ import type { PosHost } from './PosService'
 import { registerIpc } from './ipc'
 import { listPrinters, printHtml } from './print'
 import { writeFileAtomic } from './db'
+import { NetworkManager } from './lan/network'
+import { setClientVersion } from './lan/client'
+import { createConnectionController, createViewerMode, readConnectionConfig } from './lan/viewer'
 
 let mainWindow: BrowserWindow | null = null
 let service: PosService | null = null
+/** Joriy rejimni (asosiy: DB + LAN server + IPC; ko'ruvchi: proksi IPC) to'xtatish */
+let disposeMode: (() => Promise<void>) | null = null
+const CONNECTION_FILE = 'connection.json'
 
 const APP_NAME = 'Delfin Sauna'
 const USER_DATA_DIR = 'DelfinSauna'
@@ -157,14 +163,70 @@ function createWindow(): void {
   else void mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
 }
 
-async function bootstrap(): Promise<void> {
+function isTrusted(e: Electron.IpcMainInvokeEvent): boolean {
+  const url = e.senderFrame?.url ?? ''
+  return isAppUrl(url)
+}
+
+/**
+ * Rejimni ishga tushirish. connection.json mode='viewer' → DB OCHILMAYDI, IPC chaqiruvlari HTTP orqali asosiyga.
+ * Aks holda: baza + PosService + LAN server (yoqilgan bo'lsa avtomatik) + IPC.
+ */
+async function startMode(): Promise<void> {
+  const connFile = path.join(app.getPath('userData'), CONNECTION_FILE)
+  const cfg = readConnectionConfig(connFile)
+  setClientVersion(app.getVersion())
+
+  if (cfg.mode === 'viewer') {
+    const viewer = createViewerMode(cfg, { file: connFile, onChange: () => switchMode() })
+    const unregister = registerIpc(viewer.api, isTrusted)
+    disposeMode = async () => unregister()
+    return
+  }
+
   const dbFile = path.join(app.getPath('userData'), DB_FILE_NAME)
   importLegacyDb(dbFile)
-  service = await PosService.create({ file: dbFile, clock: () => Date.now(), host: createHost() })
-  registerIpc(service, (e) => {
-    const url = e.senderFrame?.url ?? ''
-    return isAppUrl(url)
+  const host = createHost()
+  const svc = await PosService.create({ file: dbFile, clock: () => Date.now(), host })
+  const viewerCtx = svc.forViewer()
+  const net = new NetworkManager({
+    store: { load: () => svc.readKv('network'), save: (j) => svc.writeKv('network', j) },
+    viewerApi: () => viewerCtx,
+    name: () => svc.businessName(),
+    version: app.getVersion()
   })
+  host.network = net
+  host.connection = createConnectionController({ file: connFile, onChange: () => switchMode() })
+  service = svc
+  await net.init()
+  const unregister = registerIpc(svc, isTrusted)
+  disposeMode = async () => {
+    unregister()
+    await net.shutdown()
+    svc.db.close()
+    if (service === svc) service = null
+  }
+}
+
+/** Rejim almashdi (connectViewer/disconnect): IPC javobi qaytgach — qayta ishga tushirish va oynani qayta yuklash */
+function switchMode(): void {
+  setTimeout(() => {
+    void (async () => {
+      try {
+        if (disposeMode) await disposeMode()
+        disposeMode = null
+        await startMode()
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        dialog.showErrorBox(APP_NAME, msg)
+      }
+      mainWindow?.reload()
+    })()
+  }, 100)
+}
+
+async function bootstrap(): Promise<void> {
+  await startMode()
   createWindow()
 }
 

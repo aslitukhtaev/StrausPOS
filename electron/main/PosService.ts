@@ -32,7 +32,18 @@ export interface PosHost {
   saveBackup?(bytes: Uint8Array, suggestedName: string): Promise<string | null>
   /** Tiklash uchun zaxira faylni tanlash. Bekor qilinsa null. */
   openBackup?(): Promise<Uint8Array | null>
+  /** LAN server boshqaruvi (asosiy kompyuter). Yo'q bo'lsa network.* xato beradi. */
+  network?: PosApi['network']
+  /** Ulanish rejimi (lokal konfiguratsiya). Yo'q bo'lsa: asosiy rejim, ulanish o'zgartirib bo'lmaydi. */
+  connection?: PosApi['connection']
 }
+
+/** Ko'ruvchi (LAN, faqat o'qish) kontekstining sintetik xodimi — mavjud xodim emas (id 0). */
+export const VIEWER_STAFF: Staff = {
+  id: 0, name: "Ko'ruvchi", role: 'cashier', active: true, isProvider: false, isWaiter: false, commissionPct: 0
+}
+export const VIEWER_PERMISSIONS: Permission[] = ['reports.view']
+export const VIEW_ONLY_ERROR = "Bu kompyuter faqat ko'rish rejimida"
 
 export interface PosServiceOptions {
   clock?: () => number
@@ -237,12 +248,38 @@ export class PosService implements PosApi {
   host: PosHost
   private currentId: Id | null = null
   private loginFails = new Map<Id, { count: number; until: number }>()
+  /** true → ko'ruvchi konteksti (forViewer): login yo'q, faqat o'qish */
+  private readonly viewer: boolean = false
 
   constructor(db: Db, opts: PosServiceOptions = {}) {
     this.db = db
     this.clock = opts.clock ?? (() => Date.now())
     this.host = opts.host ?? {}
     if (opts.seedDemo) this.seedDefaults()
+  }
+
+  /**
+   * Ko'ruvchi konteksti: o'sha Db ustida alohida servis, sintetik ko'ruvchi bilan.
+   * Asosiy kontekstning login holatiga (currentId) ta'sir qilmaydi va unga bog'liq emas.
+   * Ruxsatlar: faqat VIEWER_PERMISSIONS + o'qish metodlari (needRead); yozish amallari rad etiladi.
+   */
+  forViewer(): PosService {
+    const v = new PosService(this.db, { clock: () => this.clock(), host: {} })
+    ;(v as unknown as { viewer: boolean }).viewer = true
+    return v
+  }
+
+  get isViewer(): boolean {
+    return this.viewer
+  }
+
+  /** Lokal kalit-qiymat (masalan tarmoq sozlamasi). Ruxsat tekshiruvi chaqiruvchida. */
+  readKv(key: string): string | null {
+    return this.db.get<{ value: string }>('SELECT value FROM kv WHERE key=?', [key])?.value ?? null
+  }
+
+  writeKv(key: string, value: string): void {
+    this.db.run('INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, value])
   }
 
   /** Bazani ochib servis yaratish. file=null → faqat xotirada. */
@@ -287,6 +324,7 @@ export class PosService implements PosApi {
   }
 
   private me(): Staff | null {
+    if (this.viewer) return { ...VIEWER_STAFF }
     if (this.currentId == null) return null
     const r = this.staffRow(this.currentId)
     if (!r || !r.active) {
@@ -308,12 +346,28 @@ export class PosService implements PosApi {
 
   private need(perm: Permission): Staff {
     const s = this.requireLogin()
+    if (this.viewer) {
+      if (!VIEWER_PERMISSIONS.includes(perm)) fail(VIEW_ONLY_ERROR)
+      return s
+    }
     if (!can(s.role, perm)) fail(PERMISSION_DENIED)
     return s
   }
 
+  /** O'qish uchun ruxsat: ko'ruvchi kontekstiga ham ochiq (faqat ma'lumot ko'rish metodlarida). */
+  private needRead(perm: Permission): Staff {
+    if (this.viewer) return this.requireLogin()
+    return this.need(perm)
+  }
+
+  /** Ko'ruvchi kontekstida yozish/maxsus amallarni rad etish. */
+  private noViewer(): void {
+    if (this.viewer) fail(VIEW_ONLY_ERROR)
+  }
+
   /** Qulf o'chirilgan bo'lsa — birinchi faol ega avtomatik kiritiladi. */
   private autoLoginIfUnlocked(): Staff | null {
+    if (this.viewer) return null
     if (this.loadSettings().lockEnabled) return null
     const r = this.db.get<StaffRow>("SELECT * FROM staff WHERE role='owner' AND active=1 ORDER BY id LIMIT 1")
     if (!r) return null
@@ -322,6 +376,7 @@ export class PosService implements PosApi {
   }
 
   private authInfo(s: Staff): { staff: Staff; permissions: Permission[] } {
+    if (this.viewer) return { staff: s, permissions: [...VIEWER_PERMISSIONS] }
     return { staff: s, permissions: [...ROLE_PERMISSIONS[s.role]] }
   }
 
@@ -503,6 +558,11 @@ export class PosService implements PosApi {
     })
   }
 
+  /** Biznes nomi (LAN e'lon / hello uchun; maxfiy emas). */
+  businessName(): string {
+    return this.loadSettings().receipt.businessName || 'Delfin Sauna'
+  }
+
   /** Interfeys rejimi (Electron oyna foni uchun; ruxsat talab qilinmaydi — maxfiy emas). */
   currentTheme(): AppSettings['theme'] {
     return this.loadSettings().theme
@@ -529,6 +589,7 @@ export class PosService implements PosApi {
         .map(toStaff),
 
     login: async (staffId, pin) => {
+      this.noViewer()
       const now = this.now()
       const r = isInt(staffId) ? this.staffRow(staffId) : undefined
       if (!r) fail('Xodim topilmadi')
@@ -546,6 +607,7 @@ export class PosService implements PosApi {
     },
 
     logout: async () => {
+      this.noViewer()
       this.currentId = null
     },
 
@@ -557,6 +619,7 @@ export class PosService implements PosApi {
     needsSetup: async () => (this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM staff')?.n ?? 0) === 0,
 
     setupOwner: async (name, pin, businessName) => {
+      this.noViewer()
       if (!(await this.auth.needsSetup())) fail("Dastur allaqachon sozlangan")
       const n = reqText(name, 'Ismni kiriting', 60)
       if (!isValidPin(pin)) fail("PIN 4–8 ta raqamdan iborat bo'lishi kerak")
@@ -1143,7 +1206,7 @@ export class PosService implements PosApi {
   // ═════════════ DEBTS ═════════════
   debts: PosApi['debts'] = {
     list: async (onlyOpen) => {
-      this.need('debt.manage')
+      this.needRead('debt.manage')
       return this.db
         .all<DebtRow>(`SELECT * FROM debts ${onlyOpen ? 'WHERE closed_at IS NULL' : ''} ORDER BY created_at DESC, id DESC`)
         .map(toDebt)
@@ -1167,7 +1230,7 @@ export class PosService implements PosApi {
     },
 
     payments: async (debtId) => {
-      this.need('debt.manage')
+      this.needRead('debt.manage')
       return this.db.all<DebtPaymentRow>('SELECT * FROM debt_payments WHERE debt_id=? ORDER BY at, id', [debtId]).map(toDebtPayment)
     }
   }
@@ -1220,6 +1283,7 @@ export class PosService implements PosApi {
     },
 
     changePin: async (staffId, newPin) => {
+      this.noViewer()
       const me = this.requireLogin()
       if (me.id !== staffId && !can(me.role, 'staff.manage')) fail(PERMISSION_DENIED)
       const cur = this.staffRow(staffId)
@@ -1233,7 +1297,7 @@ export class PosService implements PosApi {
   // ═════════════ WAITERS ═════════════
   waiters: PosApi['waiters'] = {
     list: async () => {
-      this.need('session.open')
+      this.needRead('session.open')
       return this.db.all<StaffRow>('SELECT * FROM staff WHERE active=1 AND is_waiter=1 ORDER BY name, id').map(toStaff)
     },
 
@@ -1475,6 +1539,7 @@ export class PosService implements PosApi {
   // ═════════════ SYSTEM ═════════════
   system: PosApi['system'] = {
     printReceipt: async (data) => {
+      this.noViewer()
       this.requireLogin()
       if (!data || typeof data !== 'object' || !data.settings) fail("Chek ma'lumotlari noto'g'ri")
       if (!this.host.printReceipt) return
@@ -1482,6 +1547,7 @@ export class PosService implements PosApi {
     },
 
     listPrinters: async () => {
+      this.noViewer()
       this.requireLogin()
       return this.host.listPrinters ? this.host.listPrinters() : []
     },
@@ -1511,6 +1577,53 @@ export class PosService implements PosApi {
     },
 
     now: async () => this.now()
+  }
+
+  // ═════════════ NETWORK (asosiy kompyuter LAN serveri; amalga oshirish host.network da) ═════════════
+  network: PosApi['network'] = {
+    status: async () => {
+      this.noViewer()
+      this.need('settings.manage')
+      if (!this.host.network) fail('Tarmoq bu muhitda mavjud emas')
+      return this.host.network.status()
+    },
+    setEnabled: async (enabled) => {
+      this.noViewer()
+      this.need('settings.manage')
+      if (typeof enabled !== 'boolean') fail("Qiymat noto'g'ri")
+      if (!this.host.network) fail('Tarmoq bu muhitda mavjud emas')
+      return this.host.network.setEnabled(enabled)
+    },
+    regenerateCode: async () => {
+      this.noViewer()
+      this.need('settings.manage')
+      if (!this.host.network) fail('Tarmoq bu muhitda mavjud emas')
+      return this.host.network.regenerateCode()
+    }
+  }
+
+  // ═════════════ CONNECTION (lokal rejim; login talab qilinmaydi — shartnoma bo'yicha) ═════════════
+  connection: PosApi['connection'] = {
+    info: async () => {
+      if (this.host.connection) return this.host.connection.info()
+      return { mode: 'main', host: null, port: null, connected: true }
+    },
+    discover: async () => {
+      this.noViewer()
+      return this.host.connection ? this.host.connection.discover() : []
+    },
+    connectViewer: async (host, port, code) => {
+      this.noViewer()
+      if (!this.host.connection) fail('Ulanish bu muhitda mavjud emas')
+      // Sozlangan asosiy kompyuterni ko'ruvchiga aylantirish — faqat ega (bazasi bor kompyuterni tasodifan "o'chirib qo'ymaslik")
+      if (!(await this.auth.needsSetup())) this.need('settings.manage')
+      return this.host.connection.connectViewer(host, port, code)
+    },
+    disconnect: async () => {
+      this.noViewer()
+      if (!this.host.connection) fail('Ulanish bu muhitda mavjud emas')
+      return this.host.connection.disconnect()
+    }
   }
 
   /** Testlar uchun: qaytarish yozuvlari. */

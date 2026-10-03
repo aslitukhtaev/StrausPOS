@@ -26,6 +26,8 @@ const MAP: MethodMap = {
   waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
   settings: { get: true, save: true },
   reports: { sales: true, returns: true },
+  network: { status: true, setEnabled: true, regenerateCode: true },
+  connection: { info: true, discover: true, connectViewer: true, disconnect: true },
   system: { printReceipt: true, receiptHtml: true, backup: true, restore: true, now: true, listPrinters: true }
 }
 
