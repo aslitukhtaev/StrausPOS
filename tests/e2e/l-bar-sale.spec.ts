@@ -164,11 +164,11 @@ test('Bar savdo: ikki ochiq savdo, reload\'dan keyin tiklanish, bekor qilish', a
   expect(open).toHaveLength(1)
   expect(open[0].lines.map((l) => l.name)).toEqual(['Pivo 0.5 L'])
 
-  // Kassir: bar savdo bor, X (qaytarish ruxsati yo'q) o'chiq
+  // Kassir: bar savdo bor; to'lanmagan savatdan X bilan olib tashlay oladi (session.manage)
   await pos.lock()
   await pos.login('cashier')
   await pos.nav('Bar savdo')
   await expect(cartLine(pos, 'Pivo 0.5 L')).toBeVisible()
-  await expect(cartLine(pos, 'Pivo 0.5 L').locator('.sale-line__x')).toBeDisabled()
+  await expect(cartLine(pos, 'Pivo 0.5 L').locator('.sale-line__x')).toBeEnabled()
   await expect(page.locator('[data-testid="sale-pay"]')).toBeEnabled()
 })

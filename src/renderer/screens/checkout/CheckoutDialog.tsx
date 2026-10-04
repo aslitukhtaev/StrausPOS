@@ -292,6 +292,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
   ]
   const lines = view.lines.filter((l) => l.activeQty > 0)
   const guests = live ? live.guests : view.guests
+  const isBar = view.session.kind === 'bar'
   const err = plan.error
   const softErr = err && !showErrors && (method === 'debt' || method === 'mixed')
   // Biror narsa kiritilgan bo'lsa — tasodifiy fon bosishi/Esc oynani yopmasin
@@ -307,7 +308,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
       flush
       className="checkout-modal"
       title={title}
-      subtitle={'Ochilgan: ' + formatClock(view.session.openedAt) + ' · ' + guests.length + ' mehmon'}
+      subtitle={'Ochilgan: ' + formatClock(view.session.openedAt) + (isBar ? ' · Bar savdosi' : ' · ' + guests.length + ' mehmon')}
       headerExtra={running ? <Badge tone="busy" icon="clock">Vaqt hisoblanmoqda</Badge> : undefined}
       footer={
         <div className="checkout-foot">
@@ -337,7 +338,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
         <aside className="checkout-sum">
           <div className="checkout-sum__inner">
           <div className="checkout-sum__list">
-            <div className="checkout-sum__h">Vaqt</div>
+            {!isBar && <div className="checkout-sum__h">Vaqt</div>}
             {guests.map((g) => (
               <div key={g.id} className="checkout-sum__row">
                 <Icon name="user" size={20} />
@@ -364,10 +365,12 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
             ))}
           </div>
           <div className="checkout-sum__totals">
-            <div className="checkout-sum__line">
-              <span>Vaqt</span>
-              <Money value={live ? live.timeTotal : view.timeTotal} />
-            </div>
+            {!isBar && (
+              <div className="checkout-sum__line">
+                <span>Vaqt</span>
+                <Money value={live ? live.timeTotal : view.timeTotal} />
+              </div>
+            )}
             <div className="checkout-sum__line">
               <span>Buyurtmalar</span>
               <Money value={live ? live.linesTotal : view.linesTotal} />

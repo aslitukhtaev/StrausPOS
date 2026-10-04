@@ -25,7 +25,7 @@ export interface ScreenDef {
 
 const META: Record<ScreenId, { label: string; icon: IconName; permission?: Permission }> = {
   rooms: { label: 'Xonalar', icon: 'rooms' },
-  sale: { label: 'Bar savdo', icon: 'receipt', permission: 'session.open' },
+  sale: { label: 'Bar savdo', icon: 'receipt', permission: 'session.pay' },
   bar: { label: 'Bar', icon: 'bar', permission: 'stock.manage' },
   debts: { label: 'Qarzlar', icon: 'debts', permission: 'debt.manage' },
   reports: { label: 'Hisobot', icon: 'reports', permission: 'reports.view' },

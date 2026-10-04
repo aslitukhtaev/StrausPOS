@@ -48,11 +48,10 @@ describe('bar savdosi: to‘liq oqim', () => {
     expect(await stockOf(ctx, 'Coca-Cola 1 L')).toBe(cola.stock - 2)
     expect(await stockOf(ctx, 'Non')).toBe(non.stock)
 
-    // X: kassirda line.return yo'q → admin qaytaradi
+    // X: to'lanmagan bar savatidan kassir ham olib tashlay oladi (session.manage)
     const pivoLine = v.lines.find((l) => l.refId === pivo.id)!
-    await expect(svc.lines.returnLine(pivoLine.id, 1, 'xato')).rejects.toThrow(DENIED)
-    await ctx.loginAs('admin')
     v = await svc.lines.returnLine(pivoLine.id, 1, 'ochilmagan')
+    await ctx.loginAs('admin')
     expect(v.total).toBe(98_000)
     expect(await stockOf(ctx, 'Pivo 0.5 L')).toBe(pivo.stock - 3)
     expect(svc.listReturns(id)).toHaveLength(1)

@@ -1003,10 +1003,13 @@ export class PosService implements PosApi {
     },
 
     returnLine: async (lineId, qty, reason) => {
-      const me = this.need('line.return')
+      // To'lanmagan BAR savdosi savatidan olib tashlash — kassir ham qila oladi (session.manage);
+      // xona sessiyasidagi qaytarish esa line.return ruxsatini talab qiladi.
+      this.need('session.manage')
       const l = this.db.get<LineRow>('SELECT * FROM order_lines WHERE id=?', [lineId])
       if (!l) fail('Qator topilmadi')
       const s = this.openSessionRow(l.session_id)
+      const me = s.kind === 'bar' ? this.need('session.manage') : this.need('line.return')
       const active = l.qty - l.returned_qty
       if (active <= 0) fail('Bu qator allaqachon to‘liq qaytarilgan')
       reqInt(qty, `Qaytarish miqdori 1 dan ${active} gacha bo'lishi kerak`, 1, active)

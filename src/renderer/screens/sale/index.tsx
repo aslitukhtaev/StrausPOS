@@ -25,7 +25,8 @@ export default function SaleScreen() {
   const readOnly = useApp((s) => s.readOnly)
   const canOpen = useCan('session.open')
   const canPay = useCan('session.pay')
-  const canReturn = useCan('line.return')
+  // To'lanmagan bar savatidan olib tashlash — session.manage yetarli (kassir ham)
+  const canReturn = useCan('session.manage')
 
   // ── Katalog ──
   const [categories, setCategories] = useState<ProductCategory[] | null>(null)
