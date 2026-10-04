@@ -60,7 +60,8 @@ export function renderReceiptHtml(data: ReceiptData): string {
       parts.push(row(`${e(g.label)} <span class="muted">${e(formatDuration(g.elapsedMs))}</span>`, e(formatMoney(g.timeAmount))))
     }
   }
-  parts.push(row('Vaqt jami:', e(money(data.timeTotal)), 'b'))
+  // Xonasiz bar savdosi chekida (mehmon va vaqt yo'q) vaqt bo'limi chiqmaydi
+  if (data.guests.length > 0 || data.timeTotal !== 0) parts.push(row('Vaqt jami:', e(money(data.timeTotal)), 'b'))
 
   // Qatorlar
   if (data.lines.length > 0) {

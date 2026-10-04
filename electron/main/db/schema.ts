@@ -203,6 +203,48 @@ export const MIGRATIONS: string[] = [
     by INTEGER NOT NULL REFERENCES staff(id)
   );
   CREATE INDEX idx_waiter_payouts ON waiter_payouts(staff_id, month);
+  `,
+  // v3 — xonasiz bar savdosi: sessions.kind ('room'|'bar'); bar savdosida room_id = NULL.
+  // room_id NOT NULL ni olib tashlash uchun sessions jadvali qayta quriladi (id lar, FK va AUTOINCREMENT hisoblagichi
+  // saqlanadi; Db.migrate() foreign_keys=OFF holatda bajaradi va oxirida foreign_key_check qiladi).
+  `
+  CREATE TABLE sessions_v3 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL DEFAULT 'room' CHECK (kind IN ('room','bar')),
+    room_id INTEGER REFERENCES rooms(id),
+    status TEXT NOT NULL CHECK (status IN ('open','closed')),
+    opened_at INTEGER NOT NULL,
+    closed_at INTEGER,
+    opened_by INTEGER NOT NULL REFERENCES staff(id),
+    closed_by INTEGER REFERENCES staff(id),
+    discount INTEGER NOT NULL DEFAULT 0,
+    note TEXT NOT NULL DEFAULT '',
+    cancelled INTEGER NOT NULL DEFAULT 0,
+    receipt_no INTEGER,
+    time_total INTEGER,
+    lines_total INTEGER,
+    discount_applied INTEGER,
+    total INTEGER,
+    waiter_id INTEGER REFERENCES staff(id),
+    waiter_pct REAL NOT NULL DEFAULT 0,
+    product_sales INTEGER,
+    waiter_commission INTEGER,
+    CHECK ((kind = 'room' AND room_id IS NOT NULL) OR (kind = 'bar' AND room_id IS NULL AND waiter_id IS NULL))
+  );
+  INSERT INTO sessions_v3(id, kind, room_id, status, opened_at, closed_at, opened_by, closed_by, discount, note, cancelled,
+      receipt_no, time_total, lines_total, discount_applied, total, waiter_id, waiter_pct, product_sales, waiter_commission)
+    SELECT id, 'room', room_id, status, opened_at, closed_at, opened_by, closed_by, discount, note, cancelled,
+      receipt_no, time_total, lines_total, discount_applied, total, waiter_id, waiter_pct, product_sales, waiter_commission
+    FROM sessions;
+  DELETE FROM sqlite_sequence WHERE name = 'sessions_v3';
+  INSERT INTO sqlite_sequence(name, seq) SELECT 'sessions_v3', seq FROM sqlite_sequence WHERE name = 'sessions';
+  DROP TABLE sessions;
+  ALTER TABLE sessions_v3 RENAME TO sessions;
+  CREATE INDEX idx_sessions_status ON sessions(status);
+  CREATE INDEX idx_sessions_closed ON sessions(closed_at);
+  CREATE UNIQUE INDEX idx_sessions_receipt ON sessions(receipt_no) WHERE receipt_no IS NOT NULL;
+  CREATE INDEX idx_sessions_waiter ON sessions(waiter_id, closed_at);
+  CREATE INDEX idx_sessions_kind ON sessions(kind, status);
   `
 ]
 

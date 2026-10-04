@@ -27,6 +27,7 @@ export const MSG_TOO_MANY = "Juda ko'p noto'g'ri urinish. Bir daqiqadan keyin qa
 export const VIEWER_ALLOWLIST: ReadonlySet<string> = new Set([
   'rooms.board', 'rooms.list',
   'sessions.get',
+  'barSales.openList', 'barSales.history',
   'catalog.categories', 'catalog.products', 'catalog.services',
   'debts.list', 'debts.payments',
   'reports.sales', 'reports.returns',

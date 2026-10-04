@@ -173,6 +173,28 @@ describe('LAN server: kod, allowlist, brute-force', () => {
     expect(n.server.running).toBe(true)
     expect(await rpc({ host: '127.0.0.1', port: n.server.port, code: '654321' }, 'system.now', [])).toBe(ctx.clock.now())
   })
+
+  it('xonasiz bar savdosi: openList/history LAN orqali o\'qiladi, open/addProduct 403', async () => {
+    const { port, code, ctx } = await startMain()
+    const t = { host: '127.0.0.1', port, code }
+    expect(VIEWER_ALLOWLIST.has('barSales.openList')).toBe(true)
+    expect(VIEWER_ALLOWLIST.has('barSales.history')).toBe(true)
+    expect(VIEWER_ALLOWLIST.has('barSales.open')).toBe(false)
+    const pivo = (await ctx.svc.catalog.products()).find((p) => p.name === 'Pivo 0.5 L')!
+    const a = (await ctx.svc.barSales.open()).session.id
+    await ctx.svc.lines.addProduct(a, pivo.id, 1, null)
+    await ctx.svc.checkout.pay(a, [{ method: 'cash', amount: 20_000 }], null)
+    const b = (await ctx.svc.barSales.open()).session.id
+    const list = (await rpc(t, 'barSales.openList', [])) as { session: { id: number; kind: string } }[]
+    expect(list.map((x) => [x.session.id, x.session.kind])).toEqual([[b, 'bar']])
+    const hist = (await rpc(t, 'barSales.history', [{ from: 0, to: ctx.clock.now() + 1 }])) as { sessionId: number; total: number }[]
+    expect(hist).toEqual([expect.objectContaining({ sessionId: a, total: 20_000 })])
+    for (const [method, args] of [['barSales.open', []], ['lines.addProduct', [b, pivo.id, 1, null]], ['sessions.cancel', [b]]] as const) {
+      const r = await raw(port, '/rpc', { method, args }, { 'X-Delfin-Code': code })
+      expect(r.status, method).toBe(403)
+    }
+    expect((await ctx.svc.barSales.openList()).map((x) => x.lines.length)).toEqual([0])
+  })
 })
 
 describe("Ko'ruvchi konteksti", () => {
