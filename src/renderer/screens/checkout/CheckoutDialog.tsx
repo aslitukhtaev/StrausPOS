@@ -3,21 +3,24 @@
  *
  *   <CheckoutDialog sessionId={id} onClose={() => setPayId(null)} onPaid={(r) => { setPayId(null); reload() }} />
  *
- * Oqim: sessions.get → xulosa + to'lov usuli (Naqd / Karta / Aralash / Qarz) → checkout.pay →
- * chek oynasi (ko'rish, chop etish). To'lovdan keyin oyna yopilsa FAQAT `onPaid(receipt)` chaqiriladi
- * (sessiya allaqachon yopilgan); to'lovgacha yopilsa — `onClose()`.
+ * Oqim: sessions.get → xulosa + to'lov usuli (Naqd / Karta / Terminal / Qarz / Aralash) → checkout.pay →
+ * chek oynasi (ko'rish, chop etish). Aralash — to'rttala usul (qarz ham) summalar bilan; qarz bo'lsa qarzdor maydoni.
+ * Qarzdor `debtors.search` bilan qidiriladi: mavjud odam tanlansa qarz unga qo'shiladi (debtorId).
+ * To'lovdan keyin oyna yopilsa FAQAT `onPaid(receipt)` chaqiriladi (sessiya allaqachon yopilgan); to'lovgacha yopilsa — `onClose()`.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { DebtorInput, PaymentInput, ReceiptData, SessionView } from '@shared/types'
+import type { Debtor, DebtorInput, DebtPayMethod, PayMethod, PaymentInput, ReceiptData, SessionView } from '@shared/types'
 import { computeTotals, guestElapsedMs, guestTimeAmount } from '@shared/billing'
 import { api } from '@/api'
 import { useApp } from '@/store/app'
 import { useCan } from '@/store/auth'
 import {
-  Badge, Button, EmptyState, Field, Icon, Input, Modal, Money, Numpad, Segmented, Spinner, cx,
+  Badge, Button, EmptyState, Icon, Modal, Money, Numpad, Segmented, Spinner, cx,
   errorMessage, formatClock, formatDuration, formatMoney, formatPhone, toast, useNow, type IconName
 } from '@/ui'
 import { ReceiptPreview } from './ReceiptPreview'
+import { DebtorPicker } from './DebtorPicker'
+import { DEBT_PAY_OPTIONS, METHOD_ICON, METHOD_LABEL, PAY_METHODS } from './methods'
 import './checkout.css'
 
 export interface CheckoutDialogProps {
@@ -26,25 +29,10 @@ export interface CheckoutDialogProps {
   onPaid: (receipt: ReceiptData) => void
 }
 
-type Method = 'cash' | 'card' | 'mixed' | 'debt'
-type SimpleMethod = 'cash' | 'card'
+type Method = 'cash' | 'card' | 'terminal' | 'debt' | 'mixed'
 
-const METHOD_LABEL: Record<SimpleMethod | 'debt', string> = { cash: 'Naqd', card: 'Karta', debt: 'Qarz' }
-const METHOD_ICON: Record<SimpleMethod | 'debt', IconName> = { cash: 'cash', card: 'card', debt: 'wallet' }
 const n = (s: string): number => (s ? Number(s) || 0 : 0)
-
-/** Telefon: faqat raqamlar, mahalliy 9 ta (998 prefiksi olib tashlanadi) */
-function phoneDigits(raw: string): string {
-  let d = raw.replace(/\D/g, '')
-  if (d.length > 9 && d.indexOf('998') === 0) d = d.slice(3)
-  return d.slice(0, 9)
-}
-/** Yozish paytida: 90 123 45 67 ko'rinishiga bosqichma-bosqich */
-function phoneTyping(d: string): string {
-  if (d.length === 9) return formatPhone(d)
-  const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean)
-  return parts.join(' ')
-}
+const EMPTY_MIX: Record<PayMethod, string> = { cash: '', card: '', terminal: '', debt: '' }
 
 /** Naqd uchun tezkor summalar: aniq summa + yaxlit yuqori qiymatlar */
 function quickCash(total: number): number[] {
@@ -67,7 +55,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
   const canPay = useCan('session.pay')
   const canDebt = useCan('debt.manage')
   const roundTo = useApp((s) => (s.settings ? s.settings.roundTo : null))
-  const blockMinutes = useApp((s) => (s.settings ? s.settings.blockMinutes : 60))
+  const blockMinutes = useApp((s) => (s.settings ? s.settings.blockMinutes : 1))
   const graceMinutes = useApp((s) => (s.settings ? s.settings.graceMinutes : 0))
   const now = useNow()
 
@@ -77,14 +65,17 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
 
   const [method, setMethod] = useState<Method>('cash')
   const [cashGiven, setCashGiven] = useState('')
-  // Aralash: ikki qator (naqd + karta) — backend bir xil usullarni baribir qo'shadi
-  const [mix, setMix] = useState<Record<SimpleMethod, string>>({ cash: '', card: '' })
-  const [activeRow, setActiveRow] = useState<SimpleMethod>('cash')
+  // Aralash: to'rttala usul (qarz ham)
+  const [mix, setMix] = useState<Record<PayMethod, string>>(EMPTY_MIX)
+  const [activeRow, setActiveRow] = useState<PayMethod>('cash')
+  // Qarzdor
   const [debtName, setDebtName] = useState('')
   const [debtPhone, setDebtPhone] = useState('')
+  const [debtor, setDebtor] = useState<Debtor | null>(null)
+  // "Qarz" usuli: qarzga yoziladigan summa (bo'lmasa to'liq), qolgani qaysi usulda
   const [debtAmount, setDebtAmount] = useState('')
   const [debtTouched, setDebtTouched] = useState(false)
-  const [debtRest, setDebtRest] = useState<SimpleMethod>('cash')
+  const [debtRest, setDebtRest] = useState<DebtPayMethod>('cash')
   const [showErrors, setShowErrors] = useState(false)
 
   const [paying, setPaying] = useState(false)
@@ -131,40 +122,55 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
   // ── Hisob-kitob (faqat ko'rsatish / kiritilganni tekshirish) ──
   const given = n(cashGiven)
   const change = method === 'cash' && given > total ? given - total : 0
-  const mixSum = n(mix.cash) + n(mix.card)
+  const mixSum = n(mix.cash) + n(mix.card) + n(mix.terminal) + n(mix.debt)
   const mixLeft = total - mixSum
   const debtSum = debtTouched ? n(debtAmount) : total
   const debtLeft = Math.max(0, total - debtSum)
-  const phone = phoneDigits(debtPhone)
+  const needsDebtor = method === 'debt' || (method === 'mixed' && n(mix.debt) > 0)
+
+  /** Qarzdor ma'lumoti (tanlangan mavjud odam yoki yangi) yoki xato matni */
+  const debtorPlan = (): { debtor: DebtorInput | null; error: string | null } => {
+    if (debtor) return { debtor: { debtorId: debtor.id, name: debtor.name, phone: debtor.phone }, error: null }
+    const name = debtName.trim()
+    if (!name) return { debtor: null, error: 'Qarzdorning ismini kiriting' }
+    if (debtPhone.length !== 9) return { debtor: null, error: "Telefon raqamini to'liq kiriting (9 ta raqam)" }
+    return { debtor: { debtorId: null, name, phone: '+998 ' + formatPhone(debtPhone) }, error: null }
+  }
 
   const buildPlan = (tot: number): Plan => {
+    const fail = (error: string): Plan => ({ payments: [], debtor: null, error })
     if (method === 'cash') {
-      if (cashGiven && given < tot) return { payments: [], debtor: null, error: 'Yetarli emas: yana ' + formatMoney(tot - given) + " so'm" }
+      if (cashGiven && given < tot) return fail('Yetarli emas: yana ' + formatMoney(tot - given) + " so'm")
       return { payments: [{ method: 'cash', amount: tot }], debtor: null, error: null }
     }
-    if (method === 'card') return { payments: [{ method: 'card', amount: tot }], debtor: null, error: null }
+    if (method === 'card' || method === 'terminal') return { payments: [{ method, amount: tot }], debtor: null, error: null }
     if (method === 'mixed') {
-      const sum = n(mix.cash) + n(mix.card)
-      if (sum === 0 && tot > 0) return { payments: [], debtor: null, error: 'Summalarni kiriting' }
-      if (sum < tot) return { payments: [], debtor: null, error: 'Yana ' + formatMoney(tot - sum) + " so'm kiritilishi kerak" }
-      if (sum > tot) return { payments: [], debtor: null, error: formatMoney(sum - tot) + " so'm ortiqcha kiritildi" }
-      const payments = (['cash', 'card'] as SimpleMethod[]).filter((m) => n(mix[m]) > 0).map((m) => ({ method: m, amount: n(mix[m]) }))
+      const sum = PAY_METHODS.reduce((a, m) => a + n(mix[m]), 0)
+      if (sum === 0 && tot > 0) return fail('Summalarni kiriting')
+      if (sum < tot) return fail('Yana ' + formatMoney(tot - sum) + " so'm kiritilishi kerak")
+      if (sum > tot) return fail(formatMoney(sum - tot) + " so'm ortiqcha kiritildi")
+      const payments = PAY_METHODS.filter((m) => n(mix[m]) > 0).map((m) => ({ method: m, amount: n(mix[m]) }))
+      if (n(mix.debt) > 0) {
+        const d = debtorPlan()
+        if (d.error) return fail(d.error)
+        return { payments, debtor: d.debtor, error: null }
+      }
       return { payments, debtor: null, error: null }
     }
     // Qarz
     const d = debtTouched ? n(debtAmount) : tot
-    const name = debtName.trim()
-    if (!name) return { payments: [], debtor: null, error: 'Qarzdorning ismini kiriting' }
-    if (phone.length !== 9) return { payments: [], debtor: null, error: "Telefon raqamini to'liq kiriting (9 ta raqam)" }
-    if (d <= 0) return { payments: [], debtor: null, error: 'Qarz summasini kiriting' }
-    if (d > tot) return { payments: [], debtor: null, error: 'Qarz summasi jami summadan katta' }
+    const dp = debtorPlan()
+    if (dp.error) return fail(dp.error)
+    if (d <= 0) return fail('Qarz summasini kiriting')
+    if (d > tot) return fail('Qarz summasi jami summadan katta')
     const payments: PaymentInput[] = [{ method: 'debt', amount: d }]
     if (tot - d > 0) payments.push({ method: debtRest, amount: tot - d })
-    return { payments, debtor: { name, phone: '+998 ' + formatPhone(phone) }, error: null }
+    return { payments, debtor: dp.debtor, error: null }
   }
   const plan = buildPlan(total)
   /** Summa o'zgarsa ham to'lovni qayta qurish mumkinmi (kiritilgan aniq summalarga bog'liq emas) */
-  const followsTotal = method === 'cash' ? !cashGiven : method === 'card' || (method === 'debt' && !debtTouched)
+  const followsTotal =
+    method === 'cash' ? !cashGiven : method === 'card' || method === 'terminal' || (method === 'debt' && !debtTouched)
 
   // ── Numpad maqsadi ──
   let padValue = ''
@@ -184,7 +190,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
   }
 
   // ── Aralash amallari ──
-  const fillRest = (m: SimpleMethod) => {
+  const fillRest = (m: PayMethod) => {
     if (mixLeft <= 0) return
     setMix((x) => ({ ...x, [m]: String(n(x[m]) + mixLeft) }))
     setActiveRow(m)
@@ -209,7 +215,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
           if (!followsTotal) {
             setView(fresh)
             toast.warning("Jami summa o'zgardi: " + formatMoney(fresh.total) + " so'm", {
-              description: "Vaqt hisoblanishda davom etdi. Summalarni tekshirib, qayta bosing."
+              description: 'Vaqt hisoblanishda davom etdi. Summalarni tekshirib, qayta bosing.'
             })
             return
           }
@@ -284,19 +290,34 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
     )
   }
 
-  const methodOptions = [
-    { value: 'cash' as Method, label: 'Naqd', icon: 'cash' as IconName },
-    { value: 'card' as Method, label: 'Karta', icon: 'card' as IconName },
-    { value: 'mixed' as Method, label: 'Aralash', icon: 'swap' as IconName },
-    { value: 'debt' as Method, label: 'Qarz', icon: 'wallet' as IconName, disabled: !canDebt }
+  const methodOptions: { value: Method; label: string; icon: IconName; disabled?: boolean }[] = [
+    { value: 'cash', label: 'Naqd', icon: METHOD_ICON.cash },
+    { value: 'card', label: 'Karta', icon: METHOD_ICON.card },
+    { value: 'terminal', label: 'Terminal', icon: METHOD_ICON.terminal },
+    { value: 'debt', label: 'Qarz', icon: METHOD_ICON.debt, disabled: !canDebt },
+    { value: 'mixed', label: 'Aralash', icon: 'swap' }
   ]
+  const mixRows = PAY_METHODS.filter((m) => m !== 'debt' || canDebt)
   const lines = view.lines.filter((l) => l.activeQty > 0)
   const guests = live ? live.guests : view.guests
   const isBar = view.session.kind === 'bar'
   const err = plan.error
   const softErr = err && !showErrors && (method === 'debt' || method === 'mixed')
   // Biror narsa kiritilgan bo'lsa — tasodifiy fon bosishi/Esc oynani yopmasin
-  const dirty = !!cashGiven || mixSum > 0 || !!debtName || !!debtPhone || debtTouched
+  const dirty = !!cashGiven || mixSum > 0 || !!debtName || !!debtPhone || !!debtor || debtTouched
+
+  const picker = (
+    <DebtorPicker
+      name={debtName}
+      phone={debtPhone}
+      selected={debtor}
+      onName={setDebtName}
+      onPhone={setDebtPhone}
+      onSelect={setDebtor}
+      showErrors={showErrors}
+      autoFocus={method === 'debt'}
+    />
+  )
 
   // ═════════ TO'LOV BOSQICHI ═════════
   return (
@@ -352,7 +373,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
             {lines.length > 0 && <div className="checkout-sum__h">Buyurtmalar</div>}
             {lines.map((l) => (
               <div key={l.id} className="checkout-sum__row">
-                <Icon name={l.kind === 'service' ? 'sparkles' : 'bar'} size={20} />
+                <Icon name={l.kind === 'service' ? 'sparkles' : l.department === 'kitchen' ? 'flame' : 'bar'} size={20} />
                 <span className="checkout-sum__name">
                   <span className="ellipsis">{l.name}</span>
                   <span className="checkout-sum__meta num">
@@ -403,14 +424,20 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
             className="checkout-methods"
           />
 
-          {method === 'card' ? (
+          {method === 'card' || method === 'terminal' ? (
             <div className="checkout-card">
               <span className="checkout-card__icon">
-                <Icon name="card" size={44} />
+                <Icon name={METHOD_ICON[method]} size={44} />
               </span>
-              <div className="checkout-card__label">Terminaldan yechiladigan summa</div>
+              <div className="checkout-card__label">
+                {method === 'terminal' ? 'Terminaldan yechiladigan summa' : "Kartaga o'tkaziladigan summa"}
+              </div>
               <Money value={total} size="3xl" tone="accent" />
-              <div className="checkout-card__hint">Terminalda to'lov o'tganini tekshirib, «To'lash» ni bosing.</div>
+              <div className="checkout-card__hint">
+                {method === 'terminal'
+                  ? "Terminalda to'lov o'tganini (chek chiqqanini) tekshirib, «To'lash» ni bosing."
+                  : "Pul kartaga tushganini tekshirib, «To'lash» ni bosing."}
+              </div>
             </div>
           ) : (
             <div className="checkout-work">
@@ -443,13 +470,14 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
 
                 {method === 'mixed' && (
                   <>
-                    <div className="checkout-rows">
-                      {(['cash', 'card'] as SimpleMethod[]).map((m) => (
+                    <div className="checkout-rows checkout-rows--grid" role="group" aria-label="Aralash to'lov">
+                      {mixRows.map((m) => (
                         <button
                           key={m}
                           type="button"
-                          className={cx('checkout-row', m === activeRow && 'is-active')}
+                          className={cx('checkout-row', m === activeRow && 'is-active', m === 'debt' && 'is-debt')}
                           onClick={() => setActiveRow(m)}
+                          data-method={m}
                         >
                           <span className="checkout-row__m">
                             <Icon name={METHOD_ICON[m]} size={24} />
@@ -462,53 +490,34 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
                         </button>
                       ))}
                     </div>
-                    <div className="checkout-quick checkout-quick--2">
-                      <Button size="sm" icon="cash" disabled={mixLeft <= 0} onClick={() => fillRest('cash')}>
-                        Qolganini naqd
+                    <div className="checkout-quick checkout-quick--mix">
+                      <Button size="sm" icon="arrowRight" disabled={mixLeft <= 0} onClick={() => fillRest(activeRow)}>
+                        Qolganini: {METHOD_LABEL[activeRow]}
                       </Button>
-                      <Button size="sm" icon="card" disabled={mixLeft <= 0} onClick={() => fillRest('card')}>
-                        Qolganini karta
-                      </Button>
-                      <Button size="sm" variant="ghost" icon="x" disabled={!mixSum} onClick={() => { setMix({ cash: '', card: '' }); setActiveRow('cash') }}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon="x"
+                        disabled={!mixSum}
+                        onClick={() => {
+                          setMix(EMPTY_MIX)
+                          setActiveRow('cash')
+                        }}
+                      >
                         Tozalash
                       </Button>
                     </div>
-                    <div className={cx('checkout-change', 'is-on', mixLeft < 0 && 'is-short', mixLeft === 0 && 'is-done')}>
+                    <div className={cx('checkout-change', 'is-on', 'checkout-change--mix', mixLeft < 0 && 'is-short', mixLeft === 0 && 'is-done')}>
                       <span className="checkout-change__label">{mixLeft < 0 ? 'Ortiqcha' : 'Qolgan'}</span>
                       <Money value={Math.abs(mixLeft)} size="2xl" tone={mixLeft < 0 ? 'danger' : mixLeft === 0 ? 'success' : 'warning'} />
                     </div>
+                    {needsDebtor && picker}
                   </>
                 )}
 
                 {method === 'debt' && (
                   <>
-                    <div className="checkout-debtor">
-                      <Field label="Ism" required error={showErrors && !debtName.trim() ? 'Ismni kiriting' : undefined}>
-                        <Input
-                          icon="user"
-                          value={debtName}
-                          maxLength={80}
-                          placeholder="Mijoz ismi"
-                          invalid={showErrors && !debtName.trim()}
-                          onChange={(e) => setDebtName(e.target.value)}
-                          data-autofocus
-                        />
-                      </Field>
-                      <Field
-                        label="Telefon (+998)"
-                        required
-                        error={showErrors && phone.length !== 9 ? "9 ta raqam: 90 123 45 67" : undefined}
-                      >
-                        <Input
-                          icon="phone"
-                          inputMode="tel"
-                          value={phoneTyping(phone)}
-                          placeholder="90 123 45 67"
-                          invalid={showErrors && phone.length !== 9}
-                          onChange={(e) => setDebtPhone(phoneDigits(e.target.value))}
-                        />
-                      </Field>
-                    </div>
+                    {picker}
                     <AmountBox
                       label="Qarzga yoziladi"
                       value={debtSum}
@@ -529,15 +538,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
                         <div className="checkout-rest__label">
                           Qolgani <Money value={debtLeft} tone="accent" /> hozir:
                         </div>
-                        <Segmented<SimpleMethod>
-                          value={debtRest}
-                          onChange={setDebtRest}
-                          options={[
-                            { value: 'cash', label: 'Naqd', icon: 'cash' },
-                            { value: 'card', label: 'Karta', icon: 'card' }
-                          ]}
-                          block
-                        />
+                        <Segmented<DebtPayMethod> value={debtRest} onChange={setDebtRest} options={DEBT_PAY_OPTIONS} block />
                       </div>
                     )}
                   </>
@@ -553,6 +554,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
     </Modal>
   )
 }
+
 
 /** Katta summa ko'rsatkichi (numpad bilan to'ldiriladigan maydon) */
 function AmountBox({

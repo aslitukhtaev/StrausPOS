@@ -49,3 +49,8 @@ div.bar-cat { padding: 0 var(--sp-2) 0 0; cursor: default; }
 }
 .bar-chip.is-active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 .bar-label { color: var(--text-3); font-size: var(--fs-sm); margin-bottom: var(--sp-2); }
+.bar-dept { margin-bottom: var(--sp-1); }
+.bar-dept .ui-seg__item { padding-left: 6px; padding-right: 6px; font-size: var(--fs-sm); }
+.bar-cat__dept { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border-radius: var(--r-sm); background: var(--busy-soft); color: var(--busy); }
+.bar-cat__dept.is-kitchen { background: var(--warning-soft); color: var(--warning); }
+.bar-row__kicon { color: var(--warning); flex: none; }

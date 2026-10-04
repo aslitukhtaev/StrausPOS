@@ -91,3 +91,5 @@
   .rep-bars__fill { background: var(--print-bar) !important; }
   .rep-stack__seg { filter: grayscale(1); }
 }
+.rep-pay__row--debt { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px dashed var(--line); }
+.rep-pay__sub { display: block; font-size: var(--fs-sm); color: var(--text-3); font-weight: var(--fw-regular); }

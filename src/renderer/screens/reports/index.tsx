@@ -59,6 +59,7 @@ function rangeLabel(r: ReportRange): string {
 const METHODS = [
   { key: 'cash', label: 'Naqd', color: 'var(--free-fill)', icon: 'cash' },
   { key: 'card', label: 'Karta', color: 'var(--info)', icon: 'card' },
+  { key: 'terminal', label: 'Terminal', color: 'var(--busy-fill)', icon: 'receipt' },
   { key: 'debt', label: 'Qarz', color: 'var(--danger)', icon: 'wallet' }
 ] as const
 
@@ -124,9 +125,14 @@ export default function ReportsScreen() {
         icon="reports"
         subtitle={rangeLabel(range)}
         actions={
-          <Button variant="secondary" icon="printer" onClick={() => window.print()} disabled={!data}>
-            Chop etish
-          </Button>
+          <>
+            <Button variant="ghost" icon="flame" onClick={() => go('kitchen')}>
+              Oshxona hisobi
+            </Button>
+            <Button variant="secondary" icon="printer" onClick={() => window.print()} disabled={!data}>
+              Chop etish
+            </Button>
+          </>
         }
       />
 
@@ -256,12 +262,12 @@ export default function ReportsScreen() {
 
           <TableCard
             title="Ofitsiantlar"
-            subtitle="Faqat bar mahsulotlaridan (qaytarishlar ayirilgan); xizmatlar va xona vaqti kirmaydi"
+            subtitle="Ofitsiant o'zi olib borgan bar va oshxona mahsulotlaridan (qaytarishlar ayirilgan); xizmatlar va xona vaqti kirmaydi"
             actions={<Button variant="ghost" size="sm" iconRight="chevronRight" onClick={() => go('waiters')}>Oylik hisob</Button>}
           >
-            {s.byWaiter.length === 0 ? <div className="rep-pad"><Mute>Ofitsiant biriktirilgan sessiya yo'q</Mute></div> : (
+            {s.byWaiter.length === 0 ? <div className="rep-pad"><Mute>Ofitsiantlar olib borgan buyurtma yo'q</Mute></div> : (
               <table className="ui-table rep-table" data-testid="rep-waiters">
-                <thead><tr><th>Ofitsiant</th><th className="r">Sessiyalar</th><th className="r">Bar savdosi</th><th className="r">Haq</th></tr></thead>
+                <thead><tr><th>Ofitsiant</th><th className="r">Sessiyalar</th><th className="r">Olib borgani</th><th className="r">Haq</th></tr></thead>
                 <tbody>
                   {s.byWaiter.map((w) => (
                     <tr key={w.staffId}>
@@ -343,7 +349,7 @@ function Kpis({ s }: { s: SalesReport }) {
   const bar = s.barSales || { count: 0, total: 0 }
   const tiles: { label: string; icon: IconName; value: number; tone?: 'warning' | 'danger'; sign?: boolean }[] = [
     { label: 'Vaqt', icon: 'clock', value: s.timeRevenue },
-    { label: 'Bar', icon: 'bar', value: s.productRevenue },
+    { label: 'Bar + oshxona', icon: 'bar', value: s.productRevenue },
     { label: 'Xizmat', icon: 'sparkles', value: s.serviceRevenue },
     { label: 'Chegirma', icon: 'percent', value: s.discounts, tone: 'warning' },
     { label: 'Qaytarilgan', icon: 'undo', value: s.returnsAmount, tone: 'danger' }
@@ -378,32 +384,44 @@ function Kpis({ s }: { s: SalesReport }) {
 
 /* ───────────── To'lov turlari ───────────── */
 function PaymentShare({ s }: { s: SalesReport }) {
-  const sum = s.byMethod.cash + s.byMethod.card + s.byMethod.debt
+  const bm = { cash: s.byMethod.cash || 0, card: s.byMethod.card || 0, terminal: s.byMethod.terminal || 0, debt: s.byMethod.debt || 0 }
+  const dp = { cash: s.debtPayments.cash || 0, card: s.debtPayments.card || 0, terminal: s.debtPayments.terminal || 0 }
+  const dpSum = dp.cash + dp.card + dp.terminal
+  const sum = bm.cash + bm.card + bm.terminal + bm.debt
   return (
     <Card title="To'lov turlari" subtitle="Ulushi, jami to'lovga nisbatan" padding="md" className="rep-pay">
       {sum === 0 ? <Mute>To'lovlar yo'q</Mute> : (
         <>
           <div className="rep-stack" role="img" aria-label="To'lov turlari ulushi">
-            {METHODS.map((m) => s.byMethod[m.key] > 0 && (
-              <div key={m.key} className="rep-stack__seg" style={{ width: pct(s.byMethod[m.key], sum) + '%', background: m.color }} title={m.label} />
+            {METHODS.map((m) => bm[m.key] > 0 && (
+              <div key={m.key} className="rep-stack__seg" style={{ width: pct(bm[m.key], sum) + '%', background: m.color }} title={m.label} />
             ))}
           </div>
           <div className="rep-pay__rows">
             {METHODS.map((m) => (
-              <div key={m.key} className="rep-pay__row">
+              <div key={m.key} className="rep-pay__row" data-method={m.key}>
                 <span className="rep-pay__dot" style={{ background: m.color }} />
                 <Icon name={m.icon} size={22} />
                 <span className="rep-pay__name">{m.label}</span>
-                <span className="rep-pay__pct num">{pct(s.byMethod[m.key], sum)}%</span>
-                <Money value={s.byMethod[m.key]} size="md" currency={false} />
+                <span className="rep-pay__pct num">{pct(bm[m.key], sum)}%</span>
+                <Money value={bm[m.key]} size="md" currency={false} />
               </div>
             ))}
           </div>
-          {s.debtPayments.cash + s.debtPayments.card > 0 && (
-            <div className="rep-pay__row" title="Oldingi qarzlardan shu davrda yig'ilgan pul">
+          {dpSum > 0 && (
+            <div className="rep-pay__row rep-pay__row--debt" title="Oldingi qarzlardan shu davrda yig'ilgan pul" data-testid="rep-debt-payments">
               <Icon name="wallet" size={22} />
-              <span className="rep-pay__name">Qarzdan undirildi (naqd {formatMoney(s.debtPayments.cash)}, karta {formatMoney(s.debtPayments.card)})</span>
-              <Money value={s.debtPayments.cash + s.debtPayments.card} size="md" currency={false} />
+              <span className="rep-pay__name">
+                Qarzdan undirildi
+                <span className="rep-pay__sub">
+                  {[
+                    dp.cash ? 'naqd ' + formatMoney(dp.cash) : '',
+                    dp.card ? 'karta ' + formatMoney(dp.card) : '',
+                    dp.terminal ? 'terminal ' + formatMoney(dp.terminal) : ''
+                  ].filter(Boolean).join(' · ')}
+                </span>
+              </span>
+              <Money value={dpSum} size="md" currency={false} />
             </div>
           )}
         </>

@@ -58,7 +58,7 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
         <div className="bar-form__2">
           <Field label="Kategoriya">
             <Select size="lg" value={categoryId} onChange={(e) => setCategoryId(Number(e.target.value))}>
-              {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {cats.map((c) => <option key={c.id} value={c.id}>{c.name}{c.department === 'kitchen' ? ' · Oshxona' : ''}</option>)}
             </Select>
           </Field>
           <Field label="Narxi" required>

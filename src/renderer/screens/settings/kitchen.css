@@ -1,0 +1,5 @@
+/* Sozlamalar → Oshxona (KitchenSection) */
+.set-kitchen__pct { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.set-kitchen__pctin { width: 140px; flex: none; }
+.set-kitchen__example { font-size: var(--fs-md); color: var(--text-2); }
+.set-kitchen__example .ui-money { font-weight: var(--fw-bold); }

@@ -10,7 +10,7 @@ import type { IconName } from '../ui/Icon'
 import { EmptyState } from '../ui/EmptyState'
 
 // ─── REGISTRY (bir qator) ───
-export const SCREEN_IDS = ['rooms', 'sale', 'bar', 'debts', 'reports', 'waiters', 'staff', 'settings'] as const
+export const SCREEN_IDS = ['rooms', 'sale', 'bar', 'debts', 'reports', 'waiters', 'kitchen', 'staff', 'settings'] as const
 
 export type ScreenId = (typeof SCREEN_IDS)[number]
 
@@ -30,6 +30,7 @@ const META: Record<ScreenId, { label: string; icon: IconName; permission?: Permi
   debts: { label: 'Qarzlar', icon: 'debts', permission: 'debt.manage' },
   reports: { label: 'Hisobot', icon: 'reports', permission: 'reports.view' },
   waiters: { label: 'Ofitsiantlar', icon: 'cash', permission: 'reports.view' },
+  kitchen: { label: 'Oshxona', icon: 'flame', permission: 'reports.view' },
   staff: { label: 'Xodimlar', icon: 'staff', permission: 'staff.manage' },
   settings: { label: 'Sozlamalar', icon: 'settings', permission: 'settings.manage' }
 }

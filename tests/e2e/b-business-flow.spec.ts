@@ -46,8 +46,8 @@ import {
 
 interface SalesReport {
   sessionsCount: number; timeRevenue: number; productRevenue: number; serviceRevenue: number; discounts: number; total: number
-  byMethod: { cash: number; card: number; debt: number }; returnsAmount: number
-  debtPayments: { cash: number; card: number }
+  byMethod: { cash: number; card: number; terminal: number; debt: number }; returnsAmount: number
+  debtPayments: { cash: number; card: number; terminal: number }
   byWaiter: { name: string; sessions: number; productSales: number; commission: number }[]
 }
 
@@ -205,7 +205,8 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   co = await startCheckout(pos)
   await co.getByRole('radio', { name: 'Aralash' }).click()
   await pos.typeDigits('20000')
-  await co.getByRole('button', { name: 'Qolganini karta' }).click()
+  await co.locator('.checkout-row[data-method="card"]').click()
+  await co.getByRole('button', { name: 'Qolganini: Karta' }).click()
   await expect(co.locator('.checkout-row', { hasText: 'Karta' })).toContainText('80 000')
   await expect(co.locator('.checkout-change')).toContainText('0')
   await co.getByRole('button', { name: "To'lash · 100 000 so'm" }).click()
@@ -222,7 +223,7 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   await expectWsTotal(pos, 200_000)
   co = await startCheckout(pos)
   await co.getByRole('radio', { name: 'Qarz' }).click()
-  await co.getByPlaceholder('Mijoz ismi').fill('Ali Valiyev')
+  await co.getByTestId('debtor-name').fill('Ali Valiyev')
   await co.getByPlaceholder('90 123 45 67').fill('901234567')
   await expect(co.getByPlaceholder('90 123 45 67')).toHaveValue('90 123 45 67')
   // Qarz summasi 50 000, qolgani naqd
@@ -278,8 +279,8 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
     productRevenue: 47_000,
     serviceRevenue: 150_000,
     discounts: 25_000,
-    byMethod: { cash: 647_000, card: 480_000, debt: 50_000 },
-    debtPayments: { cash: 30_000, card: 20_000 },
+    byMethod: { cash: 647_000, card: 480_000, terminal: 0, debt: 50_000 },
+    debtPayments: { cash: 30_000, card: 20_000, terminal: 0 },
     returnsAmount: 15_000
   })
   expect(report.byWaiter.filter((w) => w.sessions > 0)).toEqual([

@@ -54,7 +54,8 @@
 
 /* To'lov (o'ng) */
 .checkout-pay { display: flex; flex-direction: column; gap: 16px; padding: 18px 24px 20px; min-width: 0; }
-.checkout-methods .ui-seg__item { font-weight: var(--fw-semibold); }
+.checkout-methods .ui-seg__item { min-width: 0; padding: 0 8px; gap: 6px; font-weight: var(--fw-semibold); }
+.checkout-methods { min-width: 0; }
 .checkout-work { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
 .checkout-panel { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .checkout-pad .ui-numpad { max-width: none; }
@@ -96,8 +97,9 @@
 .checkout-change.is-on .checkout-change__label { color: var(--free); }
 .checkout-change.is-short { background: var(--danger-soft); border-color: var(--danger-line); }
 .checkout-change.is-short .checkout-change__label { color: var(--danger-text); }
-.checkout-rows + .checkout-quick + .checkout-change.is-on:not(.is-done):not(.is-short) { background: var(--warning-soft); border-color: var(--warning-line); }
-.checkout-rows + .checkout-quick + .checkout-change.is-on:not(.is-done):not(.is-short) .checkout-change__label { color: var(--warning); }
+.checkout-change--mix:not(.is-done):not(.is-short) { background: var(--warning-soft); border-color: var(--warning-line); }
+.checkout-change--mix:not(.is-done):not(.is-short) .checkout-change__label { color: var(--warning); }
+.checkout-quick--mix { grid-template-columns: minmax(0, 1fr) auto; }
 
 /* Aralash qatorlari */
 .checkout-rows { display: flex; flex-direction: column; gap: 8px; }
@@ -121,10 +123,43 @@
 .checkout-row.is-active .checkout-row__m .ui-icon { color: var(--accent); }
 .checkout-row__amt { flex: 1 1 auto; min-width: 0; text-align: right; font-size: var(--fs-2xl); font-weight: var(--fw-bold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .checkout-row__amt.is-empty { color: var(--text-disabled); }
+.checkout-rows .checkout-row { min-height: 60px; }
+.checkout-rows .checkout-row__amt { font-size: var(--fs-xl); }
+.checkout-row.is-debt .checkout-row__m .ui-icon { color: var(--danger-text); }
+.checkout-row.is-debt.is-active { border-color: var(--danger-line); box-shadow: 0 0 0 3px var(--danger-soft); }
 
-/* Qarz */
-.checkout-debtor { display: grid; grid-template-columns: 1fr; gap: 10px; }
+/* Qarz / qarzdor */
+.checkout-debtor { display: flex; flex-direction: column; gap: 8px; }
+.checkout-debtor__fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .checkout-debtor .ui-field { gap: 4px; }
+.checkout-debtor__status { display: flex; align-items: center; gap: 8px; min-height: 0; font-size: var(--fs-sm); }
+.checkout-debtor__status:empty { display: none; }
+.checkout-debtor__status .subtle { display: inline-flex; align-items: center; gap: 8px; }
+.checkout-sugg { border: 2px solid var(--accent-line); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; box-shadow: var(--shadow-2); }
+.checkout-sugg__head { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 14px; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--accent); background: var(--accent-soft); }
+.checkout-sugg__head > span { flex: 1 1 auto; min-width: 0; }
+.checkout-sugg__close { width: 36px; height: 36px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); display: inline-flex; align-items: center; justify-content: center; }
+.checkout-sugg__close:hover { background: var(--hover-tint); }
+.checkout-sugg__item {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 6px 14px;
+  border: 0; border-top: 1px solid var(--line-soft); background: transparent; color: var(--text); text-align: left; font-size: var(--fs-md);
+}
+.checkout-sugg__item:hover, .checkout-sugg__item:focus-visible { background: var(--hover-tint); }
+.checkout-sugg__item.is-exact { background: var(--accent-soft); }
+.checkout-sugg__item > .ui-icon { color: var(--text-3); flex: none; }
+.checkout-sugg__txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.checkout-sugg__name { font-weight: var(--fw-semibold); }
+.checkout-sugg__phone { font-size: var(--fs-sm); color: var(--text-2); }
+.checkout-sugg__bal { flex: none; font-weight: var(--fw-bold); }
+.checkout-debtor-sel {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 14px;
+  border: 2px solid var(--accent-line); border-radius: var(--r-lg); background: var(--accent-soft);
+}
+.checkout-debtor-sel__txt { flex: 1 1 auto; min-width: 0; line-height: 1.3; }
+.checkout-debtor-sel__label { font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent); }
+.checkout-debtor-sel__name { font-size: var(--fs-lg); font-weight: var(--fw-bold); }
+.checkout-debtor-sel__meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-sm); color: var(--text-2); }
+.checkout-debtor-sel__bal .ui-money { font-weight: var(--fw-bold); }
 .checkout-rest { display: flex; flex-direction: column; gap: 8px; }
 .checkout-rest__label { font-size: var(--fs-md); color: var(--text-2); }
 .checkout-rest__label .ui-money { font-weight: var(--fw-bold); }
@@ -229,3 +264,13 @@
   .checkout-amount__val { font-size: var(--fs-2xl); }
   .checkout-pad .ui-numpad { --k: 64px; gap: 10px; }
 }
+
+/* Aralash: 2×2 katakchalar (4 usul) — 768px balandlikda qarzdor maydoniga joy qoladi */
+.checkout-rows--grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.checkout-rows--grid .checkout-row { flex-direction: column; align-items: stretch; gap: 0; min-height: 74px; padding: 6px 14px 8px; }
+.checkout-rows--grid .checkout-row__m { font-size: var(--fs-md); }
+.checkout-rows--grid .checkout-row__amt { text-align: right; font-size: var(--fs-xl); line-height: 1.2; }
+.checkout-rows--grid .checkout-amount__cur { font-size: var(--fs-sm); }
+.checkout-quick--mix .ui-btn { height: var(--h-sm); }
+.checkout-rows--grid .checkout-amount__cur { display: none; }
+.checkout-debtor-sel__clear { flex: none; align-self: flex-start; }

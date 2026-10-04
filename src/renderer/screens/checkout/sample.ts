@@ -30,8 +30,9 @@ export function sampleReceiptData(settings: AppSettings | ReceiptSettings): Rece
     total: 430_000,
     payments: [
       { method: 'cash', amount: 300_000 },
-      { method: 'card', amount: 130_000 }
+      { method: 'terminal', amount: 130_000 }
     ],
-    debtor: null
+    debtor: null,
+    provisional: false
   }
 }

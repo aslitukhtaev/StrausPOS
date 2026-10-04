@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Product, ProductCategory, ServiceItem } from '@shared/types'
+import type { Department, Product, ProductCategory, ServiceItem } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
-import { Badge, Button, DataRow, DataTable, EmptyState, Icon, IconButton, Input, Money, PageHeader, Spinner, Tabs, cx, confirmDialog, toast } from '@/ui'
+import { Badge, Button, DataRow, DataTable, EmptyState, Icon, IconButton, Input, Money, PageHeader, Segmented, Spinner, Tabs, cx, confirmDialog, toast } from '@/ui'
 import { ProductDialog } from './ProductDialog'
 import { StockDialog } from './StockDialog'
-import { CategoryDialog } from './CategoryDialog'
+import { CategoryDialog, DEPT_LABEL } from './CategoryDialog'
 import { ServicesTab } from './ServicesTab'
 import './bar.css'
 
@@ -27,6 +27,7 @@ export default function BarScreen() {
   const [services, setServices] = useState<ServiceItem[]>([])
   const [loading, setLoading] = useState(true)
   const [cat, setCat] = useState<number | 'all'>('all')
+  const [dept, setDept] = useState<Department | 'all'>('all')
   const [q, setQ] = useState('')
   const [lowOnly, setLowOnly] = useState(false)
   const [showInactive, setShowInactive] = useState(false)
@@ -57,6 +58,14 @@ export default function BarScreen() {
     return m
   }, [cats])
 
+  const catDept = useMemo(() => {
+    const m: Record<number, Department> = {}
+    cats.forEach((c) => (m[c.id] = c.department || 'bar'))
+    return m
+  }, [cats])
+  const deptCats = useMemo(() => cats.filter((c) => dept === 'all' || (c.department || 'bar') === dept), [cats, dept])
+  const inDept = (p: Product) => dept === 'all' || catDept[p.categoryId] === dept
+
   const counts = useMemo(() => {
     const m: Record<number, number> = {}
     products.forEach((p) => {
@@ -70,9 +79,10 @@ export default function BarScreen() {
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase()
     return products
-      .filter((p) => (showInactive || p.active) && (cat === 'all' || p.categoryId === cat) && (!lowOnly || isLow(p)) && (!s || p.name.toLowerCase().includes(s)))
+      .filter((p) => (showInactive || p.active) && inDept(p) && (cat === 'all' || p.categoryId === cat) && (!lowOnly || isLow(p)) && (!s || p.name.toLowerCase().includes(s)))
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [products, cat, q, lowOnly, showInactive])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, cat, q, lowOnly, showInactive, dept, catDept])
 
   const removeCat = async (c: ProductCategory) => {
     const n = products.filter((p) => p.categoryId === c.id).length
@@ -115,7 +125,7 @@ export default function BarScreen() {
 
   const actions = canEdit ? (
     tab === 'products' ? (
-      <Button variant="primary" icon="plus" onClick={() => setProdDlg({ categoryId: cat === 'all' ? cats[0]?.id : cat })} disabled={!cats.length}>
+      <Button variant="primary" icon="plus" onClick={() => setProdDlg({ categoryId: cat === 'all' ? (deptCats[0] || cats[0])?.id : cat })} disabled={!cats.length}>
         Mahsulot qo'shish
       </Button>
     ) : (
@@ -129,7 +139,7 @@ export default function BarScreen() {
 
   return (
     <div className="bar">
-      <PageHeader title="Bar" icon="bar" subtitle="Mahsulotlar, ombor qoldig'i va xizmatlar" actions={actions} />
+      <PageHeader title="Bar" icon="bar" subtitle="Bar va oshxona mahsulotlari, ombor qoldig'i va xizmatlar" actions={actions} />
       <Tabs
         value={tab}
         onChange={setTab}
@@ -145,26 +155,43 @@ export default function BarScreen() {
       ) : (
         <div className="bar__body">
           <aside className="bar-cats">
+            <Segmented<Department | 'all'>
+              block
+              className="bar-dept"
+              value={dept}
+              onChange={(v) => {
+                setDept(v)
+                setCat('all')
+              }}
+              options={[
+                { value: 'all', label: 'Hammasi' },
+                { value: 'bar', label: 'Bar' },
+                { value: 'kitchen', label: 'Oshxona' }
+              ]}
+            />
             <button type="button" className={cx('bar-cat', cat === 'all' && 'is-active')} onClick={() => setCat('all')}>
-              <span className="bar-cat__name">Hammasi</span>
-              <span className="bar-cat__n num">{products.filter((p) => p.active || showInactive).length}</span>
+              <span className="bar-cat__name">{dept === 'all' ? 'Barcha mahsulotlar' : dept === 'bar' ? 'Barcha bar' : 'Barcha oshxona'}</span>
+              <span className="bar-cat__n num">{products.filter((p) => (p.active || showInactive) && inDept(p)).length}</span>
             </button>
-            {cats.map((c) => (
-              <div key={c.id} className={cx('bar-cat', cat === c.id && 'is-active')}>
+            {deptCats.map((c) => (
+              <div key={c.id} className={cx('bar-cat', cat === c.id && 'is-active')} data-dept={c.department || 'bar'}>
                 <button type="button" className="bar-cat__main" onClick={() => setCat(c.id)}>
+                  <span className={cx('bar-cat__dept', (c.department || 'bar') === 'kitchen' && 'is-kitchen')} title={DEPT_LABEL[c.department || 'bar']}>
+                    <Icon name={(c.department || 'bar') === 'kitchen' ? 'flame' : 'bar'} size={18} />
+                  </span>
                   <span className="bar-cat__name ellipsis">{c.name}</span>
                   <span className="bar-cat__n num">{counts[c.id] || 0}</span>
                 </button>
                 {canEdit && cat === c.id && (
                   <span className="bar-cat__tools">
-                    <IconButton icon="edit" label="Nomini o'zgartirish" variant="ghost" size="sm" onClick={() => setCatDlg(c)} />
+                    <IconButton icon="edit" label="Tahrirlash" variant="ghost" size="sm" onClick={() => setCatDlg(c)} />
                     <IconButton icon="trash" label="O'chirish" variant="ghost" size="sm" onClick={() => removeCat(c)} />
                   </span>
                 )}
               </div>
             ))}
             {canEdit && (
-              <Button variant="secondary" icon="plus" block onClick={() => setCatDlg({})}>
+              <Button variant="secondary" icon="plus" block onClick={() => setCatDlg({ department: dept === 'all' ? 'bar' : dept })}>
                 Kategoriya
               </Button>
             )}
@@ -208,6 +235,7 @@ export default function BarScreen() {
                       <div className="bar-row__name">
                         <div className="bar-row__title ellipsis">{p.name}</div>
                         <div className="bar-row__sub ellipsis">
+                          {catDept[p.categoryId] === 'kitchen' && <Icon name="flame" size={16} className="bar-row__kicon" title="Oshxona" />}
                           {catName[p.categoryId] || '—'}
                           {!p.active && <Badge tone="neutral" size="sm">Nofaol</Badge>}
                         </div>

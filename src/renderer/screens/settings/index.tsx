@@ -18,13 +18,15 @@ import { BackupSection } from './BackupSection'
 import { NetworkSection } from './NetworkSection'
 import { AboutSection, APP_VERSION } from './AboutSection'
 import { LicenseSection } from './LicenseSection'
+import { KitchenSection } from './KitchenSection'
 import './settings.css'
 
-type SectionId = 'rooms' | 'receipt' | 'security' | 'billing' | 'appearance' | 'network' | 'backup' | 'license' | 'about'
+type SectionId = 'rooms' | 'kitchen' | 'receipt' | 'security' | 'billing' | 'appearance' | 'network' | 'backup' | 'license' | 'about'
 
 const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'rooms', label: 'Xonalar', desc: 'Narx, sig\'im, tartib', icon: 'rooms' },
   { id: 'receipt', label: 'Chek', desc: 'Matn, printer', icon: 'receipt' },
+  { id: 'kitchen', label: 'Oshxona', desc: 'Ulush, oshxona printeri', icon: 'flame' },
   { id: 'security', label: 'Xavfsizlik', desc: 'Qulf, PIN', icon: 'shield' },
   { id: 'billing', label: 'Hisob-kitob', desc: 'Soat, blok, yaxlitlash', icon: 'percent' },
   { id: 'appearance', label: "Ko'rinish", desc: 'Kunduzgi / tungi', icon: 'sun' },
@@ -135,6 +137,7 @@ export default function SettingsScreen() {
     const p = { settings, save, onDirty }
     body =
       tab === 'receipt' ? <ReceiptSection {...p} />
+        : tab === 'kitchen' ? <KitchenSection {...p} />
         : tab === 'security' ? <SecuritySection {...p} />
           : tab === 'appearance' ? <AppearanceSection {...p} />
             : <BillingSection {...p} />

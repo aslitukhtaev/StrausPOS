@@ -1,5 +1,5 @@
 /**
- * Ofitsiantlar — oylik hisob-kitob: oy tanlash, har bir ofitsiant bo'yicha bar savdosi, hisoblangan haq,
+ * Ofitsiantlar — oylik hisob-kitob: oy tanlash, har bir ofitsiant bo'yicha o'zi olib borgan bar + oshxona savdosi, hisoblangan haq,
  * berilgan pul va qoldiq. Qatorni bosish → tafsilot (sessiyalar, berilgan pullar), "Pul berish".
  * Hisob backendda (`waiters.monthly/sessions/payouts`); UI faqat ko'rsatadi.
  */
@@ -15,7 +15,7 @@ import {
 } from '../../ui'
 import './waiters.css'
 
-const NOTE = 'Haq faqat bar mahsulotlaridan, xizmatlar va xona vaqti kirmaydi'
+const NOTE = 'Haq ofitsiant o\'zi olib borgan bar va oshxona mahsulotlaridan; xizmatlar va xona vaqti kirmaydi'
 
 const p2 = (n: number) => (n < 10 ? '0' + n : '' + n)
 const monthKey = (y: number, m0: number) => y + '-' + p2(m0 + 1)
@@ -153,7 +153,7 @@ export default function WaitersScreen() {
           size="lg"
           icon="users"
           title="Ofitsiantlar yo'q"
-          description="Xodimlar bo'limida xodimni «Ofitsiant» qilib belgilang va foizini kiriting. Xona ochilganda ofitsiant biriktiriladi."
+          description="Xodimlar bo'limida xodimni «Ofitsiant» qilib belgilang va foizini kiriting. Ofitsiant o'z PIN'i bilan kirib istalgan xonaga buyurtma qo'shadi."
           action={<Button variant="secondary" icon="staff" onClick={() => useNav.getState().go('staff')}>Xodimlar bo'limi</Button>}
         />
       )}
@@ -162,7 +162,7 @@ export default function WaitersScreen() {
         <div className={cx('wt__content', loading && 'is-loading')}>
           <div className="wt-kpis">
             <Card padding="md" className="wt-kpi">
-              <div className="wt-kpi__label"><Icon name="bar" size={22} /> Bar savdosi</div>
+              <div className="wt-kpi__label"><Icon name="bar" size={22} /> Savdo</div>
               <Money value={totals.productSales} size="xl" />
             </Card>
             <Card padding="md" className="wt-kpi">
@@ -187,7 +187,7 @@ export default function WaitersScreen() {
                     <th>Ofitsiant</th>
                     <th className="r">Foiz</th>
                     <th className="r">Sessiyalar</th>
-                    <th className="r">Bar savdosi</th>
+                    <th className="r">Savdo</th>
                     <th className="r">Hisoblangan haq</th>
                     <th className="r">Berilgan</th>
                     <th className="r">Qoldiq</th>
@@ -260,7 +260,7 @@ export default function WaitersScreen() {
               </table>
             </div>
           </Card>
-          <div className="wt-hint subtle">Batafsil ko'rish va pul berish uchun qatorni bosing. Foiz har sessiyada biriktirilgan paytdagi qiymat bilan hisoblanadi.</div>
+          <div className="wt-hint subtle">Batafsil ko'rish va pul berish uchun qatorni bosing. Foiz har bir buyurtma qo'shilgan paytdagi qiymat bilan hisoblanadi.</div>
         </div>
       )}
 
@@ -327,7 +327,7 @@ function DetailDialog({ row, month, canPay, onClose, onPay }: {
             <span className="wt-sum__val num">{row.sessions}</span>
           </div>
           <div className="wt-sum__item">
-            <span className="wt-sum__label">Bar savdosi</span>
+            <span className="wt-sum__label">Savdo (bar + oshxona)</span>
             <Money value={row.productSales} size="lg" />
           </div>
           <div className="wt-sum__item">
@@ -356,12 +356,12 @@ function DetailDialog({ row, month, canPay, onClose, onPay }: {
                 <Badge tone="neutral" size="sm">{data.sessions.length} ta</Badge>
               </div>
               {data.sessions.length === 0 ? (
-                <div className="wt-empty">Bu oyda yopilgan sessiya yo'q</div>
+                <div className="wt-empty">Bu oyda ofitsiant buyurtma olib borgan yopilgan sessiya yo'q</div>
               ) : (
                 <div className="wt-panel__scroll">
                   <table className="ui-table wt-mini">
                     <thead>
-                      <tr><th>Sana</th><th>Xona</th><th className="r">Bar savdosi</th><th className="r">Foiz</th><th className="r">Haq</th></tr>
+                      <tr><th>Sana</th><th>Xona</th><th className="r">Olib borgani</th><th className="r">Foiz</th><th className="r">Haq</th></tr>
                     </thead>
                     <tbody>
                       {data.sessions.map((s) => (
