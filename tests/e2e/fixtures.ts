@@ -108,7 +108,7 @@ export const test = base.extend<{ pos: Pos }, { backend: Backend }>({
         await expect(page.locator('.auth')).toBeVisible()
       },
       async nav(label) {
-        await page.locator('.side__item', { hasText: label }).click()
+        await page.locator('.side__item', { hasText: new RegExp('^' + label + '$') }).click()
         await expect(page.locator('.topbar__crumb')).toHaveText(label)
       },
       allowConsole(re) {

@@ -5,7 +5,7 @@ import { test, expect, T0, MIN } from './fixtures'
 import { addProduct, backToBoard, closeAdd, enterSession, guest, line, openAdd, openRoom, setWaiterUi, wsTotal } from './ui'
 
 const DENIED = "Bu amal uchun ruxsatingiz yo'q"
-const ALL = ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']
+const ALL = ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']
 const STAFF = { isProvider: false, isWaiter: false, commissionPct: 0, active: true }
 
 async function navItems(page: import('@playwright/test').Page): Promise<string[]> {
@@ -15,7 +15,7 @@ async function navItems(page: import('@playwright/test').Page): Promise<string[]
 test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; server ham rad etadi', async ({ pos, page }) => {
   await pos.open()
   await pos.login('cashier')
-  expect(await navItems(page)).toEqual(['Xonalar', 'Qarzlar'])
+  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Qarzlar'])
 
   await openRoom(pos, 'Sauna 1', 2)
   const add = await openAdd(pos)
@@ -73,7 +73,7 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
 test('Administrator: X, chegirma, bar, hisobot bor; xodimlar, sozlamalar, zaxira yo\'q', async ({ pos, page }) => {
   await pos.open()
   await pos.login('admin')
-  expect(await navItems(page)).toEqual(['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar'])
+  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar'])
   await openRoom(pos, 'Sauna 1', 1)
   const add = await openAdd(pos)
   await addProduct(pos, add, 'Suv 0.5 L', 1)
@@ -119,7 +119,7 @@ test('Ega: hamma bo\'lim; Massajchi (kassir + xizmat ko\'rsatuvchi) kassir ruxsa
   // Massajchi (kassir + xizmat ko'rsatuvchi) — kassir ruxsatlari
   await pos.lock()
   await pos.login('provider')
-  expect(await navItems(page)).toEqual(['Xonalar', 'Qarzlar'])
+  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Qarzlar'])
 })
 
 test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar; ochish/bar/+1 soat bor; to\'lov, X, chegirma yo\'q; server rad etadi', async ({ pos, page }) => {
@@ -133,7 +133,7 @@ test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar; ochish/bar/+1 soat b
   await expect(page.locator('.lock-pin__error')).toContainText("PIN noto'g'ri")
   await page.locator('.lock-pin__switch').click()
   await pos.login('waiter1')
-  expect(await navItems(page)).toEqual(['Xonalar'])
+  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo'])
 
   // O'zini biriktirib xona ochadi, bar qo'shadi
   await openRoom(pos, 'Sauna 1', 2, { waiter: 'Sardor' })

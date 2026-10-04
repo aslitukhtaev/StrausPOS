@@ -72,7 +72,12 @@
   overflow: hidden;
 }
 .sale-tabs__scroll { flex: 1 1 auto; min-width: 0; display: flex; gap: 6px; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
-.sale-cart__new { flex: none; }
+.sale-cart__new { flex: none; padding-left: 12px; padding-right: 14px; }
+.sale-cart__newlong { display: none; }
+@media (min-width: 1600px) {
+  .sale-cart__newlong { display: inline; }
+  .sale-cart__newshort { display: none; }
+}
 .sale-tab {
   flex: none; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
   min-width: 92px; height: 52px; padding: 0 14px; border-radius: var(--r-md);

@@ -44,8 +44,8 @@ test('Setup: biznes va ega → PIN tasdig\'i → avtomatik kirish → qulf → P
   // Standart xonalar yaratilgan
   await expect(page.locator('[data-room="Sauna 1"]')).toBeVisible()
   // Ega barcha bo'limlarni ko'radi
-  for (const l of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
-    await expect(page.locator('.side__item', { hasText: l })).toBeVisible()
+  for (const l of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
+    await expect(page.locator('.side__item', { hasText: new RegExp('^' + l + '$') })).toBeVisible()
   }
   // Setup qayta chaqirilmaydi
   expect(await pos.backend.rpcError('auth.setupOwner', 'X', '1111', 'Y')).toContain('allaqachon')

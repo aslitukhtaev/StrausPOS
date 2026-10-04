@@ -12,7 +12,7 @@ const theme = (page: Page) => page.locator('html')
 
 async function tourScreens(pos: Parameters<typeof openRoom>[0]): Promise<void> {
   const { page } = pos
-  for (const s of ['Xonalar', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
+  for (const s of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
     await pos.nav(s)
     await page.waitForTimeout(400)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)
