@@ -18,6 +18,13 @@
  *   GET  /__test/state   → {"now", "frozen", "file"}
  * Login holati: bitta umumiy sessiya (server jarayonida bitta joriy xodim).
  *
+ * Litsenziya:
+ *   standart                → holat doim 'active' (e2e buzilmasin; /rpc baribir majburlash o'ramidan o'tadi)
+ *   --license-trial         → HAQIQIY litsenziya rejimi: 24 soatlik sinov (DATA_DIR/.dlic + DB), soatni
+ *                             /__test/clock bilan surib tekshirish mumkin (masalan {"advanceMs": 90000000} → muddat tugaydi).
+ *                             --reset/--demo va /__test/reset .dlic ni ham tozalaydi (sinov qayta boshlanadi).
+ *   LICENSE_PUBKEY_B64=...  → (faqat dev-server!) kalit tekshiruvi uchun test ochiq kaliti (SPKI DER base64).
+ *
  * Tarmoq ("faqat ko'rish" ikkinchi kompyuter):
  *   --lan [--code 123456]   → LAN serverni ham ko'taradi (network.setEnabled(true)): http://0.0.0.0:47321 (LAN_PORT env),
  *                             UDP qidiruv 47322 (DISCOVERY_PORT env). --code berilsa ulanish kodi shu bo'ladi.
@@ -40,6 +47,10 @@ import { setClientVersion } from '../electron/main/lan/client'
 import { DEFAULT_LAN_PORT, DISCOVERY_PORT, isValidCode } from '../electron/main/lan/protocol'
 import { createConnectionController, createViewerMode, writeConnectionConfig } from '../electron/main/lan/viewer'
 import type { ConnectionConfig } from '../electron/main/lan/viewer'
+import { LicenseManager } from '../electron/main/license/manager'
+import { ALWAYS_ACTIVE, createLicensedApi } from '../electron/main/license/guard'
+import { localMachine } from '../electron/main/license/machine'
+import { DEVELOPER_CONTACT, LICENSE_PUBLIC_KEY_DER_B64 } from '../electron/main/license/publicKey'
 
 const PORT = Number(process.env.PORT || 5174)
 const DATA_DIR = path.resolve(process.env.DELFIN_DATA_DIR || process.env.STRAUS_DATA_DIR || './dev-data')
@@ -84,6 +95,11 @@ const host: PosHost = {
 }
 
 let service: PosService
+/** --license-trial bo'lsa haqiqiy litsenziya, aks holda null (holat 'active') */
+let license: LicenseManager | null = null
+let licensedApi: PosApi | null = null
+const LICENSE_TRIAL = process.argv.includes('--license-trial') || process.env.LICENSE_TRIAL === '1'
+const LICENSE_FILE_NAME = '.dlic'
 /** /rpc shu API'ga boradi: asosiy rejimda service, ko'ruvchi rejimida proksi */
 let current: PosApi | null = null
 let mode: 'main' | 'viewer' = 'main'
@@ -140,14 +156,14 @@ async function applyMode(cfg: ConnectionConfig): Promise<void> {
   } else {
     mode = 'main'
     if (!service) await open(false)
-    current = service
+    current = licensedApi ?? service
     console.log('[dev-server] asosiy rejim')
   }
 }
 
 function removeDbFiles(): void {
   for (const f of fs.existsSync(DATA_DIR) ? fs.readdirSync(DATA_DIR) : []) {
-    if (f === DB_NAME || f.startsWith(DB_NAME + '.tmp')) fs.rmSync(path.join(DATA_DIR, f), { force: true })
+    if (f === DB_NAME || f.startsWith(DB_NAME + '.tmp') || (LICENSE_TRIAL && f.startsWith(LICENSE_FILE_NAME))) fs.rmSync(path.join(DATA_DIR, f), { force: true })
   }
 }
 
@@ -156,7 +172,30 @@ async function open(reset: boolean): Promise<void> {
   if (service) service.db.close()
   if (reset) removeDbFiles()
   service = await PosService.create({ file: DB_FILE, clock, host })
-  if (mode === 'main') current = service
+  setupLicense()
+  if (mode === 'main') current = licensedApi
+}
+
+/** Litsenziya o'rami: majburlash har doim; --license-trial'siz holat 'active' (PosService standarti) */
+function setupLicense(): void {
+  license?.stop()
+  license = null
+  host.license = undefined
+  if (LICENSE_TRIAL) {
+    const svc = service
+    license = new LicenseManager({
+      clock,
+      machine: localMachine(),
+      publicKey: process.env.LICENSE_PUBKEY_B64 || LICENSE_PUBLIC_KEY_DER_B64,
+      kv: { get: (k) => svc.readKv(k), set: (k, v) => svc.writeKv(k, v) },
+      file: path.join(DATA_DIR, LICENSE_FILE_NAME),
+      registry: null,
+      contact: DEVELOPER_CONTACT
+    })
+    license.start()
+    host.license = license.api()
+  }
+  licensedApi = createLicensedApi(service, license ?? ALWAYS_ACTIVE)
 }
 
 async function setupStaff(login: keyof typeof TEST_STAFF | null): Promise<Record<string, number>> {
@@ -225,7 +264,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   if (req.method === 'OPTIONS') return send(res, 204, undefined)
 
   if (url.pathname === '/__test/state' && req.method === 'GET') {
-    return send(res, 200, { now: clock(), frozen: frozenAt !== null, file: DB_FILE })
+    return send(res, 200, { now: clock(), frozen: frozenAt !== null, file: DB_FILE, license: license ? license.status() : null })
   }
 
   if (req.method !== 'POST') return send(res, 404, { error: 'Topilmadi' })
@@ -259,6 +298,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (body.now === null) frozenAt = null
     else if (typeof body.now === 'number' && Number.isFinite(body.now)) frozenAt = Math.floor(body.now)
     if (typeof body.advanceMs === 'number' && Number.isFinite(body.advanceMs)) frozenAt = clock() + Math.floor(body.advanceMs)
+    // Soat surilganda litsenziya darhol yangi vaqtni ko'rsin (Electron'da har daqiqada)
+    license?.touch()
     return send(res, 200, { now: clock(), frozen: frozenAt !== null })
   }
 

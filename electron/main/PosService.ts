@@ -37,6 +37,8 @@ export interface PosHost {
   network?: PosApi['network']
   /** Ulanish rejimi (lokal konfiguratsiya). Yo'q bo'lsa: asosiy rejim, ulanish o'zgartirib bo'lmaydi. */
   connection?: PosApi['connection']
+  /** Litsenziya (electron/main/license). Yo'q bo'lsa (testlar, dev-server standart) — holat doim 'active'. */
+  license?: PosApi['license']
 }
 
 /** Ko'ruvchi (LAN, faqat o'qish) kontekstining sintetik xodimi — mavjud xodim emas (id 0). */
@@ -1704,6 +1706,19 @@ export class PosService implements PosApi {
       this.noViewer()
       if (!this.host.connection) fail('Ulanish bu muhitda mavjud emas')
       return this.host.connection.disconnect()
+    }
+  }
+
+  // ═════════════ LICENSE (login talab qilinmaydi; majburlash — license/guard.ts, IPC darajasida) ═════════════
+  license: PosApi['license'] = {
+    status: async () => {
+      if (this.host.license) return this.host.license.status()
+      return { state: 'active', machineCode: '', trialEndsAt: null, expiresAt: null, permanent: true, contact: '' }
+    },
+    activate: async (key) => {
+      this.noViewer()
+      if (!this.host.license) fail('Litsenziya bu muhitda mavjud emas')
+      return this.host.license.activate(key)
     }
   }
 

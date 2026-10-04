@@ -101,7 +101,7 @@ test('Bar savdo: savat → X → aralash to\'lov → chek → bugungi savdolar �
   await expect(h).toBeVisible()
   await expect(h.getByTestId('sale-hist-row')).toHaveCount(1)
   await expect(h.getByTestId('sale-hist-row')).toContainText('50 000')
-  await expect(h.getByTestId('sale-hist-row')).toContainText('2 ta mahsulot')
+  await expect(h.getByTestId('sale-hist-row')).toContainText('3 ta mahsulot')
   await h.getByTestId('sale-hist-row').click()
   await expect(h.locator('iframe[title="Chek"]')).toBeVisible()
   await h.getByTestId('sale-reprint').click()
@@ -153,9 +153,9 @@ test('Bar savdo: ikki ochiq savdo, reload\'dan keyin tiklanish, bekor qilish', a
 
   // Bekor qilish (tasdiq bilan) — Chips omborga qaytadi
   await page.getByTestId('sale-cancel').click()
-  const c = pos.dialog('Savdoni bekor qilasizmi?')
-  await expect(c).toBeVisible()
-  await c.getByRole('button', { name: 'Ha, bekor qilish' }).click()
+  await expect(page.locator('.ui-confirm__title')).toHaveText('Savdoni bekor qilasizmi?')
+  await expect(page.locator('.ui-confirm__msg')).toContainText('2 ta mahsulot omborga qaytariladi')
+  await page.getByRole('button', { name: 'Ha, bekor qilish' }).click()
   await expect(pos.toast('Savdo bekor qilindi')).toBeVisible()
   await expect(tabs(pos)).toHaveCount(1)
   await expect(cart(pos)).toContainText("Savat bo'sh")

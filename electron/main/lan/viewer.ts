@@ -8,6 +8,8 @@ import type { AppMode, ConnectionInfo, DiscoveredServer } from '../../../src/sha
 import { API_METHODS } from '../apiMethods'
 import { PosError, VIEWER_PERMISSIONS, VIEWER_STAFF } from '../PosService'
 import { writeFileAtomic } from '../db'
+import { viewerLicenseStatus } from '../license/guard'
+import { localMachine } from '../license/machine'
 import { discover as udpDiscover, hello, rpc } from './client'
 import type { RemoteTarget } from './client'
 import { MSG_NOT_FOUND, VIEW_ONLY_MESSAGE, isValidCode, isViewerAllowed } from './protocol'
@@ -86,6 +88,8 @@ export function createViewerApi(target: RemoteTarget, connection: PosApi['connec
   api.auth.current = async () => ({ staff: { ...VIEWER_STAFF }, permissions: [...VIEWER_PERMISSIONS] })
   api.auth.listLoginStaff = async () => []
   api.auth.needsSetup = async () => false
+  // Litsenziya: ko'ruvchi o'zi faqat o'qiydi — lokal 'active' (asosiy kompyuterning holati emas)
+  api.license.status = async () => viewerLicenseStatus(localMachine().code)
   api.connection = connection as unknown as Record<string, (...a: unknown[]) => Promise<unknown>>
   return { api: api as unknown as PosApi, lastOk: () => ok }
 }

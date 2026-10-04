@@ -410,8 +410,8 @@ export default function SaleScreen() {
                 <span>Yangi savdo</span>
               </div>
             )}
-            {sales && sales.length > 0 && (
-              <Button size="sm" variant="ghost" icon="plus" onClick={newSale} disabled={activeId === null} className="sale-cart__new" title="Yangi savdo">
+            {sales && sales.length > 0 && activeId !== null && (
+              <Button size="sm" variant="ghost" icon="plus" onClick={newSale} className="sale-cart__new" title="Yangi savdo" aria-label="Yangi savdo">
                 <span className="sale-cart__newlong">Yangi savdo</span>
                 <span className="sale-cart__newshort">Yangi</span>
               </Button>

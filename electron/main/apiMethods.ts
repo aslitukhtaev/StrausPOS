@@ -18,6 +18,7 @@ const MAP: MethodMap = {
   lines: { addProduct: true, addService: true, returnLine: true },
   checkout: { pay: true, receipt: true },
   barSales: { open: true, openList: true, history: true },
+  license: { status: true, activate: true },
   catalog: {
     categories: true, saveCategory: true, removeCategory: true, products: true, saveProduct: true,
     removeProduct: true, adjustStock: true, services: true, saveService: true, removeService: true

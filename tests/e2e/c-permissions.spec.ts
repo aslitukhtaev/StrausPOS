@@ -122,7 +122,7 @@ test('Ega: hamma bo\'lim; Massajchi (kassir + xizmat ko\'rsatuvchi) kassir ruxsa
   expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Qarzlar'])
 })
 
-test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar; ochish/bar/+1 soat bor; to\'lov, X, chegirma yo\'q; server rad etadi', async ({ pos, page }) => {
+test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar va Bar savdo; ochish/bar/+1 soat bor; to\'lov, X, chegirma yo\'q; server rad etadi', async ({ pos, page }) => {
   await pos.open()
   // Qulf ekranida ofitsiantlar ham bor; noto'g'ri PIN rad etiladi
   const tileS = page.locator('.lock-tile', { has: page.locator('.lock-tile__name', { hasText: /^Sardor$/ }) })

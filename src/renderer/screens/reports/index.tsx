@@ -115,7 +115,7 @@ export default function ReportsScreen() {
   }
 
   const s = data?.sales
-  const empty = !!s && s.sessionsCount === 0 && data!.returns.length === 0
+  const empty = !!s && s.sessionsCount === 0 && (s.barSales ? s.barSales.count : 0) === 0 && data!.returns.length === 0
 
   return (
     <div className="rep">
@@ -369,7 +369,7 @@ function Kpis({ s }: { s: SalesReport }) {
         </Card>
       ))}
       <Card padding="md" className="rep-kpi">
-        <div className="rep-kpi__label"><Icon name="receipt" size={22} /> Seanslar</div>
+        <div className="rep-kpi__label"><Icon name="rooms" size={22} /> Xona seanslari</div>
         <div className="rep-kpi__count num">{s.sessionsCount}<span className="rep-kpi__unit"> ta</span></div>
       </Card>
     </div>

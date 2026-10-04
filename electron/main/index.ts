@@ -13,12 +13,18 @@ import { writeFileAtomic } from './db'
 import { NetworkManager } from './lan/network'
 import { setClientVersion } from './lan/client'
 import { createConnectionController, createViewerMode, readConnectionConfig } from './lan/viewer'
+import { LicenseManager } from './license/manager'
+import { createLicensedApi } from './license/guard'
+import { localMachine, windowsRegistry } from './license/machine'
+import { DEVELOPER_CONTACT, LICENSE_PUBLIC_KEY_DER_B64 } from './license/publicKey'
 
 let mainWindow: BrowserWindow | null = null
 let service: PosService | null = null
 /** Joriy rejimni (asosiy: DB + LAN server + IPC; ko'ruvchi: proksi IPC) to'xtatish */
 let disposeMode: (() => Promise<void>) | null = null
 const CONNECTION_FILE = 'connection.json'
+/** Litsenziya zaxira fayli (sinov boshlanishi, lastSeen, kalit) */
+const LICENSE_FILE = '.dlic'
 
 const APP_NAME = 'Delfin Sauna'
 const USER_DATA_DIR = 'DelfinSauna'
@@ -197,11 +203,24 @@ async function startMode(): Promise<void> {
   })
   host.network = net
   host.connection = createConnectionController({ file: connFile, onChange: () => switchMode() })
+  // Litsenziya: ochiq kalit FAQAT publicKey.ts dan (env orqali almashtirib bo'lmaydi — prod xavfsizligi)
+  const license = new LicenseManager({
+    clock: () => Date.now(),
+    machine: localMachine(),
+    publicKey: LICENSE_PUBLIC_KEY_DER_B64,
+    kv: { get: (k) => svc.readKv(k), set: (k, v) => svc.writeKv(k, v) },
+    file: path.join(app.getPath('userData'), LICENSE_FILE),
+    registry: windowsRegistry(),
+    contact: DEVELOPER_CONTACT
+  })
+  license.start()
+  host.license = license.api()
   service = svc
   await net.init()
-  const unregister = registerIpc(svc, isTrusted)
+  const unregister = registerIpc(createLicensedApi(svc, license), isTrusted)
   disposeMode = async () => {
     unregister()
+    license.stop()
     await net.shutdown()
     svc.db.close()
     if (service === svc) service = null
