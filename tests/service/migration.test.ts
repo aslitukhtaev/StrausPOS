@@ -251,3 +251,174 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
     svc.db.close()
   })
 })
+
+/**
+ * v3 sxemali baza (2026-10 gacha): blockMinutes=60 sozlamasi, qarzlar (bir odam turli yozuvlarda, telefonsiz ham),
+ * qarz to'lovi, eski (sessiyaga biriktirilgan) ofitsiantli yopilgan sessiya va ochiq sessiya.
+ */
+async function buildV3(settings: Record<string, unknown> = { receipt: { businessName: 'V3 Sauna' }, roundTo: 1000, blockMinutes: 60, graceMinutes: 5 }): Promise<Uint8Array> {
+  const SQL = await loadSqlJs()
+  const db = new SQL.Database()
+  db.run('PRAGMA foreign_keys = OFF')
+  db.exec(MIGRATIONS[0])
+  db.exec(MIGRATIONS[1])
+  db.exec(MIGRATIONS[2])
+  db.run('PRAGMA foreign_keys = ON')
+  db.run('PRAGMA user_version = 3')
+  db.run("INSERT INTO kv(key, value) VALUES('settings', ?)", [JSON.stringify(settings)])
+  db.run("INSERT INTO staff(id, name, role, pin_hash, active, is_provider, is_waiter, commission_pct, created_at) VALUES(1, 'Ega', 'owner', ?, 1, 0, 0, 0, 0)", [hashPin('1234')])
+  db.run("INSERT INTO staff(id, name, role, pin_hash, active, is_provider, is_waiter, commission_pct, created_at) VALUES(2, 'Sardor', 'waiter', ?, 1, 0, 1, 10, 0)", [hashPin('5555')])
+  db.run("INSERT INTO rooms(id, name, price_per_hour, capacity, active, sort_order) VALUES(1, 'Sauna 1', 50000, 6, 1, 1)")
+  db.run("INSERT INTO rooms(id, name, price_per_hour, capacity, active, sort_order) VALUES(2, 'Sauna 2', 60000, 4, 1, 2)")
+  db.run("INSERT INTO categories(id, name, sort_order) VALUES(1, 'Ichimliklar', 1)")
+  db.run("INSERT INTO products(id, category_id, name, price, stock, track_stock, low_stock_at, active) VALUES(1, 1, 'Pivo', 20000, 10, 1, 2, 1)")
+  const opened = T0 - 3 * HOUR
+  const closed = T0 - 2 * HOUR
+  // 1: yopilgan, eski ofitsiant (Sardor 10%): 50 000 vaqt + Pivo 2 = 90 000 → karta 50 000 + qarz 40 000 (Ali)
+  db.run(
+    `INSERT INTO sessions(id, kind, room_id, status, opened_at, closed_at, opened_by, closed_by, discount, note, cancelled, receipt_no,
+       time_total, lines_total, discount_applied, total, waiter_id, waiter_pct, product_sales, waiter_commission)
+     VALUES(1, 'room', 1, 'closed', ?, ?, 1, 1, 0, '', 0, 1, 50000, 40000, 0, 90000, 2, 10, 40000, 4000)`,
+    [opened, closed]
+  )
+  db.run("INSERT INTO guests(id, session_id, label, state, paid_minutes) VALUES(1, 1, 'Mehmon 1', 'finished', 60)")
+  db.run('INSERT INTO intervals(guest_id, room_id, rate, start, end) VALUES(1, 1, 50000, ?, ?)', [opened, closed])
+  db.run(
+    "INSERT INTO order_lines(id, session_id, guest_id, kind, ref_id, name, unit_price, qty, returned_qty, provider_id, created_at, created_by) VALUES(1, 1, NULL, 'product', 1, 'Pivo', 20000, 2, 0, NULL, ?, 1)",
+    [opened]
+  )
+  db.run("INSERT INTO payments(id, session_id, method, amount, at, by) VALUES(1, 1, 'card', 50000, ?, 1)", [closed])
+  db.run("INSERT INTO payments(id, session_id, method, amount, at, by) VALUES(2, 1, 'debt', 40000, ?, 1)", [closed])
+  db.run("UPDATE sqlite_sequence SET seq=20 WHERE name='payments'")
+  db.run("INSERT INTO debts(id, session_id, customer_name, phone, amount, paid, created_at) VALUES(1, 1, 'Ali', '+998 90 111 22 33', 40000, 10000, ?)", [closed])
+  db.run("INSERT INTO debt_payments(id, debt_id, method, amount, at, by) VALUES(1, 1, 'cash', 10000, ?, 1)", [closed + 10 * MIN])
+  // Bir odam boshqa ism/formatda; telefonsiz eski yozuvlar ism bo'yicha
+  db.run("INSERT INTO debts(id, session_id, customer_name, phone, amount, paid, created_at) VALUES(2, NULL, 'Ali aka', '90-111-22-33', 30000, 0, ?)", [closed + 20 * MIN])
+  db.run("INSERT INTO debts(id, session_id, customer_name, phone, amount, paid, created_at) VALUES(3, NULL, 'Vali', '', 15000, 0, ?)", [closed + 30 * MIN])
+  db.run("INSERT INTO debts(id, session_id, customer_name, phone, amount, paid, created_at, closed_at) VALUES(4, NULL, ' vali ', '-', 5000, 5000, ?, ?)", [closed + 40 * MIN, closed + 50 * MIN])
+  // 3: ochiq (Sauna 2), sessiyaga biriktirilgan Sardor, Pivo 2
+  db.run("INSERT INTO sessions(id, kind, room_id, status, opened_at, opened_by, waiter_id, waiter_pct) VALUES(3, 'room', 2, 'open', ?, 1, 2, 10)", [T0 - 30 * MIN])
+  db.run("INSERT INTO guests(id, session_id, label, state, paid_minutes) VALUES(2, 3, 'Mehmon 1', 'running', 60)")
+  db.run('INSERT INTO intervals(guest_id, room_id, rate, start, end) VALUES(2, 2, 60000, ?, NULL)', [T0 - 30 * MIN])
+  db.run(
+    "INSERT INTO order_lines(id, session_id, guest_id, kind, ref_id, name, unit_price, qty, returned_qty, provider_id, created_at, created_by) VALUES(2, 3, NULL, 'product', 1, 'Pivo', 20000, 2, 0, NULL, ?, 1)",
+    [T0 - 20 * MIN]
+  )
+  const bytes = db.export()
+  db.close()
+  return bytes
+}
+
+describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant, daqiqalik vaqt)', () => {
+  it('jadvallar qayta quriladi, ma’lumot saqlanadi, qarzdorlar guruhlanadi, blockMinutes 60 → 1', async () => {
+    const file = path.join(dir, 'delfin.db')
+    fs.writeFileSync(file, await buildV3())
+    const clock = new FakeClock()
+    const svc = await PosService.create({ file, clock: clock.now })
+    expect(svc.db.version).toBe(4)
+    expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])
+    expect(svc.db.all("SELECT name FROM sqlite_master WHERE name LIKE '%_v4'")).toEqual([])
+    for (const t of ['payments', 'debt_payments'])
+      expect(svc.db.get<{ sql: string }>(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${t}'`)!.sql).toContain("'terminal'")
+    expect(svc.db.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='payments'").map((r) => r.name)).toEqual(['idx_payments_session'])
+    for (const t of ['payments', 'debts', 'order_lines']) {
+      const fks = svc.db.all<{ table: string }>(`PRAGMA foreign_key_list(${t})`).map((f) => f.table)
+      expect(fks, t).toContain('sessions')
+    }
+    // CHECK hali ham ishlaydi
+    expect(() => svc.db.run("INSERT INTO payments(session_id, method, amount, at, by) VALUES(1, 'bitcoin', 1, 0, 1)")).toThrow()
+    expect(() => svc.db.run("UPDATE categories SET department='sklad'")).toThrow()
+
+    await svc.auth.login(1, '1234')
+    // Sozlamalar: blockMinutes 60 → 1, qolganlari saqlanadi, oshxona standartlari
+    const s = await svc.settings.get()
+    expect(s).toMatchObject({ blockMinutes: 1, graceMinutes: 5, roundTo: 1000 })
+    expect(s.receipt.businessName).toBe('V3 Sauna')
+    expect(s.kitchen).toEqual({ sharePct: 100, printerName: '', paperWidth: 80, autoPrint: true })
+
+    // Qarzdorlar: Ali (2 qarz — telefon bo'yicha, birinchi ism saqlanadi), Vali (telefonsiz — ism bo'yicha)
+    const all = await svc.debtors.list(false)
+    expect(all.map((d) => [d.name, d.phone, d.total, d.paid, d.balance, d.debtsCount])).toEqual([
+      ['Vali', '', 20_000, 5_000, 15_000, 2],
+      ['Ali', '+998 90 111 22 33', 70_000, 10_000, 60_000, 2]
+    ])
+    expect((await svc.debtors.list(true)).map((d) => d.name)).toEqual(['Vali', 'Ali'])
+    const ali = all[1]
+    expect((await svc.debts.list(false)).every((d) => d.debtorId > 0)).toBe(true)
+    expect((await svc.checkout.receipt(1)).debtor).toEqual({ debtorId: ali.id, name: 'Ali', phone: '+998 90 111 22 33' })
+    expect(await svc.debts.payments(1)).toEqual([expect.objectContaining({ id: 1, method: 'cash', amount: 10_000 })])
+
+    // Bo'limlar va qatorlar
+    expect((await svc.catalog.categories()).map((c) => c.department)).toEqual(['bar'])
+    const closedV = await svc.sessions.get(1)
+    expect(closedV.session).toMatchObject({ waiterId: 2, waiterPct: 10 }) // tarix
+    expect(closedV.waiterName).toBe('Sardor')
+    expect(closedV.lines[0]).toMatchObject({ department: 'bar', waiterId: null, waiterPct: 0 })
+    // Ochiq sessiya: ofitsiant qatorga o'tkazildi
+    const openV = await svc.sessions.get(3)
+    expect(openV.session).toMatchObject({ waiterId: null, waiterPct: 0 })
+    expect(openV.lines[0]).toMatchObject({ department: 'bar', waiterId: 2, waiterPct: 10 })
+    expect(openV.total).toBe(60_000 + 40_000)
+
+    // Terminal bilan to'lov; payments hisoblagichi saqlangan (21 dan davom)
+    const r = await svc.checkout.pay(3, [{ method: 'terminal', amount: 100_000 }], null)
+    expect(r.receiptNo).toBe(2)
+    expect((await svc.sessions.get(3)).payments[0]).toMatchObject({ id: 21, method: 'terminal' })
+    // Ofitsiant: eski sessiya (muzlatilgan 4 000) + yangi qatorlar (40 000 × 10% = 4 000)
+    expect((await svc.waiters.monthly('2026-01')).find((w) => w.staffId === 2)).toMatchObject({ sessions: 2, productSales: 80_000, commission: 8_000 })
+    const rep = await svc.reports.sales({ from: 0, to: T0 + HOUR })
+    expect(rep.byMethod).toEqual({ cash: 0, card: 50_000, terminal: 100_000, debt: 40_000 })
+    expect(rep.debtPayments).toEqual({ cash: 10_000, card: 0, terminal: 0 })
+    expect(rep.byWaiter).toEqual([{ staffId: 2, name: 'Sardor', sessions: 2, productSales: 80_000, commission: 8_000 }])
+
+    // Yangi qarz o'sha telefon bilan (boshqa ism) → Ali ga qo'shiladi, ism o'zgarmaydi
+    const n = await svc.sessions.open(1, 1, 60)
+    const rn = await svc.checkout.pay(n.session.id, [{ method: 'debt', amount: 50_000 }], { name: 'Alisher', phone: '901112233' })
+    expect(rn.debtor).toEqual({ debtorId: ali.id, name: 'Ali', phone: '+998 90 111 22 33' })
+    // FIFO: eng eski (30 000 qoldiqli 1-qarz) dan
+    const after = await svc.debtors.pay(ali.id, 'terminal', 40_000)
+    expect(after).toMatchObject({ total: 120_000, paid: 50_000, balance: 70_000, debtsCount: 3 })
+    expect((await svc.debtors.debts(ali.id)).map((d) => [d.id, d.paid, d.closedAt !== null])).toEqual([
+      [5, 0, false],
+      [2, 10_000, false],
+      [1, 40_000, true]
+    ])
+    svc.db.close()
+
+    // Qayta ochish: migratsiya qayta ishlamaydi
+    const again = await PosService.create({ file, clock: clock.now })
+    expect(again.db.version).toBe(4)
+    await again.auth.login(1, '1234')
+    expect((await again.debtors.list(false))).toHaveLength(2)
+    expect((await again.settings.get()).blockMinutes).toBe(1)
+    again.db.close()
+  })
+
+  it('blockMinutes 60 dan boshqa bo‘lsa (ega o‘zi tanlagan) saqlanadi; v3 zaxiradan tiklash ham migratsiya qiladi', async () => {
+    const svc = await PosService.create({ file: path.join(dir, 'delfin.db'), clock: new FakeClock().now })
+    await svc.auth.setupOwner('Yangi', '9999', 'Delfin Sauna')
+    await svc.restoreBytes(await buildV3({ receipt: {}, blockMinutes: 30 }))
+    expect(svc.db.version).toBe(4)
+    await svc.auth.login(1, '1234')
+    expect((await svc.settings.get()).blockMinutes).toBe(30)
+    expect(await svc.debtors.list(false)).toHaveLength(2)
+    svc.db.close()
+  })
+
+  it('qarzsiz va sozlamasiz v3 baza ham muammosiz yangilanadi', async () => {
+    const SQL = await loadSqlJs()
+    const db = new SQL.Database()
+    db.run('PRAGMA foreign_keys = OFF')
+    for (let i = 0; i < 3; i++) db.exec(MIGRATIONS[i])
+    db.run('PRAGMA user_version = 3')
+    const bytes = db.export()
+    db.close()
+    const file = path.join(dir, 'empty.db')
+    fs.writeFileSync(file, bytes)
+    const svc = await PosService.create({ file, clock: new FakeClock().now })
+    expect(svc.db.version).toBe(4)
+    expect(svc.db.all('SELECT * FROM debtors')).toEqual([])
+    expect(await svc.auth.needsSetup()).toBe(true)
+    svc.db.close()
+  })
+})

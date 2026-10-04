@@ -206,3 +206,36 @@ describe('chek ma’lumotlari', () => {
     expect(printed[0].html).toContain('<!doctype html>')
   })
 })
+
+describe('oraliq chek (checkout.preBill)', () => {
+  it('provisional=true, chek raqami YO‘Q va to‘lov raqamini band qilmaydi; HTML katta ogohlantirish bilan', async () => {
+    const { svc, sessionId, clock, loginAs } = await sessionWithBill()
+    await loginAs('waiter')
+    const pb = await svc.checkout.preBill(sessionId)
+    expect(pb).toMatchObject({ provisional: true, receiptNo: 0, total: 270_000, closedAt: clock.t, cashier: 'Sardor', payments: [], debtor: null })
+    expect(pb.lines).toHaveLength(2)
+    const html = await svc.system.receiptHtml(pb)
+    expect(html).toContain("TO'LANMAGAN · ORALIQ HISOB")
+    expect(html).toContain('Oraliq hisob')
+    expect(html).not.toContain('Chek №')
+    // Sessiya ochiq qoladi, vaqt davom etadi
+    expect((await svc.sessions.get(sessionId)).session.status).toBe('open')
+    await svc.checkout.preBill(sessionId)
+    await loginAs('cashier')
+    const r = await svc.checkout.pay(sessionId, [{ method: 'cash', amount: 270_000 }], null)
+    expect(r).toMatchObject({ receiptNo: 1, provisional: false })
+    expect(await svc.system.receiptHtml(r)).not.toContain('ORALIQ')
+    await expect(svc.checkout.preBill(sessionId)).rejects.toThrow('Sessiya yopilgan')
+    await expect(svc.checkout.preBill(99999)).rejects.toThrow('Sessiya topilmadi')
+    await svc.auth.logout()
+    await expect(svc.checkout.preBill(sessionId)).rejects.toThrow('Avval tizimga kiring')
+  })
+
+  it('xonasiz bar savdosida ham ishlaydi', async () => {
+    const { svc } = await setup()
+    const b = await svc.barSales.open()
+    await svc.lines.addProduct(b.session.id, (await productByName(svc, 'Chips')).id, 2, null)
+    const pb = await svc.checkout.preBill(b.session.id)
+    expect(pb).toMatchObject({ provisional: true, receiptNo: 0, roomName: 'Bar', total: 24_000, guests: [] })
+  })
+})

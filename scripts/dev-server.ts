@@ -3,7 +3,7 @@
  *
  *   npm run dev:server                 → ./dev-data/delfin.db (mavjud bo'lsa davom etadi)
  *   npm run dev:server -- --reset      → bazani tozalab boshlash (yoki RESET=1)
- *   npm run dev:server -- --demo       → toza baza + tayyor xodimlar va ofitsiantlar (setupOwner o'tgan holat)
+ *   npm run dev:server -- --demo       → toza baza + tayyor xodimlar, ofitsiantlar, oshxona bo'limi va namunaviy savdolar
  * Ma'lumotlar papkasi: DELFIN_DATA_DIR (eski nomi STRAUS_DATA_DIR ham qabul qilinadi — e2e moslik).
  *
  * Endpointlar (port 5174, PORT env bilan o'zgaradi):
@@ -25,14 +25,16 @@
  *                             --reset/--demo va /__test/reset .dlic ni ham tozalaydi (sinov qayta boshlanadi).
  *   LICENSE_PUBKEY_B64=...  → (faqat dev-server!) kalit tekshiruvi uchun test ochiq kaliti (SPKI DER base64).
  *
- * Tarmoq ("faqat ko'rish" ikkinchi kompyuter):
+ * Tarmoq (TERMINAL — ikkinchi kompyuter, ofitsiantlar monobloki):
  *   --lan [--code 123456]   → LAN serverni ham ko'taradi (network.setEnabled(true)): http://0.0.0.0:47321 (LAN_PORT env),
  *                             UDP qidiruv 47322 (DISCOVERY_PORT env). --code berilsa ulanish kodi shu bo'ladi.
- *   --viewer-of http://host:47321 --code 123456
- *                           → KO'RUVCHI rejimi: baza ochilmaydi, /rpc so'rovlari Electron'dagi kabi ko'ruvchi proksisidan
- *                             o'tadi (auth.current = sintetik "Ko'ruvchi", allowlist'dagi o'qishlar asosiyga, qolgani
- *                             "Bu kompyuter faqat ko'rish rejimida"). connection.connectViewer/disconnect ham ishlaydi
- *                             (jarayon ichida rejim almashadi; brauzer sahifasini UI o'zi qayta yuklaydi).
+ *                             Har terminal — alohida login konteksti (bu jarayondagi asosiy login'ga ta'sir qilmaydi).
+ *   --terminal-of http://host:47321 --code 123456   (eski nomi --viewer-of ham qabul qilinadi)
+ *                           → TERMINAL rejimi: baza ochilmaydi, /rpc so'rovlari Electron'dagi kabi terminal proksisidan
+ *                             o'tadi (o'z qulf/login ekrani; barcha amallar asosiyda shu terminal konteksti bilan;
+ *                             network.*, system.backup/restore, license.activate, auth.setupOwner — rad).
+ *                             connection.connectTerminal/disconnect ham ishlaydi (jarayon ichida rejim almashadi).
+ *                             Terminal identifikatori DATA_DIR/connection.json da saqlanadi.
  */
 import http from 'http'
 import fs from 'fs'
@@ -45,8 +47,10 @@ import type { PosApi } from '../src/shared/api'
 import { NetworkManager } from '../electron/main/lan/network'
 import { setClientVersion } from '../electron/main/lan/client'
 import { DEFAULT_LAN_PORT, DISCOVERY_PORT, isValidCode } from '../electron/main/lan/protocol'
-import { createConnectionController, createViewerMode, writeConnectionConfig } from '../electron/main/lan/viewer'
-import type { ConnectionConfig } from '../electron/main/lan/viewer'
+import {
+  MAIN_CONFIG, createConnectionController, createTerminalMode, loadConnectionConfig, readConnectionConfig, writeConnectionConfig
+} from '../electron/main/lan/terminal'
+import type { ConnectionConfig } from '../electron/main/lan/terminal'
 import { LicenseManager } from '../electron/main/license/manager'
 import { ALWAYS_ACTIVE, createLicensedApi } from '../electron/main/license/guard'
 import { localMachine } from '../electron/main/license/machine'
@@ -100,9 +104,9 @@ let license: LicenseManager | null = null
 let licensedApi: PosApi | null = null
 const LICENSE_TRIAL = process.argv.includes('--license-trial') || process.env.LICENSE_TRIAL === '1'
 const LICENSE_FILE_NAME = '.dlic'
-/** /rpc shu API'ga boradi: asosiy rejimda service, ko'ruvchi rejimida proksi */
+/** /rpc shu API'ga boradi: asosiy rejimda service, terminal rejimida proksi */
 let current: PosApi | null = null
-let mode: 'main' | 'viewer' = 'main'
+let mode: 'main' | 'terminal' = 'main'
 
 const ARGV = process.argv.slice(2)
 function argValue(name: string): string | null {
@@ -132,7 +136,9 @@ function ensureNetwork(): NetworkManager {
   if (!network) {
     network = new NetworkManager({
       store: { load: () => service.readKv('network'), save: (j) => service.writeKv('network', j) },
-      viewerApi: () => service.forViewer(),
+      // Har terminal — alohida login konteksti (joriy baza ustida), litsenziya o'rami bilan
+      createTerminal: () => createLicensedApi(service.forTerminal(), license ?? ALWAYS_ACTIVE),
+      run: serial,
       name: () => service.businessName(),
       version: VERSION,
       clock,
@@ -149,10 +155,11 @@ host.network = {
 host.connection = connection
 
 async function applyMode(cfg: ConnectionConfig): Promise<void> {
-  if (cfg.mode === 'viewer') {
-    mode = 'viewer'
-    current = createViewerMode(cfg, { file: CONN_FILE, onChange: (c) => applyMode(c), discoverOpts: { port: UDP_PORT } }).api
-    console.log(`[dev-server] KO'RUVCHI rejimi → http://${cfg.host}:${cfg.port}`)
+  if (cfg.mode === 'terminal') {
+    mode = 'terminal'
+    const full = loadConnectionConfig(CONN_FILE) // terminalId kafolati
+    current = createTerminalMode(full, { file: CONN_FILE, onChange: (c) => applyMode(c), discoverOpts: { port: UDP_PORT } }).api
+    console.log(`[dev-server] TERMINAL rejimi → http://${cfg.host}:${cfg.port}`)
   } else {
     mode = 'main'
     if (!service) await open(false)
@@ -170,6 +177,8 @@ function removeDbFiles(): void {
 async function open(reset: boolean): Promise<void> {
   fs.mkdirSync(DATA_DIR, { recursive: true })
   if (service) service.db.close()
+  // Eski bazaga bog'langan terminal kontekstlari (login'lar) bekor
+  network?.server.clearTerminals()
   if (reset) removeDbFiles()
   service = await PosService.create({ file: DB_FILE, clock, host })
   setupLicense()
@@ -211,6 +220,50 @@ async function setupStaff(login: keyof typeof TEST_STAFF | null): Promise<Record
   await service.auth.logout()
   if (login) await service.auth.login(ids[login], TEST_STAFF[login].pin)
   return ids
+}
+
+/**
+ * --demo: oshxona bo'limi ("Taomlar" → "Oshxona", department='kitchen', ovqatlar) va namunaviy savdolar:
+ * xona (ofitsiant qatorda, oshxona cheki) — terminal + naqd; bar savdosi — terminal; bar savdosi — qarz (qarzdor).
+ * /__test/reset (e2e) bunga tegmaydi.
+ */
+async function seedDemo(ids: Record<string, number>): Promise<void> {
+  await service.auth.login(ids.owner, TEST_STAFF.owner.pin)
+  const old = (await service.catalog.categories()).find((c) => c.name === 'Taomlar')
+  const cat = await service.catalog.saveCategory(
+    old ? { id: old.id, name: 'Oshxona', department: 'kitchen' } : { name: 'Oshxona', department: 'kitchen' }
+  )
+  const dishes: [string, number][] = [["Lag'mon", 35_000], ['Osh', 40_000], ['Manti', 30_000], ['Qozon kabob', 60_000], ['Shurva', 30_000]]
+  for (const [name, price] of dishes) await service.catalog.saveProduct({ name, price, categoryId: cat.id, trackStock: false, lowStockAt: 0 })
+  const products = await service.catalog.products()
+  const pid = (name: string): number => {
+    const p = products.find((x) => x.name === name)
+    if (!p) throw new Error('Demo mahsulot topilmadi: ' + name)
+    return p.id
+  }
+  const room = (await service.rooms.list())[0]
+  // 1) Xona: 2 mehmon × 1 soat, Pivo 2 + Lag'mon 2 + Shashlik 1 (Sardor olib bordi) → terminal + naqd
+  const s1 = await service.sessions.open(room.id, 2, 60)
+  await service.lines.addProducts(
+    s1.session.id,
+    [{ productId: pid('Pivo 0.5 L'), qty: 2 }, { productId: pid("Lag'mon"), qty: 2 }, { productId: pid('Shashlik'), qty: 1 }],
+    null,
+    ids.waiter1
+  )
+  const v1 = await service.sessions.get(s1.session.id)
+  await service.checkout.pay(s1.session.id, [{ method: 'terminal', amount: v1.total - 50_000 }, { method: 'cash', amount: 50_000 }], null)
+  // 2) Bar savdosi: Osh + Coca-Cola → terminal
+  const b1 = await service.barSales.open()
+  await service.lines.addProducts(b1.session.id, [{ productId: pid('Osh'), qty: 1 }, { productId: pid('Coca-Cola 1 L'), qty: 1 }], null)
+  await service.checkout.pay(b1.session.id, [{ method: 'terminal', amount: (await service.sessions.get(b1.session.id)).total }], null)
+  // 3) Bar savdosi: Manti 2 → qarz (qarzdor)
+  const b2 = await service.barSales.open()
+  await service.lines.addProduct(b2.session.id, pid('Manti'), 2, null)
+  await service.checkout.pay(b2.session.id, [{ method: 'debt', amount: (await service.sessions.get(b2.session.id)).total }], {
+    name: 'Jasur',
+    phone: '+998 90 123 45 67'
+  })
+  await service.auth.logout()
 }
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
@@ -282,7 +335,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return send(res, 200, { result: result === undefined ? null : result })
   }
 
-  if (url.pathname.startsWith('/__test/') && mode === 'viewer') return send(res, 400, { error: "Ko'ruvchi rejimida mavjud emas" })
+  if (url.pathname.startsWith('/__test/') && mode === 'terminal') return send(res, 400, { error: 'Terminal rejimida mavjud emas' })
 
   if (url.pathname === '/__test/reset') {
     const ids = await serial(async () => {
@@ -310,18 +363,23 @@ async function main(): Promise<void> {
   const args = ARGV
   const reset = args.includes('--reset') || process.env.RESET === '1'
   const demo = args.includes('--demo')
-  const viewerOf = argValue('--viewer-of')
+  const terminalOf = argValue('--terminal-of') ?? argValue('--viewer-of')
   const code = argValue('--code')
-  if (viewerOf) {
-    const u = new URL(viewerOf)
-    if (!isValidCode(code)) throw new Error('--viewer-of uchun --code 6 raqam kerak')
-    const cfg: ConnectionConfig = { mode: 'viewer', host: u.hostname, port: Number(u.port || DEFAULT_LAN_PORT), code }
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+  const prevConn = readConnectionConfig(CONN_FILE)
+  if (terminalOf) {
+    const u = new URL(terminalOf)
+    if (!isValidCode(code)) throw new Error('--terminal-of uchun --code 6 raqam kerak')
+    const cfg: ConnectionConfig = {
+      mode: 'terminal', host: u.hostname, port: Number(u.port || DEFAULT_LAN_PORT), code,
+      terminalId: prevConn.terminalId, printerName: prevConn.printerName
+    }
     writeConnectionConfig(CONN_FILE, cfg)
     await applyMode(cfg)
   } else {
-    writeConnectionConfig(CONN_FILE, { mode: 'main', host: null, port: null, code: null })
+    writeConnectionConfig(CONN_FILE, { ...MAIN_CONFIG, terminalId: prevConn.terminalId, printerName: prevConn.printerName })
     await open(reset || demo)
-    if (demo) await setupStaff(null)
+    if (demo) await seedDemo(await setupStaff(null))
     if (args.includes('--lan')) {
       if (code !== null) {
         if (!isValidCode(code)) throw new Error('--code 6 raqam bo‘lishi kerak')
@@ -344,7 +402,7 @@ async function main(): Promise<void> {
     })
   })
   server.listen(PORT, () => {
-    console.log(`[dev-server] http://localhost:${PORT}/rpc  ${mode === 'viewer' ? "(ko'ruvchi, baza yo'q)" : 'baza: ' + DB_FILE + (reset || demo ? ' (toza)' : '')}`)
+    console.log(`[dev-server] http://localhost:${PORT}/rpc  ${mode === 'terminal' ? "(terminal, baza yo'q)" : 'baza: ' + DB_FILE + (reset || demo ? ' (toza)' : '')}`)
     if (demo)
       console.log('[dev-server] demo xodimlar: Ega 1234, Administrator 2222, Kassir 3333, Massajchi 4444, ofitsiantlar: Sardor 5555 (10%), Bekzod 6666 (12%)')
   })

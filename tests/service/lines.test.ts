@@ -169,3 +169,62 @@ describe('katalog boshqaruvi', () => {
     expect((await svc.rooms.list()).some((x) => x.id === r.id)).toBe(false)
   })
 })
+
+describe('addProducts (qo‘shish oynasi: −/+ savat, bitta amal)', () => {
+  it('bir nechta mahsulot bitta tranzaksiyada; takrorlar birlashadi; ombor kamayadi', async () => {
+    const { svc, rooms } = await setup()
+    const water = await productByName(svc, 'Suv 0.5 L') // 5 000, 48
+    const chips = await productByName(svc, 'Chips') // 12 000, 20
+    const tea = await productByName(svc, 'Qora choy (choynak)') // ombor hisobisiz
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+    const v = await svc.lines.addProducts(
+      v0.session.id,
+      [{ productId: water.id, qty: 2 }, { productId: chips.id, qty: 1 }, { productId: water.id, qty: 1 }, { productId: tea.id, qty: 2 }],
+      v0.guests[0].id
+    )
+    expect(v.lines.map((l) => [l.name, l.qty, l.guestId])).toEqual([
+      ['Suv 0.5 L', 3, v0.guests[0].id],
+      ['Chips', 1, v0.guests[0].id],
+      ['Qora choy (choynak)', 2, v0.guests[0].id]
+    ])
+    // 3 × 5 000 + 12 000 + 2 × 10 000 = 47 000
+    expect(v.linesTotal).toBe(47_000)
+    expect((await productByName(svc, 'Suv 0.5 L')).stock).toBe(45)
+    expect((await productByName(svc, 'Chips')).stock).toBe(19)
+  })
+
+  it('bitta mahsulot yetishmasa — hech narsa qo‘shilmaydi (atomik), xato qaysi mahsulotligini aytadi', async () => {
+    const { svc, rooms } = await setup()
+    const water = await productByName(svc, 'Suv 0.5 L')
+    const pista = await productByName(svc, 'Pista') // 10
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+    await expect(
+      svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 2 }, { productId: pista.id, qty: 6 }, { productId: pista.id, qty: 5 }], null)
+    ).rejects.toThrow('"Pista": omborda yetarli emas (qoldi: 10)')
+    expect((await svc.sessions.get(v0.session.id)).lines).toEqual([])
+    expect((await productByName(svc, 'Suv 0.5 L')).stock).toBe(water.stock)
+    await svc.catalog.saveProduct({ ...pista, active: false })
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 1 }, { productId: pista.id, qty: 1 }], null)).rejects.toThrow(
+      '"Pista": sotuvda emas'
+    )
+    await expect(svc.lines.addProduct(v0.session.id, pista.id, 1, null)).rejects.toThrow('Mahsulot sotuvda emas')
+  })
+
+  it('tekshiruvlar: bo‘sh ro‘yxat, noto‘g‘ri miqdor/id, yopilgan sessiya, ruxsat', async () => {
+    const { svc, rooms, loginAs } = await setup()
+    const water = await productByName(svc, 'Suv 0.5 L')
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+    await expect(svc.lines.addProducts(v0.session.id, [], null)).rejects.toThrow('Hech qanday mahsulot tanlanmagan')
+    await expect(svc.lines.addProducts(v0.session.id, null as unknown as [], null)).rejects.toThrow('Hech qanday mahsulot tanlanmagan')
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 0 }], null)).rejects.toThrow('Miqdor')
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 1.5 }], null)).rejects.toThrow('Miqdor')
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: 99999, qty: 1 }], null)).rejects.toThrow('Mahsulot topilmadi')
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 6000 }, { productId: water.id, qty: 6000 }], null)).rejects.toThrow('juda katta')
+    await loginAs('provider')
+    await svc.auth.logout()
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 1 }], null)).rejects.toThrow('Avval tizimga kiring')
+    await loginAs('owner')
+    await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: v0.total }], null)
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: water.id, qty: 1 }], null)).rejects.toThrow('Sessiya yopilgan')
+  })
+})
