@@ -325,7 +325,7 @@ describe('bar savdosi: hisobotlar (qo‘lda hisoblangan)', () => {
 
     await ctx.loginAs('owner')
     const rep = await svc.reports.sales({ from: T0, to: T0 + 2 * HOUR })
-    expect(rep.sessionsCount).toBe(4)
+    expect(rep.sessionsCount).toBe(1) // faqat xona seansi; 3 ta bar savdosi barSales.count da
     expect(rep.total).toBe(70_000 + 55_000 + 25_000 + 20_000)
     expect(rep.timeRevenue).toBe(50_000)
     expect(rep.productRevenue).toBe(20_000 + 55_000 + 27_000 + 20_000)

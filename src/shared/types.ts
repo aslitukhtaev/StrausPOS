@@ -312,6 +312,7 @@ export interface ReportRange {
 
 export interface SalesReport {
   range: ReportRange
+  /** Faqat xona seanslari (bar savdolari — barSales.count) */
   sessionsCount: number
   timeRevenue: number
   productRevenue: number

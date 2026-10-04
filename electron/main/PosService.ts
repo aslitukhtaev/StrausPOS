@@ -1492,7 +1492,8 @@ export class PosService implements PosApi {
 
       const report: SalesReport = {
         range: { from, to },
-        sessionsCount: sessions.length,
+        // Faqat xona seanslari; xonasiz bar savdolari alohida — barSales.count
+        sessionsCount: sessions.filter((s) => s.kind !== 'bar').length,
         timeRevenue: 0,
         productRevenue: 0,
         serviceRevenue: 0,
