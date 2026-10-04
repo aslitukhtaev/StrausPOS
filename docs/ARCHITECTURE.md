@@ -32,17 +32,16 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 ## Hisob-kitob qoidalari ("qattiq" tizim)
 - Xona ochilganda har mehmonga vaqt OLINADI: 1/2/3... soat (`Guest.paidMinutes`). Taymer ORQAGA sanaydi.
 - Mehmon 5 daqiqa o'tirsa ham olingan vaqt to'liq to'lanadi. Oshib ketsa `graceMinutes` dan keyin har boshlangan
-  `blockMinutes` (standart 60) to'liq qo'shiladi. "+1 soat" bilan oldindan uzaytirish mumkin (`extendGuest/extendAll`).
+  `blockMinutes` (standart 1 = aynan o'tirilgan daqiqa) qo'shiladi. "+1 soat" bilan oldindan uzaytirish mumkin (`extendGuest/extendAll`).
 - Har bir mehmon vaqti alohida (intervallar). Pauza = taymer to'xtaydi. Tugatish = mehmon chiqdi (olingan vaqt baribir to'lanadi).
 - Xona almashtirish: eski narx eski vaqtda qoladi; qolgan (oldindan olingan) daqiqalar yangi xona narxida.
 - `warnBeforeMinutes` qolganda xona kartasi va mehmon taymeri qizaradi, ovozli/vizual ogohlantirish.
 - Qator qaytarish (X): `returnedQty` oshadi, mahsulot omborga qaytadi, `ReturnRecord` yoziladi.
 - To'lov: naqd/karta/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy.
 - Xizmat (massaj): qat'iy narx, provider yoziladi, ulush YO'Q.
-- **Ofitsiant**: xona ochilganda biriktiriladi (biriktirilmasa ogohlantirish). Haqi = biriktirilgan sessiyadagi
-  BAR MAHSULOTLARI (kind='product', qaytarishlar ayirilgan; xizmatlar va vaqt KIRMAYDI) × `waiterPct`%.
-  Foiz biriktirish paytida sessiyada muzlatiladi, to'lov paytida haq sessiyaga yoziladi. Oylik hisob: `waiters.monthly`,
-  berilgan pullar `waiters.payout`.
+- **Ofitsiant**: xonaga BIRIKTIRILMAYDI (qarang: "2026-10 o'zgarishlari"). Haqi = o'zi qo'shgan bar va oshxona
+  mahsulotlari qatorlari (qaytarishlar ayirilgan; xizmatlar va vaqt KIRMAYDI) × qatorda muzlatilgan `waiterPct`%.
+  Oylik hisob: `waiters.monthly`, berilgan pullar `waiters.payout`.
 - Guruh uchun bitta chek.
 - **Xonasiz bar savdosi** (`barSales.*`): kind='bar' sessiya — faqat mahsulotlar, to'lov va chek odatdagidek; ofitsiant haqi YO'Q;
   hisobotda umumiy tushumga kiradi va alohida `barSales` ko'rsatkichi; xonalar panelida ko'rinmaydi.
@@ -65,6 +64,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - **Ofitsiant xonaga biriktirilmaydi.** Har bir ofitsiant o'z PIN'i bilan kirib istalgan xonaga buyurtma qo'shadi;
   qator `waiterId`/`waiterPct` ni oladi. Haq = (bar + OSHXONA mahsulotlari qatorlari, qaytarish ayirilgan) × foiz; xizmat yo'q.
   Kassir qo'shganda "kim olib bordi" ixtiyoriy. Xonasiz bar savdosida haq yo'q.
+- Oshxona printeri nomi bo'sh bo'lsa — tizimning standart printeriga chiqadi.
 - **Oshxona bo'limi** bardan alohida (kategoriya `department`). Oshxona mahsuloti qo'shilganda asosiy kompyuterdagi
   oshxona printeriga avtomatik oshxona cheki (xona, mahsulotlar, miqdor, ofitsiant, vaqt; qaytarishda "BEKOR" cheki).
   Oshxona kunlik hisobi: savdo × `kitchen.sharePct`% = oshxonaga beriladigan, kunlik pul berish (`kitchen.*`).

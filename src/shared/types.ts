@@ -16,7 +16,7 @@ export interface Staff {
   active: boolean
   /** Xizmat ko'rsatuvchi (masalan masseuse) — xizmat qo'shishda tanlanadi. */
   isProvider: boolean
-  /** Ofitsiant — xonaga biriktiriladi va shu xonadagi BAR mahsulotlaridan foiz oladi (xizmatlardan emas). */
+  /** Ofitsiant — xonaga biriktirilmaydi; o'zi qo'shgan bar va oshxona mahsulotlaridan foiz oladi (xizmatlardan emas). */
   isWaiter: boolean
   /** Ofitsiant foizi, 0..100 (masalan 10). Biriktirilgan paytdagi qiymat sessiyada muzlatiladi. */
   commissionPct: number

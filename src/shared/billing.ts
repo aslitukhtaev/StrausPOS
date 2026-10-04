@@ -21,7 +21,7 @@ export interface BillingOptions {
   graceMinutes: number
 }
 
-export const DEFAULT_BILLING: BillingOptions = { roundTo: 1000, blockMinutes: 60, graceMinutes: 0 }
+export const DEFAULT_BILLING: BillingOptions = { roundTo: 1000, blockMinutes: 1, graceMinutes: 0 }
 
 /** Intervalning davomiyligi (ms). end=null bo'lsa `now` gacha. */
 export function intervalMs(iv: TimeInterval, now: number): number {
@@ -97,7 +97,7 @@ export function buildGuestView(g: Guest, lines: OrderLine[], now: number, opts: 
   }
 }
 
-/** Ofitsiant haqi: faqat bar MAHSULOTLARI (xizmatlar emas), qaytarishlar ayirilgan. */
+/** Ofitsiant haqi asosi: bar va oshxona MAHSULOTLARI (xizmatlar emas), qaytarishlar ayirilgan. */
 export function waiterProductSales(lines: Pick<OrderLine, 'kind' | 'qty' | 'returnedQty' | 'unitPrice'>[]): number {
   return lines.filter((l) => l.kind === 'product').reduce((s, l) => s + lineAmount(l), 0)
 }
