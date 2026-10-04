@@ -65,7 +65,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - **Ofitsiant xonaga biriktirilmaydi.** Har bir ofitsiant o'z PIN'i bilan kirib istalgan xonaga buyurtma qo'shadi;
   qator `waiterId`/`waiterPct` ni oladi. Haq = (bar + OSHXONA mahsulotlari qatorlari, qaytarish ayirilgan) × foiz; xizmat yo'q.
   Kassir qo'shganda "kim olib bordi" ixtiyoriy. Xonasiz bar savdosida haq yo'q.
-- **Oshxona bo'limi** barдан alohida (kategoriya `department`). Oshxona mahsuloti qo'shilganda asosiy kompyuterdagi
+- **Oshxona bo'limi** bardan alohida (kategoriya `department`). Oshxona mahsuloti qo'shilganda asosiy kompyuterdagi
   oshxona printeriga avtomatik oshxona cheki (xona, mahsulotlar, miqdor, ofitsiant, vaqt; qaytarishda "BEKOR" cheki).
   Oshxona kunlik hisobi: savdo × `kitchen.sharePct`% = oshxonaga beriladigan, kunlik pul berish (`kitchen.*`).
 - **To'lov usullari**: Naqd · Karta · Terminal · Qarz; Aralash — to'rttasi ham (qarz ham).
