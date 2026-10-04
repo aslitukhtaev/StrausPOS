@@ -5,4 +5,4 @@
 export const LICENSE_PUBLIC_KEY_DER_B64 = 'MCowBQYDK2VwAyEA4i6xBVQM4IzqSM/BZC2gD2i8akBxjNqPAS36ggfzoe4='
 
 /** Bloklanganda / aktivatsiya ekranida ko'rinadigan aloqa (ishlab chiquvchi telefoni) */
-export const DEVELOPER_CONTACT = '+998 __ ___ __ __'
+export const DEVELOPER_CONTACT = '+998 99 702 67 20'
