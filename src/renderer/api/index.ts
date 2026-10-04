@@ -21,7 +21,7 @@ export function getApi(): PosApi {
   const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '')
   const w = (typeof window !== 'undefined' ? window : {}) as { api?: PosApi }
   if (params.has('mock')) {
-    instance = createMockApi({ empty: params.get('mock') === 'empty', viewer: params.has('viewer'), offline: params.has('offline') })
+    instance = createMockApi({ empty: params.get('mock') === 'empty', terminal: params.has('terminal') || params.has('viewer'), offline: params.has('offline') })
     kind = 'mock'
   } else if (w.api) {
     instance = w.api

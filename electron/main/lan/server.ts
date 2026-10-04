@@ -1,9 +1,13 @@
 /**
- * Asosiy kompyuterning LAN serveri (Node 16 `http` + `dgram`).
+ * Asosiy kompyuterning LAN serveri (Node 16 `http` + `dgram`) — TERMINALLAR uchun.
  *   GET  /hello            → {name, version}            (kodsiz)
- *   POST /rpc {method,args} → {result} | {error}        (X-Delfin-Code; faqat VIEWER_ALLOWLIST)
+ *   POST /rpc {method,args} → {result} | {error}        (X-Delfin-Code + X-Delfin-Terminal)
  *   UDP  DISCOVERY_PORT: "DELFIN?" → {"app":"delfin","name","port"}
- * Statuslar: 401 kod noto'g'ri, 403 ruxsat yo'q (yozish), 429 brute-force bloki, 400 amal xatosi.
+ * Har bir terminal (X-Delfin-Terminal UUID) uchun ALOHIDA PosService login konteksti saqlanadi:
+ * terminaldagi kirish/chiqish asosiy kompyuterdagi login'ga ta'sir qilmaydi (va aksincha).
+ * Barcha PosApi metodlari ruxsat etiladi (ruxsat — kontekstdagi xodim roliga qarab, PosService ichida),
+ * faqat TERMINAL_DENYLIST (network.*, connection.*, system.backup/restore, license.activate, auth.setupOwner) → 403.
+ * Statuslar: 401 kod noto'g'ri, 403 faqat asosiy kompyuterda, 429 brute-force bloki, 400 amal xatosi.
  */
 import http from 'http'
 import dgram from 'dgram'
@@ -12,13 +16,19 @@ import type { AddressInfo } from 'net'
 import type { PosApi } from '../../../src/shared/api'
 import { invokeApi, parseMethod } from '../apiMethods'
 import {
-  CODE_FAIL_WINDOW_MS, CODE_HEADER, DISCOVERY_QUERY, MAX_CODE_FAILS, MSG_BAD_CODE, MSG_TOO_MANY, VIEWER_TTL_MS,
-  VIEW_ONLY_MESSAGE, isViewerAllowed, nameFromUserAgent
+  CODE_FAIL_WINDOW_MS, CODE_HEADER, DISCOVERY_QUERY, MAIN_ONLY_MESSAGE, MAX_CODE_FAILS, MAX_TERMINALS, MSG_BAD_CODE,
+  MSG_NO_TERMINAL, MSG_TOO_MANY, MSG_UNKNOWN, TERMINAL_HEADER, TERMINAL_SESSION_TTL_MS, TERMINAL_TTL_MS,
+  isTerminalDenied, isValidTerminalId, nameFromUserAgent
 } from './protocol'
 
 export interface LanServerOptions {
-  /** Ko'ruvchi konteksti (PosService.forViewer()) — har so'rovda olinadi (baza almashsa ham to'g'ri) */
-  api: () => PosApi
+  /**
+   * Yangi terminal uchun alohida login konteksti (masalan litsenziya o'ramidagi PosService.forTerminal()).
+   * Terminal birinchi so'rov yuborganda bir marta chaqiriladi.
+   */
+  createTerminal: () => PosApi
+  /** So'rovlarni ketma-ket bajarish (dev-server: umumiy sql.js navbati). Standart — to'g'ridan-to'g'ri. */
+  run?: <T>(fn: () => Promise<T>) => Promise<T>
   name: () => string
   version: string
   /** Joriy ulanish kodi */
@@ -28,10 +38,19 @@ export interface LanServerOptions {
   discoveryPort?: number | null
 }
 
-export interface ViewerSeen {
+export interface TerminalSeen {
+  ip: string
+  name: string
+  staffName: string | null
+  lastSeen: number
+}
+
+interface TerminalEntry {
+  id: string
   ip: string
   name: string
   lastSeen: number
+  api: PosApi
 }
 
 const MAX_BODY = 256 * 1024
@@ -52,7 +71,7 @@ export class LanServer {
   private http: http.Server | null = null
   private udp: dgram.Socket | null = null
   private fails = new Map<string, number[]>()
-  private seen = new Map<string, ViewerSeen>()
+  private terms = new Map<string, TerminalEntry>()
   private boundPort = 0
   private readonly clock: () => number
 
@@ -150,15 +169,56 @@ export class LanServer {
 
   private sockets = new Set<import('net').Socket>()
 
-  /** Oxirgi 2 daqiqada so'rov yuborgan ko'ruvchilar */
-  viewers(): ViewerSeen[] {
+  /** Oxirgi 2 daqiqada so'rov yuborgan terminallar (kirgan xodim ismi bilan) */
+  async terminals(): Promise<TerminalSeen[]> {
     const now = this.clock()
-    return [...this.seen.values()].filter((v) => now - v.lastSeen <= VIEWER_TTL_MS).sort((a, b) => b.lastSeen - a.lastSeen)
+    const list = [...this.terms.values()].filter((t) => now - t.lastSeen <= TERMINAL_TTL_MS).sort((a, b) => b.lastSeen - a.lastSeen)
+    const out: TerminalSeen[] = []
+    for (const t of list) {
+      let staffName: string | null = null
+      try {
+        const cur = await t.api.auth.current()
+        staffName = cur ? cur.staff.name : null
+      } catch {
+        staffName = null
+      }
+      out.push({ ip: t.ip, name: t.name, staffName, lastSeen: t.lastSeen })
+    }
+    return out
   }
 
-  /** Kod almashganda: eski ko'ruvchilar ro'yxati tozalanadi */
-  clearViewers(): void {
-    this.seen.clear()
+  /** Terminal kontekstlari soni (testlar/diagnostika) */
+  get terminalCount(): number {
+    return this.terms.size
+  }
+
+  /**
+   * Barcha terminal kontekstlarini o'chirish (kod almashdi / server o'chirildi / baza almashdi):
+   * terminallardagi login'lar bekor bo'ladi — qayta kirish kerak.
+   */
+  clearTerminals(): void {
+    this.terms.clear()
+  }
+
+  /** Terminal konteksti (yo'q bo'lsa yaratiladi); uzoq ishlatilmaganlar va ortiqchalari o'chiriladi */
+  private terminal(id: string, ip: string, name: string): TerminalEntry {
+    const now = this.clock()
+    for (const [k, t] of this.terms) if (now - t.lastSeen > TERMINAL_SESSION_TTL_MS) this.terms.delete(k)
+    let t = this.terms.get(id)
+    if (!t) {
+      while (this.terms.size >= MAX_TERMINALS) {
+        let oldest: TerminalEntry | null = null
+        for (const x of this.terms.values()) if (!oldest || x.lastSeen < oldest.lastSeen) oldest = x
+        if (!oldest) break
+        this.terms.delete(oldest.id)
+      }
+      t = { id, ip, name, lastSeen: now, api: this.opts.createTerminal() }
+      this.terms.set(id, t)
+    }
+    t.ip = ip
+    t.name = name
+    t.lastSeen = now
+    return t
   }
 
   private safeName(): string {
@@ -234,7 +294,10 @@ export class LanServer {
       this.addFail(ip)
       return this.send(res, 401, { error: MSG_BAD_CODE })
     }
-    // 3) Allowlist
+    // 3) Terminal identifikatori
+    const th = req.headers[TERMINAL_HEADER]
+    const tid = Array.isArray(th) ? th[0] : th
+    if (!isValidTerminalId(tid)) return this.send(res, 400, { error: MSG_NO_TERMINAL })
     let body: Record<string, unknown>
     try {
       body = (await this.readBody(req)) as Record<string, unknown>
@@ -242,16 +305,16 @@ export class LanServer {
       return this.send(res, 400, { error: e instanceof Error ? e.message : "So'rov noto'g'ri" })
     }
     if (!body || typeof body !== 'object') return this.send(res, 400, { error: "So'rov noto'g'ri" })
-    const m = isViewerAllowed(body.method) ? parseMethod(body.method) : null
-    if (!m) return this.send(res, 403, { error: VIEW_ONLY_MESSAGE })
-
-    const ua = req.headers['user-agent']
-    this.seen.set(ip, { ip, name: nameFromUserAgent(ua), lastSeen: this.clock() })
-    if (this.seen.size > 200) this.seen.delete(this.seen.keys().next().value as string)
+    const term = this.terminal(tid.toLowerCase(), ip, nameFromUserAgent(req.headers['user-agent']))
+    // 4) Metod: noma'lum → 400; faqat asosiy kompyuterga tegishli → 403
+    const m = parseMethod(body.method)
+    if (!m) return this.send(res, 400, { error: MSG_UNKNOWN })
+    if (isTerminalDenied(`${m.group}.${m.method}`)) return this.send(res, 403, { error: MAIN_ONLY_MESSAGE })
 
     const args = Array.isArray(body.args) ? body.args : []
+    const run = this.opts.run ?? (<T>(fn: () => Promise<T>) => fn())
     try {
-      const result = await invokeApi(this.opts.api(), m.group, m.method, args)
+      const result = await run(() => invokeApi(term.api, m.group, m.method, args))
       return this.send(res, 200, { result: result === undefined ? null : result })
     } catch (e) {
       const isPos = e instanceof Error && e.name === 'PosError'

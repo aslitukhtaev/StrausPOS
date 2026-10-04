@@ -1,6 +1,6 @@
 /**
- * Ko'ruvchi (faqat ko'rish) rejimiga ulanish oqimi: asosiy kompyuterni topish (qidirish yoki qo'lda IP) → 6 raqamli kod → Ulanish.
- * Setup tanlov sahifasidan va Qulf ekranidagi havoladan ochiladi.
+ * TERMINAL rejimiga ulanish oqimi (ofitsiantlar kompyuteri): asosiy kompyuterni topish (qidirish yoki qo'lda IP) →
+ * 6 raqamli kod → Ulanish. Setup tanlov sahifasidan va Qulf ekranidagi havoladan (ega tasdig'i bilan) ochiladi.
  */
 import { useEffect, useState } from 'react'
 import type { DiscoveredServer } from '@shared/types'
@@ -12,7 +12,7 @@ const DEFAULT_PORT = 47321
 const CODE_LEN = 6
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/
 
-export function ViewerConnect({ onBack }: { onBack: () => void }) {
+export function TerminalConnect({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState<'find' | 'code'>('find')
   const [found, setFound] = useState<DiscoveredServer[] | null>(null)
   const [searching, setSearching] = useState(false)
@@ -68,8 +68,8 @@ export function ViewerConnect({ onBack }: { onBack: () => void }) {
     setBusy(true)
     setError(null)
     try {
-      await api.connection.connectViewer(target.host, target.port, value)
-      toast.success('Ulandi', { description: (target.name || target.host) + ' — faqat ko\'rish rejimi' })
+      await api.connection.connectTerminal(target.host, target.port, value)
+      toast.success('Ulandi', { description: (target.name || target.host) + ' — terminal rejimi' })
       // Electron ilovani o'zi qayta yuklaydi; brauzer/mock uchun qayta boot
       if (apiKind() === 'mock') void useApp.getState().boot()
       else location.reload()
@@ -91,7 +91,7 @@ export function ViewerConnect({ onBack }: { onBack: () => void }) {
           </p>
         </div>
         <div className="vc-target">
-          <Icon name="eye" size={22} />
+          <Icon name="swap" size={22} />
           <span className="ellipsis">{target.name || 'Asosiy kompyuter'}</span>
           <span className="vc-target__host num">{target.host}:{target.port}</span>
         </div>
@@ -131,7 +131,10 @@ export function ViewerConnect({ onBack }: { onBack: () => void }) {
     <div className="setup__body vc" key="find">
       <div className="auth__head">
         <h1>Asosiy kompyuterga ulanish</h1>
-        <p className="auth__lead">Bu kompyuter faqat ko'radi: xonalar, hisobot, ofitsiantlar, qarzlar. Ikkalasi bitta Wi-Fi'da bo'lsin.</p>
+        <p className="auth__lead">
+          Bu kompyuter terminal bo'ladi: xodimlar o'z PIN kodi bilan kirib to'liq ishlaydi, ma'lumotlar asosiy kompyuterda.
+          Ikkalasi bitta Wi-Fi'da bo'lsin.
+        </p>
       </div>
 
       <div className="vc-list" data-testid="vc-list">

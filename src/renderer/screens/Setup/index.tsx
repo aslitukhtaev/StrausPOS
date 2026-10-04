@@ -1,5 +1,6 @@
 /**
- * Birinchi ishga tushirish: avval tanlov — [Yangi biznes (asosiy kompyuter)] / [Asosiy kompyuterga ulanish (faqat ko'rish)].
+ * Birinchi ishga tushirish: avval tanlov — [Yangi biznes (asosiy kompyuter)] / [Asosiy kompyuterga ulanish (terminal —
+ * ofitsiantlar kompyuteri)].
  * Yangi biznes: biznes nomi + ega ismi → PIN → PIN tasdig'i → ega yaratiladi va avtomatik kirish.
  */
 import { useState } from 'react'
@@ -7,7 +8,7 @@ import { api } from '../../api'
 import { useApp } from '../../store/app'
 import { Button, Field, Icon, Input, Numpad, PinDots, cx, errorMessage, toast } from '../../ui'
 import { BrandPanel } from '../Lock/BrandPanel'
-import { ViewerConnect } from './ViewerConnect'
+import { TerminalConnect } from './TerminalConnect'
 import '../Lock/lock.css'
 import './setup.css'
 
@@ -17,15 +18,15 @@ const PIN_MIN = 4
 const PIN_MAX = 6
 
 export default function SetupScreen() {
-  const [kind, setKind] = useState<'choose' | 'owner' | 'viewer'>('choose')
+  const [kind, setKind] = useState<'choose' | 'owner' | 'terminal'>('choose')
   if (kind === 'owner') return <OwnerSetup onBack={() => setKind('choose')} />
   return (
     <div className="auth">
-      <BrandPanel businessName="" footer={kind === 'viewer' ? "Faqat ko'rish · ma'lumotlar asosiy kompyuterda" : 'Birinchi sozlash · bir daqiqa vaqt oladi'} />
+      <BrandPanel businessName="" footer={kind === 'terminal' ? "Terminal · ma'lumotlar asosiy kompyuterda" : 'Birinchi sozlash · bir daqiqa vaqt oladi'} />
       <section className="auth__panel">
         <div className="setup">
-          {kind === 'viewer' ? (
-            <ViewerConnect onBack={() => setKind('choose')} />
+          {kind === 'terminal' ? (
+            <TerminalConnect onBack={() => setKind('choose')} />
           ) : (
             <div className="setup__body" key="choose">
               <div className="auth__head">
@@ -35,16 +36,16 @@ export default function SetupScreen() {
               <button type="button" className="setup-choice" onClick={() => setKind('owner')} data-testid="setup-owner">
                 <span className="setup-choice__icon"><Icon name="rooms" size={34} /></span>
                 <span className="setup-choice__text">
-                  <span className="setup-choice__title">Yangi biznes</span>
+                  <span className="setup-choice__title">Yangi biznes (asosiy kompyuter)</span>
                   <span className="setup-choice__desc">Asosiy kompyuter — kassa shu yerda, ma'lumotlar shu kompyuterda saqlanadi</span>
                 </span>
                 <Icon name="chevronRight" size={30} />
               </button>
-              <button type="button" className="setup-choice setup-choice--viewer" onClick={() => setKind('viewer')} data-testid="setup-viewer">
-                <span className="setup-choice__icon"><Icon name="eye" size={34} /></span>
+              <button type="button" className="setup-choice setup-choice--viewer" onClick={() => setKind('terminal')} data-testid="setup-terminal">
+                <span className="setup-choice__icon"><Icon name="swap" size={34} /></span>
                 <span className="setup-choice__text">
                   <span className="setup-choice__title">Asosiy kompyuterga ulanish</span>
-                  <span className="setup-choice__desc">Faqat ko'rish — Wi-Fi orqali xonalar, hisobot va qarzlarni kuzatish</span>
+                  <span className="setup-choice__desc">Terminal — ofitsiantlar kompyuteri: Wi-Fi orqali, xodimlar o'z PIN kodi bilan ishlaydi</span>
                 </span>
                 <Icon name="chevronRight" size={30} />
               </button>

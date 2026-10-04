@@ -1,5 +1,5 @@
 /**
- * Ko'ruvchi tomoni: asosiy kompyuterga HTTP so'rovlar (Node 16 `http`; fetch yo'q) va UDP qidiruv.
+ * Terminal tomoni: asosiy kompyuterga HTTP so'rovlar (Node 16 `http`; fetch yo'q) va UDP qidiruv.
  */
 import http from 'http'
 import dgram from 'dgram'
@@ -7,13 +7,15 @@ import os from 'os'
 import type { DiscoveredServer } from '../../../src/shared/types'
 import {
   CODE_HEADER, DISCOVERY_PORT, DISCOVERY_QUERY, DISCOVER_MS, MSG_BAD_CODE, MSG_NO_LINK, MSG_NOT_FOUND, RPC_TIMEOUT_MS,
-  userAgent
+  TERMINAL_HEADER, userAgent
 } from './protocol'
 
 export interface RemoteTarget {
   host: string
   port: number
   code: string
+  /** Terminal identifikatori (UUID) — serverdagi alohida login konteksti */
+  terminalId: string
 }
 
 /** Tarmoq xatosi (aloqa yo'q) va server javobidagi xato farqlanadi */
@@ -31,7 +33,8 @@ export function setClientVersion(v: string): void {
 }
 
 function request(
-  host: string, port: number, method: 'GET' | 'POST', path: string, body: unknown, code: string | null, timeoutMs: number
+  host: string, port: number, method: 'GET' | 'POST', path: string, body: unknown, code: string | null, timeoutMs: number,
+  terminalId: string | null = null
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   return new Promise((resolve, reject) => {
     const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body), 'utf8')
@@ -41,6 +44,7 @@ function request(
       headers['Content-Length'] = payload.length
     }
     if (code !== null) headers[CODE_HEADER] = code
+    if (terminalId !== null) headers[TERMINAL_HEADER] = terminalId
     let done = false
     const finish = (fn: () => void): void => {
       if (done) return
@@ -87,7 +91,7 @@ export async function hello(host: string, port: number, timeoutMs = RPC_TIMEOUT_
 
 /** POST /rpc. Xatolar o'zbekcha: aloqa yo'q / kod noto'g'ri / serverning o'z xabari. */
 export async function rpc(target: RemoteTarget, method: string, args: unknown[], timeoutMs = RPC_TIMEOUT_MS): Promise<unknown> {
-  const r = await request(target.host, target.port, 'POST', '/rpc', { method, args }, target.code, timeoutMs)
+  const r = await request(target.host, target.port, 'POST', '/rpc', { method, args }, target.code, timeoutMs, target.terminalId)
   if (r.status === 200) return r.body.result
   if (r.status === 401) throw new RemoteError(MSG_BAD_CODE, 401)
   const msg = typeof r.body.error === 'string' && r.body.error ? r.body.error : MSG_NOT_FOUND

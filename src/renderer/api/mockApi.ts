@@ -5,8 +5,8 @@
  *   ?mock=1      — tayyor ma'lumot: Aziz (Ega, PIN 1234), Dilnoza (Admin, 1111), Jasur (Kassir, 0000), Malika (Kassir/masseuse, 2222),
  *                Bekzod (Ofitsiant 10%, 3333)
  *   ?mock=empty  — birinchi ishga tushirish (Setup ekrani)
- *   &viewer=1    — ko'ruvchi (faqat ko'rish) rejimi: connection.info().mode='viewer', bitta band xona bilan
- *   &offline=1   — ko'ruvchida aloqa uzilgan holat (connection.info().connected=false, board xato)
+ *   &terminal=1  — terminal rejimi: connection.info().mode='terminal' (odatdagi login), bitta band xona bilan
+ *   &offline=1   — terminalda aloqa uzilgan holat (connection.info().connected=false, board xato)
  *
  * Qo'llab-quvvatlanadi: auth.*, settings.*, system.now, rooms.list/board, staff.list, waiters.list, catalog.categories/products/services,
  * debts.list, xonasiz bar savdosi (barSales.*, lines.addProduct/returnLine, sessions.get/cancel, checkout.pay/receipt — faqat bar
@@ -44,8 +44,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   language: 'uz'
 }
 
-export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline?: boolean } = {}): PosApi {
-  let viewer = !!opts.viewer
+export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offline?: boolean } = {}): PosApi {
+  let terminal = !!opts.terminal
   let offline = !!opts.offline
   let staff: Staff[] = opts.empty
     ? []
@@ -90,10 +90,10 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
     port: 47321,
     code: '482913',
     addresses: ['192.168.1.10'],
-    viewers: [{ ip: '192.168.1.24', name: 'TEPA-KOMPYUTER', lastSeen: Date.now() - 4000 }]
+    terminals: [{ ip: '192.168.1.24', name: 'OFITSIANT-MONOBLOK', staffName: 'Bekzod Aliyev', lastSeen: Date.now() - 4000 }]
   }
   const conn = (): ConnectionInfo =>
-    viewer ? { mode: 'viewer', host: '192.168.1.10', port: 47321, connected: !offline } : { mode: 'main', host: null, port: null, connected: true }
+    terminal ? { mode: 'terminal', host: '192.168.1.10', port: 47321, connected: !offline } : { mode: 'main', host: null, port: null, connected: true }
   const online = () => {
     if (offline) throw new Error("Asosiy kompyuter bilan aloqa yo'q")
   }
@@ -170,12 +170,7 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
         current = null
         return delay(undefined)
       },
-      current: () =>
-        delay(
-          viewer
-            ? { staff: { id: 0, name: "Ko'ruvchi", role: 'cashier', active: true, isProvider: false, isWaiter: false, commissionPct: 0 } as Staff, permissions: ['reports.view'] as Permission[] }
-            : session()
-        ),
+      current: () => delay(session()),
       needsSetup: () => delay(staff.length === 0),
       setupOwner: (name, pin, businessName) => {
         if (staff.length > 0) return fail("Ega allaqachon yaratilgan")
@@ -214,7 +209,7 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
         online()
         return delay(
           rooms.map((room): RoomCard => {
-            if (viewer && room.id === 3) {
+            if (terminal && room.id === 3) {
               const v = busyView()
               return { room: clone(room), session: v, guestsActive: v.guests.length, currentTotal: v.total }
             }
@@ -329,7 +324,7 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
         return delay(clone(net), 300)
       },
       regenerateCode: () => {
-        net = { ...net, code: String(100000 + Math.floor(Math.random() * 900000)), viewers: [] }
+        net = { ...net, code: String(100000 + Math.floor(Math.random() * 900000)), terminals: [] }
         return delay(clone(net), 300)
       }
     },
@@ -342,14 +337,14 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
       info: () => delay(conn(), 40),
       discover: () =>
         delay([{ host: '192.168.1.10', port: 47321, name: 'Delfin Sauna' }, { host: '192.168.1.15', port: 47321, name: 'Delfin Sauna (2-filial)' }], 1500),
-      connectViewer: (host, _port, code) => {
+      connectTerminal: (host, _port, code) => {
         if (!host.trim()) return fail('Manzilni kiriting')
         if (code !== '482913') return fail("Kod noto'g'ri. Asosiy kompyuterdagi Sozlamalar → Tarmoq bo'limidagi kodni kiriting.", 700)
-        viewer = true
+        terminal = true
         return delay(undefined, 700)
       },
       disconnect: () => {
-        viewer = false
+        terminal = false
         offline = false
         return delay(undefined, 200)
       }

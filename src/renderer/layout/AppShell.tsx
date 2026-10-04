@@ -10,22 +10,19 @@ import { useNav } from '../store/nav'
 import { useNow } from '../store/clock'
 import { api, apiKind } from '../api'
 import { Avatar, Button, ErrorBoundary, Icon, IconButton, Logo, confirmDialog, errorMessage, formatClock, formatDate, cx, toast } from '../ui'
-import { SCREENS, screenAllowed, type ScreenId } from './routes'
+import { SCREENS, screenAllowed } from './routes'
 import { useAutoLock } from './useAutoLock'
-import { useViewerLink } from './useViewerLink'
+import { changeConnection, useTerminalLink } from './useViewerLink'
 import { formatLeft, useLicense } from '../store/license'
 import './license.css'
 
-/** Ko'ruvchi (faqat ko'rish) kompyuterdagi bo'limlar */
-const VIEWER_SCREENS: ScreenId[] = ['rooms', 'reports', 'waiters', 'debts']
-
-/** Tepa paneldagi "Faqat ko'rish · <biznes>" belgisi va aloqa nuqtasi */
-function ViewerBadge({ name, connected, host }: { name: string; connected: boolean; host: string | null }) {
+/** Tepa paneldagi kichik "Terminal · <asosiy nomi>" belgisi va aloqa nuqtasi */
+function TerminalBadge({ name, connected, host }: { name: string; connected: boolean; host: string | null }) {
   return (
-    <div className={cx('topbar__viewer', !connected && 'is-off')} data-testid="viewer-badge" title={host ? 'Asosiy kompyuter: ' + host : undefined}>
-      <Icon name="eye" size={22} strokeWidth={2.2} />
+    <div className={cx('topbar__viewer', !connected && 'is-off')} data-testid="terminal-badge" title={host ? 'Asosiy kompyuter: ' + host : undefined}>
+      <Icon name="swap" size={22} strokeWidth={2.2} />
       <span className="topbar__viewertext">
-        <span className="topbar__viewerlabel">Faqat ko'rish</span>
+        <span className="topbar__viewerlabel">Terminal</span>
         <span className="topbar__viewername ellipsis">{name}</span>
       </span>
       <span className="topbar__dot" aria-label={connected ? 'Aloqa bor' : "Aloqa yo'q"} />
@@ -34,25 +31,6 @@ function ViewerBadge({ name, connected, host }: { name: string; connected: boole
   )
 }
 
-async function changeConnection() {
-  const ok = await confirmDialog({
-    title: "Ulanishni o'zgartirasizmi?",
-    message: "Bu kompyuter asosiy kompyuterdan uziladi. Keyin boshqa kompyuterga ulanish yoki yangi biznes ochish mumkin.",
-    confirmText: 'Ha, uzish',
-    cancelText: "Yo'q",
-    danger: true,
-    icon: 'logout'
-  })
-  if (!ok) return
-  try {
-    await api.connection.disconnect()
-    toast.success('Ulanish uzildi')
-    if (apiKind() === 'mock') void useApp.getState().boot()
-    else location.reload()
-  } catch (e) {
-    toast.error(errorMessage(e))
-  }
-}
 import { useRoomsBackground } from '../screens/rooms/background'
 
 /** Kunduzgi ↔ tungi tezkor almashtirgich */
@@ -83,17 +61,21 @@ function TrialBadge({ endsAt }: { endsAt: number }) {
   )
 }
 
-/** Muddat tugagan / soat buzilgan: qizil banner + Aktivatsiya */
-function LicenseBanner({ tampered }: { tampered: boolean }) {
+/** Muddat tugagan / soat buzilgan: qizil banner + Aktivatsiya (terminalda — faqat xabar: aktivatsiya asosiy kompyuterda) */
+function LicenseBanner({ tampered, terminal }: { tampered: boolean; terminal: boolean }) {
   return (
     <div className="shell__banner shell__banner--license" role="alert" data-testid="license-banner">
       <Icon name="lock" size={26} strokeWidth={2.2} />
       <span className="shell__bannertext">
-        {tampered ? 'Kompyuter soati noto‘g‘ri — dastur faqat ko‘rish rejimida' : 'Litsenziya muddati tugagan — dastur faqat ko‘rish rejimida'}
+        {terminal
+          ? 'Asosiy kompyuterda litsenziya muddati tugagan — dastur faqat ko‘rish rejimida'
+          : tampered ? 'Kompyuter soati noto‘g‘ri — dastur faqat ko‘rish rejimida' : 'Litsenziya muddati tugagan — dastur faqat ko‘rish rejimida'}
       </span>
-      <Button variant="danger" icon="key" onClick={() => useLicense.getState().openDialog()} data-testid="license-banner-activate">
-        Aktivatsiya
-      </Button>
+      {!terminal && (
+        <Button variant="danger" icon="key" onClick={() => useLicense.getState().openDialog()} data-testid="license-banner-activate">
+          Aktivatsiya
+        </Button>
+      )}
     </div>
   )
 }
@@ -110,13 +92,13 @@ function Clock() {
 
 export function AppShell() {
   useAutoLock()
-  useViewerLink()
+  useTerminalLink()
   const readOnly = useApp((s) => s.readOnly)
-  /** Ko'ruvchi kompyuter (readOnly litsenziya tufayli ham bo'lishi mumkin — u holda login/qulf odatdagidek) */
-  const isViewer = useApp((s) => s.mode === 'viewer')
+  /** Terminal (ikkinchi kompyuter): to'liq ishlaydi, login odatdagidek; tepada belgi, aloqa banneri */
+  const isTerminal = useApp((s) => s.mode === 'terminal')
   const license = useLicense((s) => s.status)
-  const licenseBlocked = useLicense((s) => s.blocked) && !isViewer
-  const trialEndsAt = !isViewer && license && license.state === 'trial' ? license.trialEndsAt : null
+  const licenseBlocked = useLicense((s) => s.blocked)
+  const trialEndsAt = !isTerminal && license && license.state === 'trial' ? license.trialEndsAt : null
   const connected = useApp((s) => s.connected)
   const host = useApp((s) => s.host)
   // Vaqt tugash ogohlantirishlari har qanday ekranda ham chalinsin
@@ -128,19 +110,14 @@ export function AppShell() {
   const screen = useNav((s) => s.screen)
   const go = useNav((s) => s.go)
 
-  const visible = useMemo(
-    () =>
-      isViewer
-        ? SCREENS.filter((d) => VIEWER_SCREENS.indexOf(d.id) >= 0).sort((a, b) => VIEWER_SCREENS.indexOf(a.id) - VIEWER_SCREENS.indexOf(b.id))
-        : SCREENS.filter((d) => screenAllowed(d, (p) => permissions.indexOf(p) >= 0)),
-    [permissions, isViewer]
-  )
-  const offline = isViewer && !connected
+  const visible = useMemo(() => SCREENS.filter((d) => screenAllowed(d, (p) => permissions.indexOf(p) >= 0)), [permissions])
+  const canChangeLink = permissions.indexOf('settings.manage') >= 0
+  const offline = isTerminal && !connected
   const active = visible.find((d) => d.id === screen) ?? visible[0]
   const Current = active ? active.Component : null
 
   return (
-    <div className={cx('shell', (offline || licenseBlocked) && 'shell--banner', isViewer && 'shell--viewer', readOnly && 'shell--readonly')}>
+    <div className={cx('shell', (offline || licenseBlocked) && 'shell--banner', isTerminal && 'shell--terminal', readOnly && 'shell--readonly')}>
       <aside className="shell__side">
         <div className="side__brand" title="Delfin Sauna">
           <Logo size={44} variant="full" />
@@ -159,9 +136,9 @@ export function AppShell() {
             </button>
           ))}
         </nav>
-        {isViewer ? (
+        {isTerminal && canChangeLink ? (
           <div className="side__foot side__foot--viewer">
-            <Button variant="ghost" icon="swap" block onClick={() => void changeConnection()} data-testid="viewer-disconnect">
+            <Button variant="ghost" icon="swap" block onClick={() => void changeConnection()} data-testid="terminal-disconnect">
               Ulanishni o'zgartirish
             </Button>
           </div>
@@ -171,20 +148,17 @@ export function AppShell() {
       </aside>
 
       <header className="shell__top">
-        {isViewer ? (
-          <ViewerBadge name={businessName || 'Delfin Sauna'} connected={connected} host={host} />
-        ) : (
-          <div className="topbar__biz">
-            <div className="topbar__bizname ellipsis">{businessName || 'Delfin Sauna'}</div>
-            {active && <div className="topbar__crumb">{active.label}</div>}
-          </div>
-        )}
+        <div className="topbar__biz">
+          <div className="topbar__bizname ellipsis">{businessName || 'Delfin Sauna'}</div>
+          {active && <div className="topbar__crumb">{active.label}</div>}
+        </div>
+        {isTerminal && <TerminalBadge name={businessName || 'Delfin Sauna'} connected={connected} host={host} />}
         <div className="spacer" />
         {trialEndsAt != null && <TrialBadge endsAt={trialEndsAt} />}
         <Clock />
         <ThemeToggle />
-        {!isViewer && <div className="topbar__sep" />}
-        {staff && !isViewer && (
+        <div className="topbar__sep" />
+        {staff && (
           <div className="topbar__user">
             <Avatar name={staff.name} size={46} />
             <div className="topbar__usertext">
@@ -193,19 +167,22 @@ export function AppShell() {
             </div>
           </div>
         )}
-        {!isViewer && (
-          <Button variant="secondary" icon="lock" onClick={() => void lock()} className="topbar__lock">
-            Qulflash
-          </Button>
-        )}
+        <Button variant="secondary" icon="lock" onClick={() => void lock()} className="topbar__lock">
+          Qulflash
+        </Button>
       </header>
 
-      {licenseBlocked && <LicenseBanner tampered={license?.state === 'tampered'} />}
+      {licenseBlocked && <LicenseBanner tampered={license?.state === 'tampered'} terminal={isTerminal} />}
       {offline && (
-        <div className="shell__banner" role="alert" data-testid="viewer-offline">
+        <div className="shell__banner" role="alert" data-testid="terminal-offline">
           <Icon name="alert" size={26} strokeWidth={2.2} />
           <span className="shell__bannertext">Asosiy kompyuter bilan aloqa yo'q — qayta ulanmoqda…</span>
           <span className="shell__bannerhint">{host ? host + ' · ' : ''}har 5 soniyada urinadi</span>
+          {canChangeLink && (
+            <Button size="sm" variant="ghost" icon="swap" onClick={() => void changeConnection()}>
+              Ulanishni o'zgartirish
+            </Button>
+          )}
         </div>
       )}
 

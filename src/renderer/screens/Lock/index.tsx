@@ -1,5 +1,7 @@
 /**
  * Qulf / kirish ekrani: xodimni tanlash → PIN (numpad yoki klaviatura) → Kirish.
+ * Terminalda ham xuddi shunday (xodimlar ro'yxati asosiy kompyuterdan); pastda "Terminal · manzil" va ulanishni o'zgartirish.
+ * Asosiy kompyuterda: "Bu kompyuterni terminal qilish" — ega PIN tasdig'i bilan (sozlangan bazani tasodifan uzmaslik uchun).
  */
 import { useEffect, useState } from 'react'
 import type { Staff } from '@shared/types'
@@ -10,7 +12,8 @@ import { Avatar, Button, EmptyState, Icon, Numpad, PinDots, Spinner, cx, errorMe
 import { formatLeft, useLicense } from '../../store/license'
 import '../../layout/license.css'
 import { BrandPanel } from './BrandPanel'
-import { ViewerConnect } from '../Setup/ViewerConnect'
+import { TerminalConnect } from '../Setup/TerminalConnect'
+import { changeConnection } from '../../layout/useViewerLink'
 import '../Setup/setup.css'
 import './lock.css'
 
@@ -39,9 +42,110 @@ function LicenseLink() {
   )
 }
 
+/** "Bu kompyuterni terminal qilish": avval ega PIN bilan tasdiqlaydi, keyin ulanish oqimi */
+function ToTerminal({ staff, businessName, onBack }: { staff: Staff[]; businessName: string; onBack: () => void }) {
+  const owners = staff.filter((s) => s.role === 'owner')
+  const [owner, setOwner] = useState<Staff | null>(owners.length === 1 ? owners[0] : null)
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [shake, setShake] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+
+  const back = () => {
+    // Tasdiq uchun kirilgan bo'lsa — chiqamiz (qulf ekraniga qaytiladi)
+    if (confirmed) void api.auth.logout().catch(() => undefined)
+    onBack()
+  }
+
+  const submit = async (value = pin) => {
+    if (!owner || busy || value.length < PIN_MIN) return
+    setBusy(true)
+    setError(null)
+    try {
+      const session = await api.auth.login(owner.id, value)
+      if (session.permissions.indexOf('settings.manage') < 0) {
+        void api.auth.logout().catch(() => undefined)
+        throw new Error('Faqat ega tasdiqlay oladi')
+      }
+      setConfirmed(true)
+    } catch (e) {
+      setError(errorMessage(e))
+      setShake((n) => n + 1)
+      setPin('')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="auth">
+      <BrandPanel businessName={businessName} footer="Terminal rejimiga o'tkazish · ma'lumotlar asosiy kompyuterda bo'ladi" />
+      <section className="auth__panel">
+        <div className="setup">
+          {confirmed ? (
+            <TerminalConnect onBack={back} />
+          ) : (
+            <div className="setup__body setup__body--pin" key="owner">
+              <div className="auth__head auth__head--center">
+                <h1>Ega tasdig'i</h1>
+                <p className="auth__lead">
+                  Bu kompyuter terminalga aylantiriladi — undagi ma'lumotlar ishlatilmaydi (o'chirilmaydi). Davom etish uchun ega PIN kodini kiriting.
+                </p>
+              </div>
+              {owners.length === 0 && <div className="lock-pin__error is-on" role="alert"><Icon name="alert" size={20} /> Ega topilmadi</div>}
+              {owners.length > 1 && !owner && (
+                <div className="lock-pick__grid">
+                  {owners.map((s) => (
+                    <button key={s.id} type="button" className="lock-tile" onClick={() => setOwner(s)}>
+                      <Avatar name={s.name} size={56} />
+                      <span className="lock-tile__name">{s.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {owner && (
+                <>
+                  <div className="lock-pin__prompt">{owner.name} — PIN kod</div>
+                  <div key={shake} className={'lock-pin__dots' + (shake ? ' is-shake' : '')}>
+                    <PinDots length={pin.length} max={PIN_MAX} error={!!error} />
+                  </div>
+                  <div className={'lock-pin__error' + (error ? ' is-on' : '')} role="alert">
+                    {error ? <><Icon name="alert" size={20} /> {error}</> : ' '}
+                  </div>
+                  <Numpad
+                    mode="pin"
+                    value={pin}
+                    onChange={(v) => {
+                      setError(null)
+                      setPin(v)
+                      if (v.length === PIN_MAX) void submit(v)
+                    }}
+                    maxLength={PIN_MAX}
+                    onSubmit={() => void submit()}
+                    submitDisabled={pin.length < PIN_MIN}
+                    disabled={busy}
+                    size="lg"
+                    className="lock-pin__pad"
+                  />
+                </>
+              )}
+              <Button variant="ghost" icon="arrowLeft" onClick={back} disabled={busy}>
+                Orqaga
+              </Button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 export default function LockScreen() {
   const businessName = useApp((s) => s.businessName)
   const enter = useApp((s) => s.enter)
+  const isTerminal = useApp((s) => s.mode === 'terminal')
+  const host = useApp((s) => s.host)
   const [staff, setStaff] = useState<Staff[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Staff | null>(null)
@@ -49,7 +153,7 @@ export default function LockScreen() {
   const [error, setError] = useState<string | null>(null)
   const [shake, setShake] = useState(0)
   const [busy, setBusy] = useState(false)
-  const [toViewer, setToViewer] = useState(false)
+  const [toTerminal, setToTerminal] = useState(false)
 
   const load = () => {
     setLoadError(null)
@@ -58,8 +162,12 @@ export default function LockScreen() {
       .then((list) => {
         setStaff(list)
         if (list.length === 1) setSelected(list[0])
+        if (isTerminal) useApp.getState().setConnected(true)
       })
-      .catch((e) => setLoadError(errorMessage(e)))
+      .catch((e) => {
+        setLoadError(errorMessage(e))
+        if (isTerminal) useApp.getState().setConnected(false)
+      })
   }
   useEffect(load, [])
 
@@ -105,17 +213,8 @@ export default function LockScreen() {
     return () => window.removeEventListener('keydown', onKey)
   }, [selected, staff])
 
-  if (toViewer) {
-    return (
-      <div className="auth">
-        <BrandPanel businessName={businessName} footer="Faqat ko'rish rejimiga o'tkazish" />
-        <section className="auth__panel">
-          <div className="setup">
-            <ViewerConnect onBack={() => setToViewer(false)} />
-          </div>
-        </section>
-      </div>
-    )
+  if (toTerminal && staff) {
+    return <ToTerminal staff={staff} businessName={businessName} onBack={() => setToTerminal(false)} />
   }
 
   return (
@@ -194,12 +293,17 @@ export default function LockScreen() {
             )}
           </div>
         )}
-        {!selected && (
-          <button type="button" className="lock-viewerlink" onClick={() => setToViewer(true)} data-testid="lock-to-viewer">
-            <Icon name="eye" size={18} /> Bu kompyuterni ko'rish rejimiga o'tkazish
+        {!selected && !isTerminal && staff && (
+          <button type="button" className="lock-viewerlink" onClick={() => setToTerminal(true)} data-testid="lock-to-terminal">
+            <Icon name="swap" size={18} /> Bu kompyuterni terminal qilish
           </button>
         )}
-        <LicenseLink />
+        {!selected && isTerminal && (
+          <button type="button" className="lock-viewerlink" onClick={() => void changeConnection()} data-testid="lock-terminal" title="Ulanishni o'zgartirish">
+            <Icon name="swap" size={18} /> Terminal{host ? ' · ' + host : ''} — ulanishni o'zgartirish
+          </button>
+        )}
+        {!isTerminal && <LicenseLink />}
       </section>
     </div>
   )

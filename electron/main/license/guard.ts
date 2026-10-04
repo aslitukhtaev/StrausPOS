@@ -1,25 +1,39 @@
 /**
- * Litsenziya majburlashi (main jarayon, IPC / dev-server /rpc darajasida — UI'ga ishonilmaydi).
+ * Litsenziya majburlashi (main jarayon, IPC / dev-server /rpc va LAN terminal so'rovlari darajasida — UI'ga ishonilmaydi).
+ * Terminallar asosiy kompyuter litsenziyasi bilan ishlaydi: server har terminal kontekstini shu o'ram bilan o'raydi.
  * Holat expired/tampered bo'lsa faqat quyidagilar bajariladi:
- *   LAN ko'ruvchi allowlist'idagi o'qish metodlari, auth.*, license.*, connection.*, system.backup, system.now, settings.get.
+ *   READ_METHODS (o'qish), auth.*, license.*, connection.*, system.backup, system.now, settings.get.
  * Qolgan HAR QANDAY metod "Litsenziya muddati tugagan…" xatosi bilan rad etiladi. Ma'lumotlar o'zgarmaydi.
  * Muvaffaqiyatli yozish amalidan keyin lastSeen yangilanadi (soat orqaga surilishini aniqlash uchun).
  */
 import type { PosApi } from '../../../src/shared/api'
-import type { LicenseStatus } from '../../../src/shared/types'
 import { API_METHODS } from '../apiMethods'
 import { PosError } from '../PosService'
-import { VIEWER_ALLOWLIST } from '../lan/protocol'
 import type { LicenseManager } from './manager'
-import { DEVELOPER_CONTACT } from './publicKey'
 
 const ALWAYS_GROUPS: ReadonlySet<string> = new Set(['auth', 'license', 'connection'])
 const ALWAYS_METHODS: ReadonlySet<string> = new Set(['system.backup', 'system.now', 'settings.get'])
 
+/** Ma'lumotni faqat o'qiydigan metodlar — litsenziya tugaganda ham ishlaydi (ko'rish rejimi) */
+export const READ_METHODS: ReadonlySet<string> = new Set([
+  'rooms.board', 'rooms.list',
+  'sessions.get',
+  'barSales.openList', 'barSales.history',
+  'catalog.categories', 'catalog.products', 'catalog.services',
+  'debts.list', 'debts.payments',
+  'debtors.search', 'debtors.list', 'debtors.debts',
+  'kitchen.daily', 'kitchen.payouts',
+  'reports.sales', 'reports.returns',
+  'waiters.monthly', 'waiters.sessions', 'waiters.payouts', 'waiters.list',
+  'settings.get',
+  'system.now', 'system.receiptHtml', 'system.listPrinters',
+  'staff.list'
+])
+
 /** Litsenziya tugaganda ham ruxsat etilgan metod (o'qish / kirish / litsenziya / zaxira) */
 export function allowedWhenBlocked(name: string): boolean {
   const group = name.split('.')[0]
-  return ALWAYS_GROUPS.has(group) || ALWAYS_METHODS.has(name) || VIEWER_ALLOWLIST.has(name)
+  return ALWAYS_GROUPS.has(group) || ALWAYS_METHODS.has(name) || READ_METHODS.has(name)
 }
 
 /** Majburlash uchun kerakli qism (LicenseManager yoki dev-server'dagi "doim faol" stub) */
@@ -52,9 +66,4 @@ export function createLicensedApi(api: PosApi, lic: LicenseGate): PosApi {
     }
   }
   return out as unknown as PosApi
-}
-
-/** Ko'ruvchi kompyuter: o'zi faqat o'qiydi — lokal holat doim 'active' (asosiyning holati emas) */
-export function viewerLicenseStatus(machineCode: string): LicenseStatus {
-  return { state: 'active', machineCode, trialEndsAt: null, expiresAt: null, permanent: true, contact: DEVELOPER_CONTACT }
 }

@@ -17,7 +17,7 @@ import type { KvStore } from '../../electron/main/license/manager'
 import { allowedWhenBlocked, createLicensedApi } from '../../electron/main/license/guard'
 import { machineHash, parseRegValue, fallbackGuid } from '../../electron/main/license/machine'
 import type { RegistryStore } from '../../electron/main/license/machine'
-import { createViewerApi } from '../../electron/main/lan/viewer'
+import { createTerminalApi } from '../../electron/main/lan/terminal'
 import { MSG_KEY_EXPIRED, MSG_KEY_INVALID, MSG_KEY_OTHER_MACHINE } from '../../electron/main/license/verify'
 import { HOUR, MIN, setup } from './helpers'
 import type { Ctx } from './helpers'
@@ -115,7 +115,7 @@ async function readsWork(e: Env): Promise<void> {
 
 async function writesBlocked(e: Env, msg: RegExp = BLOCKED): Promise<void> {
   const { api, ctx } = e
-  await expect(api.sessions.open(ctx.rooms.s1, 2, 60, null)).rejects.toThrow(msg)
+  await expect(api.sessions.open(ctx.rooms.s1, 2, 60)).rejects.toThrow(msg)
   await expect(api.rooms.save({ name: 'Yangi', pricePerHour: 10000, capacity: 2 })).rejects.toThrow(msg)
   await expect(api.settings.save(await api.settings.get())).rejects.toThrow(msg)
   await expect(api.barSales.open()).rejects.toThrow(msg)
@@ -155,13 +155,13 @@ describe('sinov (24 soat)', () => {
     expect(fs.existsSync(e.file)).toBe(true)
     e.ctx.clock.advance(TRIAL_MS - MIN)
     expect((await e.api.license.status()).state).toBe('trial')
-    const v = await e.api.sessions.open(e.ctx.rooms.s1, 2, 60, null)
+    const v = await e.api.sessions.open(e.ctx.rooms.s1, 2, 60)
     expect(v.guests).toHaveLength(2)
   })
 
   it('sinov tugashi → yozish rad etiladi, o\'qish ishlaydi, ma\'lumot o\'chmaydi', async () => {
     const e = await env()
-    const v = await e.api.sessions.open(e.ctx.rooms.s1, 2, 60, null)
+    const v = await e.api.sessions.open(e.ctx.rooms.s1, 2, 60)
     e.ctx.clock.advance(TRIAL_MS)
     const st = await e.api.license.status()
     expect(st.state).toBe('expired')
@@ -189,7 +189,7 @@ describe('sinov (24 soat)', () => {
   })
 
   it('allowlist: faqat o\'qish / auth / license / connection / backup', () => {
-    for (const m of ['rooms.board', 'reports.sales', 'auth.login', 'auth.setupOwner', 'license.activate', 'connection.connectViewer', 'system.backup', 'system.now', 'settings.get', 'sessions.get'])
+    for (const m of ['rooms.board', 'reports.sales', 'auth.login', 'auth.setupOwner', 'license.activate', 'connection.connectTerminal', 'system.backup', 'system.now', 'settings.get', 'sessions.get'])
       expect(allowedWhenBlocked(m)).toBe(true)
     for (const m of ['rooms.save', 'sessions.open', 'checkout.pay', 'checkout.receipt', 'settings.save', 'system.restore', 'system.printReceipt', 'network.setEnabled', 'debts.pay', 'waiters.payout', 'barSales.open'])
       expect(allowedWhenBlocked(m)).toBe(false)
@@ -205,7 +205,7 @@ describe('aktivatsiya kaliti', () => {
     // sinov muddati o'tgan bo'lsa ham kalit ishlaydi
     e.ctx.clock.advance(5 * DAY_MS)
     expect((await e.api.license.status()).state).toBe('active')
-    await e.api.sessions.open(e.ctx.rooms.s1, 1, 60, null)
+    await e.api.sessions.open(e.ctx.rooms.s1, 1, 60)
     // tugash kuni oxirigacha amal qiladi
     e.ctx.clock.t = (today + 31) * DAY_MS - 1
     expect((await e.api.license.status()).state).toBe('active')
@@ -216,7 +216,7 @@ describe('aktivatsiya kaliti', () => {
     // yangi doimiy kalit → yana ishlaydi
     const p = await e.api.license.activate(makeKey({ expiresDay: 0 }))
     expect(p).toMatchObject({ state: 'active', permanent: true, expiresAt: null })
-    await e.api.sessions.open(e.ctx.rooms.s2, 1, 60, null)
+    await e.api.sessions.open(e.ctx.rooms.s2, 1, 60)
   })
 
   it('doimiy kalit → active, sinov tugagandan keyin ham', async () => {
@@ -300,7 +300,7 @@ describe('soat orqaga surilishi', () => {
   it('2 soatdan ko\'p orqaga → tampered: yozish rad, o\'qish ishlaydi; soat to\'g\'rilansa — tiklanadi', async () => {
     const e = await env()
     e.ctx.clock.advance(5 * HOUR)
-    await e.api.sessions.open(e.ctx.rooms.s1, 1, 60, null) // mutatsiya → lastSeen
+    await e.api.sessions.open(e.ctx.rooms.s1, 1, 60) // mutatsiya → lastSeen
     const seen = e.ctx.clock.t
     expect(e.ctx.svc.readKv(KV_SEEN)).toBe(String(seen))
     expect(e.reg.m.get('s')).toBe(String(seen))
@@ -417,14 +417,12 @@ describe("qayta o'rnatish sinovni qayta boshlamaydi", () => {
   })
 })
 
-describe("ko'ruvchi rejimi", () => {
-  it("license.status lokal 'active', activate rad etiladi", async () => {
-    const conn = { info: async () => ({ mode: 'viewer' as const, host: '127.0.0.1', port: 1, connected: false }), discover: async () => [], connectViewer: async () => undefined, disconnect: async () => undefined }
-    const v = createViewerApi({ host: '127.0.0.1', port: 1, code: '123456' }, conn, 200)
-    const st = await v.api.license.status()
-    expect(st.state).toBe('active')
-    expect(st.machineCode).toMatch(/^[0-9A-Z]{5}-[0-9A-Z]{5}-[0-9A-Z]{3}$/)
-    await expect(v.api.license.activate(makeKey({}))).rejects.toThrow(/faqat ko'rish/)
+describe('terminal rejimi', () => {
+  it("license.activate terminalda lokal rad etiladi; status asosiydan (aloqa yo'q → xato)", async () => {
+    const conn = { info: async () => ({ mode: 'terminal' as const, host: '127.0.0.1', port: 1, connected: false }), discover: async () => [], connectTerminal: async () => undefined, disconnect: async () => undefined }
+    const v = createTerminalApi({ host: '127.0.0.1', port: 1, code: '123456', terminalId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1' }, conn, { timeoutMs: 200 })
+    await expect(v.api.license.activate(makeKey({}))).rejects.toThrow(/faqat asosiy kompyuterda/)
+    await expect(v.api.license.status()).rejects.toThrow("Asosiy kompyuter bilan aloqa yo'q")
   })
 
   it("host.license yo'q (dev-server standarti) → active", async () => {

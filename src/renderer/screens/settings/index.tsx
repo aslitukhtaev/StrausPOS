@@ -50,7 +50,12 @@ function readTab(): SectionId {
 
 export default function SettingsScreen() {
   const allowed = useCan('settings.manage')
-  const [tab, setTab] = useState<SectionId>(readTab)
+  const [tabState, setTab] = useState<SectionId>(readTab)
+  // Terminalda Tarmoq/Zaxira/Litsenziya/Oshxona (printer asosiyda) yashirin; "Chek"dagi printer — terminalning o'z printeri
+  const isTerminal = useApp((s) => s.mode === 'terminal')
+  const terminalHidden: string[] = ['network', 'backup', 'license', 'kitchen']
+  const nav = isTerminal ? NAV.filter((n) => terminalHidden.indexOf(n.id) < 0) : NAV
+  const tab: SectionId = nav.some((n) => n.id === tabState) ? tabState : 'rooms'
   const [settings, setSettingsState] = useState<AppSettings | null>(() => useApp.getState().settings)
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const dirtyRef = useRef(false)
@@ -148,7 +153,7 @@ export default function SettingsScreen() {
       <PageHeader title="Sozlamalar" icon="settings" subtitle="Xonalar, chek, xavfsizlik va zaxira — faqat ega uchun" />
       <div className="set-layout">
         <nav className="set-nav" aria-label="Sozlamalar bo'limlari">
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <button
               key={n.id}
               type="button"

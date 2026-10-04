@@ -1,6 +1,7 @@
 /**
  * Asosiy kompyuter: LAN server holati (network.* amalga oshirish).
  * Holat bazaning kv jadvalida ('network': {enabled, port, code}) saqlanadi.
+ * Kod almashsa yoki server o'chirilsa — barcha terminal kontekstlari (login'lari) o'chiriladi.
  * Ruxsat tekshiruvi (settings.manage) PosService.network da — bu klass faqat host.
  */
 import crypto from 'crypto'
@@ -23,8 +24,10 @@ export interface NetStore {
 
 export interface NetworkManagerOptions {
   store: NetStore
-  /** Ko'ruvchi konteksti (PosService.forViewer()) */
-  viewerApi: () => PosApi
+  /** Yangi terminal uchun alohida login konteksti (litsenziya o'ramidagi PosService.forTerminal()) */
+  createTerminal: () => PosApi
+  /** So'rovlarni ketma-ket bajarish (dev-server navbati) */
+  run?: <T>(fn: () => Promise<T>) => Promise<T>
   name: () => string
   version: string
   clock?: () => number
@@ -57,7 +60,8 @@ export class NetworkManager implements NetworkApi {
   constructor(private readonly opts: NetworkManagerOptions) {
     this.cfg = this.load()
     this.server = new LanServer({
-      api: opts.viewerApi,
+      createTerminal: opts.createTerminal,
+      run: opts.run,
       name: opts.name,
       version: opts.version,
       code: () => this.cfg.code,
@@ -107,7 +111,7 @@ export class NetworkManager implements NetworkApi {
     port: this.server.running ? this.server.port : this.cfg.port,
     code: this.cfg.code,
     addresses: lanAddresses(),
-    viewers: this.server.viewers()
+    terminals: await this.server.terminals()
   })
 
   setEnabled = async (enabled: boolean): Promise<NetworkStatus> => {
@@ -115,7 +119,7 @@ export class NetworkManager implements NetworkApi {
       await this.server.start(this.cfg.port, this.opts.bindHost) // band port → o'zbekcha xato, holat o'zgarmaydi
     } else {
       await this.server.stop()
-      this.server.clearViewers()
+      this.server.clearTerminals()
     }
     this.cfg = { ...this.cfg, enabled }
     this.persist(this.cfg)
@@ -127,7 +131,7 @@ export class NetworkManager implements NetworkApi {
     while (code === this.cfg.code) code = newCode()
     this.cfg = { ...this.cfg, code }
     this.persist(this.cfg)
-    this.server.clearViewers()
+    this.server.clearTerminals()
     return this.status()
   }
 }

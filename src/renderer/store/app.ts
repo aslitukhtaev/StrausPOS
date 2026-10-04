@@ -14,14 +14,14 @@
  * `<html data-theme>` shu store tomonidan qo'yiladi. Login'dan oldin — localStorage keshi.
  *
  * Tarmoq rejimi (boot'da `connection.info()`):
- *   const readOnly = useApp((s) => s.readOnly)        // true = ko'ruvchi kompyuter: HECH QANDAY o'zgartirish tugmasi yo'q
- *   const connected = useApp((s) => s.connected)      // ko'ruvchida asosiy kompyuter bilan aloqa
+ *   const isTerminal = useApp((s) => s.mode === 'terminal')  // ikkinchi kompyuter (ofitsiantlar monobloki), baza asosiyda
+ *   const connected = useApp((s) => s.connected)      // terminalda asosiy kompyuter bilan aloqa (asosiyda doim true)
  *   useApp.getState().setConnected(false)             // rpc xatosida (banner + qayta ulanish)
- * Ko'ruvchida login/qulf/Setup yo'q — to'g'ridan-to'g'ri qobiq; ruxsatlar faqat ['reports.view'].
+ * Terminal TO'LIQ ishlaydi: o'z Qulf/PIN ekrani (asosiydagi xodimlar), ruxsatlar kirgan xodim roliga qarab —
+ * ekranlar asosiy kompyuterdagidek. Setup yo'q (biznes asosiyda sozlangan).
  *
- * Litsenziya (store/license): asosiy kompyuterda muddat tugagan/soat buzilgan bo'lsa ham `readOnly = true`
- * (o'zgartirish tugmalari yashirin), lekin login/qulf odatdagidek. Ko'ruvchiga xos narsalar (login yo'q,
- * "Faqat ko'rish" belgisi, aloqa banneri) uchun `mode === 'viewer'` ni tekshiring, readOnly'ni emas.
+ * Litsenziya (store/license): muddat tugagan/soat buzilgan bo'lsa `readOnly = true` (o'zgartirish tugmalari yashirin),
+ * login/qulf odatdagidek. Terminalda asosiy kompyuter litsenziyasi amal qiladi (server ham majburlaydi).
  */
 import { create } from 'zustand'
 import type { AppMode, AppSettings, Permission, Staff } from '@shared/types'
@@ -87,18 +87,15 @@ function readCachedName(): string {
   return lsGet(BN_KEY) || lsGet(LEGACY_BN_KEY) || ''
 }
 
-/** Ko'ruvchi rejimidagi ruxsatlar — faqat ko'rish (server ham shuni beradi; UI uchun qat'iy) */
-const VIEWER_PERMISSIONS: Permission[] = ['reports.view']
-const VIEWER_STAFF: Staff = { id: 0, name: "Ko'ruvchi", role: 'cashier', active: true, isProvider: false, isWaiter: false, commissionPct: 0 }
-
 interface AppState {
   phase: Phase
-  /** 'main' = asosiy kompyuter (baza shu yerda), 'viewer' = faqat ko'rish */
+  /** 'main' = asosiy kompyuter (baza shu yerda), 'terminal' = ikkinchi kompyuter (baza asosiyda) */
   mode: AppMode
+  /** Litsenziya muddati tugagan / soat buzilgan → o'zgartirish tugmalari yashirin */
   readOnly: boolean
-  /** Ko'ruvchida asosiy kompyuter bilan aloqa (asosiyda doim true) */
+  /** Terminalda asosiy kompyuter bilan aloqa (asosiyda doim true) */
   connected: boolean
-  /** Ko'ruvchi: asosiy kompyuter manzili */
+  /** Terminal: asosiy kompyuter manzili */
   host: string | null
   setConnected(c: boolean): void
   bootError: string | null
@@ -117,9 +114,11 @@ interface AppState {
   reloadSettings(): Promise<void>
   setSettings(s: AppSettings): void
   /** Kirish muvaffaqiyatli bo'lgandan keyin (Lock/Setup ekranlari chaqiradi) */
-  /** Ko'ruvchi rejimida qobiqqa kirish (login'siz) */
-  enterViewer(): Promise<void>
   enter(session: { staff: Staff; permissions: Permission[] }): void
+  /** Terminal boot: litsenziya (asosiydan), joriy terminal login'i → qobiq yoki Qulf */
+  bootTerminal(): Promise<void>
+  /** Terminal: server terminal login'ini bekor qilgan (asosiy qayta ishga tushdi / kod almashdi) → Qulf ekrani */
+  relogin(): Promise<void>
   lock(): Promise<void>
   /** Setup tugagach */
   setupDone(businessName: string): void
@@ -177,9 +176,9 @@ export const useApp = create<AppState>((set, get) => ({
       } catch {
         info = null // eski backend — asosiy rejim
       }
-      if (info && info.mode === 'viewer') {
-        set({ mode: 'viewer', readOnly: true, connected: info.connected, host: info.host })
-        await get().enterViewer()
+      if (info && info.mode === 'terminal') {
+        set({ mode: 'terminal', readOnly: false, connected: info.connected, host: info.host })
+        await get().bootTerminal()
         return
       }
       set({ mode: 'main', readOnly: false, connected: true, host: null })
@@ -221,21 +220,28 @@ export const useApp = create<AppState>((set, get) => ({
     get().setThemePref(pref)
   },
 
-  async enterViewer() {
+  async bootTerminal() {
     const api = getApi()
-    // Login yo'q: aloqa bo'lmasa ham qobiq ochiladi (banner + qayta ulanish)
+    // Aloqa bo'lmasa ham Qulf ekrani ochiladi (xato + qayta urinish + ulanishni o'zgartirish)
     void syncClock(() => api.system.now()).catch(() => undefined)
-    let staff = VIEWER_STAFF
+    await useLicense.getState().load() // asosiy kompyuter litsenziyasi (proksi)
+    set({ readOnly: useLicense.getState().blocked })
+    startLicenseWatch()
+    void get().reloadSettings()
+    let cur = null
     try {
-      const cur = await api.auth.current()
-      if (cur) staff = cur.staff
-      void get().reloadSettings()
+      cur = await api.auth.current()
+      get().setConnected(true)
     } catch {
       get().setConnected(false)
     }
-    useAuth.getState().set({ staff, permissions: VIEWER_PERMISSIONS.slice() })
-    useNav.getState().go('rooms')
-    set({ phase: 'shell' })
+    if (cur) get().enter(cur)
+    else set({ phase: 'lock' })
+  },
+
+  async relogin() {
+    useAuth.getState().set(null)
+    set({ phase: 'lock' })
   },
 
   enter(session) {
@@ -247,7 +253,6 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async lock() {
-    if (get().mode === 'viewer') return // ko'ruvchida qulf yo'q
     try {
       await getApi().auth.logout()
     } catch {
@@ -263,9 +268,9 @@ export const useApp = create<AppState>((set, get) => ({
   }
 }))
 
-// Litsenziya holati ish davomida o'zgarsa (sinov tugadi / kalit kiritildi) — asosiy rejimda readOnly'ni moslash
+// Litsenziya holati ish davomida o'zgarsa (sinov tugadi / kalit kiritildi) — readOnly'ni moslash (terminalda ham)
 setLicenseBlockedHandler((blocked) => {
-  if (useApp.getState().mode === 'main') useApp.setState({ readOnly: blocked })
+  useApp.setState({ readOnly: blocked })
 })
 
 // "auto" rejimda tizim mavzusi o'zgarsa — darhol qo'llash

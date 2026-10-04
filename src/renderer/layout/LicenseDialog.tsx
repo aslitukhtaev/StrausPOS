@@ -10,8 +10,9 @@ import { LicensePanel } from './LicensePanel'
 export function LicenseDialog() {
   const open = useLicense((s) => s.dialogOpen)
   const close = useLicense((s) => s.closeDialog)
-  const isViewer = useApp((s) => s.mode === 'viewer')
-  if (isViewer) return null
+  // Terminalda aktivatsiya yo'q — litsenziya asosiy kompyuterda
+  const isTerminal = useApp((s) => s.mode === 'terminal')
+  if (isTerminal) return null
   return (
     <Modal
       open={open}

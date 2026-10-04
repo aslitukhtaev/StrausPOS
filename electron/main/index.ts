@@ -12,7 +12,7 @@ import { listPrinters, printHtml } from './print'
 import { writeFileAtomic } from './db'
 import { NetworkManager } from './lan/network'
 import { setClientVersion } from './lan/client'
-import { createConnectionController, createViewerMode, readConnectionConfig } from './lan/viewer'
+import { createConnectionController, createTerminalMode, loadConnectionConfig } from './lan/terminal'
 import { LicenseManager } from './license/manager'
 import { createLicensedApi } from './license/guard'
 import { localMachine, windowsRegistry } from './license/machine'
@@ -20,7 +20,7 @@ import { DEVELOPER_CONTACT, LICENSE_PUBLIC_KEY_DER_B64 } from './license/publicK
 
 let mainWindow: BrowserWindow | null = null
 let service: PosService | null = null
-/** Joriy rejimni (asosiy: DB + LAN server + IPC; ko'ruvchi: proksi IPC) to'xtatish */
+/** Joriy rejimni (asosiy: DB + LAN server + IPC; terminal: proksi IPC) to'xtatish */
 let disposeMode: (() => Promise<void>) | null = null
 const CONNECTION_FILE = 'connection.json'
 /** Litsenziya zaxira fayli (sinov boshlanishi, lastSeen, kalit) */
@@ -175,17 +175,22 @@ function isTrusted(e: Electron.IpcMainInvokeEvent): boolean {
 }
 
 /**
- * Rejimni ishga tushirish. connection.json mode='viewer' → DB OCHILMAYDI, IPC chaqiruvlari HTTP orqali asosiyga.
- * Aks holda: baza + PosService + LAN server (yoqilgan bo'lsa avtomatik) + IPC.
+ * Rejimni ishga tushirish. connection.json mode='terminal' (eski 'viewer' ham) → DB OCHILMAYDI, IPC chaqiruvlari
+ * HTTP orqali asosiyga (shu terminalning tokeni bilan); kassa cheki shu kompyuter printeriga.
+ * Aks holda: baza + PosService + LAN server (yoqilgan bo'lsa avtomatik; har terminal — alohida login konteksti) + IPC.
  */
 async function startMode(): Promise<void> {
   const connFile = path.join(app.getPath('userData'), CONNECTION_FILE)
-  const cfg = readConnectionConfig(connFile)
+  const cfg = loadConnectionConfig(connFile)
   setClientVersion(app.getVersion())
 
-  if (cfg.mode === 'viewer') {
-    const viewer = createViewerMode(cfg, { file: connFile, onChange: () => switchMode() })
-    const unregister = registerIpc(viewer.api, isTrusted)
+  if (cfg.mode === 'terminal') {
+    const term = createTerminalMode(cfg, {
+      file: connFile,
+      onChange: () => switchMode(),
+      host: { printReceipt: (html, settings) => printHtml(html, settings), listPrinters: () => listPrinters() }
+    })
+    const unregister = registerIpc(term.api, isTrusted)
     disposeMode = async () => unregister()
     return
   }
@@ -194,17 +199,22 @@ async function startMode(): Promise<void> {
   importLegacyDb(dbFile)
   const host = createHost()
   const svc = await PosService.create({ file: dbFile, clock: () => Date.now(), host })
-  const viewerCtx = svc.forViewer()
+  // Litsenziya keyinroq yaratiladi; terminal konteksti birinchi so'rovda (litsenziya tayyor bo'lganda) yaratiladi
+  let license: LicenseManager | null = null
   const net = new NetworkManager({
     store: { load: () => svc.readKv('network'), save: (j) => svc.writeKv('network', j) },
-    viewerApi: () => viewerCtx,
+    // Har terminal — alohida login konteksti; asosiy kompyuter litsenziyasi serverda ham majburlanadi
+    createTerminal: () => {
+      if (!license) throw new Error('Litsenziya tayyor emas')
+      return createLicensedApi(svc.forTerminal(), license)
+    },
     name: () => svc.businessName(),
     version: app.getVersion()
   })
   host.network = net
   host.connection = createConnectionController({ file: connFile, onChange: () => switchMode() })
   // Litsenziya: ochiq kalit FAQAT publicKey.ts dan (env orqali almashtirib bo'lmaydi — prod xavfsizligi)
-  const license = new LicenseManager({
+  license = new LicenseManager({
     clock: () => Date.now(),
     machine: localMachine(),
     publicKey: LICENSE_PUBLIC_KEY_DER_B64,
@@ -217,17 +227,18 @@ async function startMode(): Promise<void> {
   host.license = license.api()
   service = svc
   await net.init()
-  const unregister = registerIpc(createLicensedApi(svc, license), isTrusted)
+  const lic = license
+  const unregister = registerIpc(createLicensedApi(svc, lic), isTrusted)
   disposeMode = async () => {
     unregister()
-    license.stop()
+    lic.stop()
     await net.shutdown()
     svc.db.close()
     if (service === svc) service = null
   }
 }
 
-/** Rejim almashdi (connectViewer/disconnect): IPC javobi qaytgach — qayta ishga tushirish va oynani qayta yuklash */
+/** Rejim almashdi (connectTerminal/disconnect): IPC javobi qaytgach — qayta ishga tushirish va oynani qayta yuklash */
 function switchMode(): void {
   setTimeout(() => {
     void (async () => {
