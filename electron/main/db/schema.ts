@@ -1,7 +1,12 @@
 /**
  * Sxema va migratsiyalar. Versiya `PRAGMA user_version` da saqlanadi.
  * Yangi o'zgarish = MIGRATIONS ga yangi element qo'shish (eskilarini o'zgartirmang).
+ * SQL bilan ifodalab bo'lmaydigan ma'lumot o'zgarishlari — MIGRATION_DATA[versiya] (o'sha SQL dan keyin,
+ * o'sha tranzaksiya ichida bajariladi).
  */
+import type { Database, SqlValue } from 'sql.js'
+import { normalizePhone } from './phone'
+
 export const MIGRATIONS: string[] = [
   // v1 — boshlang'ich sxema
   `
@@ -245,7 +250,163 @@ export const MIGRATIONS: string[] = [
   CREATE UNIQUE INDEX idx_sessions_receipt ON sessions(receipt_no) WHERE receipt_no IS NOT NULL;
   CREATE INDEX idx_sessions_waiter ON sessions(waiter_id, closed_at);
   CREATE INDEX idx_sessions_kind ON sessions(kind, status);
+  `,
+  // v4 — 2026-10: terminal to'lov usuli (payments/debt_payments CHECK — jadvallar qayta quriladi), qarzdorlar (bitta odam —
+  // bitta yozuv), oshxona bo'limi (kategoriya department, oshxona cheklari, kunlik hisob), ofitsiant qatorda
+  // (order_lines.waiter_id/waiter_pct). Ma'lumot qismi (qarzdorlarni guruhlash, blockMinutes 60 → 1) — MIGRATION_DATA[4].
+  `
+  CREATE TABLE payments_v4 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id),
+    method TEXT NOT NULL CHECK (method IN ('cash','card','terminal','debt')),
+    amount INTEGER NOT NULL,
+    at INTEGER NOT NULL,
+    by INTEGER NOT NULL REFERENCES staff(id)
+  );
+  INSERT INTO payments_v4(id, session_id, method, amount, at, by) SELECT id, session_id, method, amount, at, by FROM payments;
+  DELETE FROM sqlite_sequence WHERE name = 'payments_v4';
+  INSERT INTO sqlite_sequence(name, seq) SELECT 'payments_v4', seq FROM sqlite_sequence WHERE name = 'payments';
+  DROP TABLE payments;
+  ALTER TABLE payments_v4 RENAME TO payments;
+  CREATE INDEX idx_payments_session ON payments(session_id);
+
+  CREATE TABLE debtors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL DEFAULT '',
+    -- normallashtirilgan telefon (faqat raqamlar); NULL — raqamsiz eski yozuv
+    phone_key TEXT UNIQUE,
+    created_at INTEGER NOT NULL
+  );
+
+  ALTER TABLE debts ADD COLUMN debtor_id INTEGER REFERENCES debtors(id);
+  CREATE INDEX idx_debts_debtor ON debts(debtor_id, created_at);
+
+  CREATE TABLE debt_payments_v4 (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    debt_id INTEGER NOT NULL REFERENCES debts(id),
+    method TEXT NOT NULL CHECK (method IN ('cash','card','terminal')),
+    amount INTEGER NOT NULL,
+    at INTEGER NOT NULL,
+    by INTEGER NOT NULL REFERENCES staff(id)
+  );
+  INSERT INTO debt_payments_v4(id, debt_id, method, amount, at, by) SELECT id, debt_id, method, amount, at, by FROM debt_payments;
+  DELETE FROM sqlite_sequence WHERE name = 'debt_payments_v4';
+  INSERT INTO sqlite_sequence(name, seq) SELECT 'debt_payments_v4', seq FROM sqlite_sequence WHERE name = 'debt_payments';
+  DROP TABLE debt_payments;
+  ALTER TABLE debt_payments_v4 RENAME TO debt_payments;
+  CREATE INDEX idx_debt_payments_debt ON debt_payments(debt_id);
+  CREATE INDEX idx_debt_payments_at ON debt_payments(at);
+
+  ALTER TABLE categories ADD COLUMN department TEXT NOT NULL DEFAULT 'bar' CHECK (department IN ('bar','kitchen'));
+
+  ALTER TABLE order_lines ADD COLUMN department TEXT CHECK (department IS NULL OR department IN ('bar','kitchen'));
+  ALTER TABLE order_lines ADD COLUMN waiter_id INTEGER REFERENCES staff(id);
+  ALTER TABLE order_lines ADD COLUMN waiter_pct REAL NOT NULL DEFAULT 0;
+  UPDATE order_lines SET department = 'bar' WHERE kind = 'product';
+  CREATE INDEX idx_lines_waiter ON order_lines(waiter_id);
+  -- Yangilanish paytida OCHIQ bo'lgan, ofitsiant biriktirilgan xona sessiyalari: ofitsiant mavjud mahsulot qatorlariga
+  -- o'tkaziladi (yangi qoida). Yopilgan sessiyalardagi waiter_id/waiter_commission tarix sifatida qoladi.
+  UPDATE order_lines SET
+      waiter_id = (SELECT s.waiter_id FROM sessions s WHERE s.id = order_lines.session_id),
+      waiter_pct = (SELECT s.waiter_pct FROM sessions s WHERE s.id = order_lines.session_id)
+    WHERE kind = 'product' AND waiter_id IS NULL
+      AND session_id IN (SELECT id FROM sessions WHERE status = 'open' AND kind = 'room' AND waiter_id IS NOT NULL);
+  UPDATE sessions SET waiter_id = NULL, waiter_pct = 0 WHERE status = 'open' AND waiter_id IS NOT NULL;
+
+  ALTER TABLE sessions ADD COLUMN kitchen_sales INTEGER;
+  ALTER TABLE sessions ADD COLUMN kitchen_share_pct REAL;
+
+  CREATE TABLE kitchen_payouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    at INTEGER NOT NULL,
+    by INTEGER NOT NULL REFERENCES staff(id)
+  );
+  CREATE INDEX idx_kitchen_payouts_day ON kitchen_payouts(day);
+
+  -- Oshxona cheklari jurnali: id = buyurtma №; chop etish xatosi shu yerda qoladi (keyin kitchen.reprint)
+  CREATE TABLE kitchen_tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES sessions(id),
+    kind TEXT NOT NULL CHECK (kind IN ('order','cancel','reprint')),
+    items TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    by INTEGER NOT NULL REFERENCES staff(id),
+    printed INTEGER NOT NULL DEFAULT 0,
+    error TEXT
+  );
+  CREATE INDEX idx_kitchen_tickets_session ON kitchen_tickets(session_id);
   `
 ]
+
+/** Ma'lumot migratsiyasi uchun minimal interfeys (sql.js Database ustida). */
+export interface MigrationDb {
+  all(sql: string, params?: SqlValue[]): Record<string, SqlValue>[]
+  run(sql: string, params?: SqlValue[]): void
+}
+
+export function migrationDb(db: Database): MigrationDb {
+  return {
+    all(sql, params = []) {
+      const st = db.prepare(sql)
+      try {
+        st.bind(params)
+        const out: Record<string, SqlValue>[] = []
+        while (st.step()) out.push(st.getAsObject())
+        return out
+      } finally {
+        st.free()
+      }
+    },
+    run(sql, params = []) {
+      db.run(sql, params)
+    }
+  }
+}
+
+/**
+ * v4 ma'lumot qismi:
+ *  1) mavjud qarzlar normallashtirilgan telefon (raqam bo'lmasa — ism) bo'yicha guruhlanib, har bir guruhga bitta qarzdor
+ *     yaratiladi (eng birinchi qarzdagi ism/telefon saqlanadi) va debts.debtor_id to'ldiriladi;
+ *  2) sozlamalardagi blockMinutes = 60 (eski standart) → 1 (mijoz talabi: aynan o'tirilgan daqiqa uchun).
+ */
+function migrateV4Data(db: MigrationDb): void {
+  const debts = db.all('SELECT id, customer_name, phone, created_at FROM debts ORDER BY created_at, id')
+  const groups = new Map<string, number>()
+  for (const d of debts) {
+    const name = String(d.customer_name ?? '').trim() || 'Nomaʼlum'
+    const phone = String(d.phone ?? '').trim()
+    const key = normalizePhone(phone)
+    const gk = key ? 'p:' + key : 'n:' + name.toLowerCase()
+    let debtorId = groups.get(gk)
+    if (debtorId === undefined) {
+      db.run('INSERT INTO debtors(name, phone, phone_key, created_at) VALUES(?,?,?,?)', [name, phone, key, Number(d.created_at ?? 0)])
+      debtorId = Number(db.all('SELECT last_insert_rowid() AS id')[0].id)
+      groups.set(gk, debtorId)
+    }
+    db.run('UPDATE debts SET debtor_id=? WHERE id=?', [debtorId, Number(d.id)])
+  }
+
+  const row = db.all("SELECT value FROM kv WHERE key='settings'")[0]
+  if (row) {
+    try {
+      const s = JSON.parse(String(row.value)) as Record<string, unknown>
+      if (s && typeof s === 'object' && s.blockMinutes === 60) {
+        s.blockMinutes = 1
+        db.run("UPDATE kv SET value=? WHERE key='settings'", [JSON.stringify(s)])
+      }
+    } catch {
+      /* buzilgan sozlama — PosService standartga qaytaradi */
+    }
+  }
+}
+
+/** Versiya → ma'lumot migratsiyasi (shu versiyaning SQL qismidan keyin bajariladi). */
+export const MIGRATION_DATA: Record<number, (db: MigrationDb) => void> = {
+  4: migrateV4Data
+}
 
 export const SCHEMA_VERSION = MIGRATIONS.length

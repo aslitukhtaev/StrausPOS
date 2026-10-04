@@ -20,7 +20,7 @@ describe('fayl rejimi va atomik saqlash', () => {
     const file = path.join(dir, 'delfin.db')
     const ctx = await setup({ file })
     expect(fs.existsSync(file)).toBe(true)
-    const v0 = await ctx.svc.sessions.open(ctx.rooms.s1, 2, 60, null)
+    const v0 = await ctx.svc.sessions.open(ctx.rooms.s1, 2, 60)
     // Hech qanday "flush" chaqirmasdan — darhol diskda
     const reopened = await PosService.create({ file, clock: ctx.clock.now })
     expect(await reopened.auth.needsSetup()).toBe(false)
@@ -37,7 +37,7 @@ describe('fayl rejimi va atomik saqlash', () => {
     const file = path.join(dir, 'delfin.db')
     const ctx = await setup({ file })
     const before = fs.readFileSync(file)
-    await expect(ctx.svc.sessions.open(ctx.rooms.s1, 99, 60, null)).rejects.toThrow()
+    await expect(ctx.svc.sessions.open(ctx.rooms.s1, 99, 60)).rejects.toThrow()
     expect(Buffer.compare(before, fs.readFileSync(file))).toBe(0)
   })
 
@@ -58,7 +58,7 @@ describe('fayl rejimi va atomik saqlash', () => {
 describe('zaxira va tiklash', () => {
   it('eksport baytlari → tiklash: holat to‘liq qaytadi, foydalanuvchi chiqariladi', async () => {
     const { svc, rooms, clock, staff } = await setup()
-    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
     clock.advanceMin(60)
     await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: 50_000 }], null)
     const bytes = svc.exportBytes()
@@ -67,7 +67,7 @@ describe('zaxira va tiklash', () => {
     // Keyingi o'zgarishlar
     const chips = await productByName(svc, 'Chips')
     await svc.catalog.adjustStock(chips.id, -20, 'Yo‘qoldi')
-    await svc.sessions.open(rooms.s2, 1, 60, null)
+    await svc.sessions.open(rooms.s2, 1, 60)
 
     await svc.restoreBytes(bytes)
     expect(await svc.auth.current()).toBeNull()
@@ -95,7 +95,7 @@ describe('zaxira va tiklash', () => {
     const res = await svc.system.backup()
     expect(res?.path).toContain('delfin-zaxira-2026-01-15-1000.db')
     expect(savedName).toBe('delfin-zaxira-2026-01-15-1000.db')
-    await svc.sessions.open(rooms.s1, 1, 60, null)
+    await svc.sessions.open(rooms.s1, 1, 60)
     expect(await svc.system.restore()).toBe(true)
     await svc.auth.login(staff.owner.id, '1234')
     expect((await svc.rooms.board()).every((c) => c.session === null)).toBe(true)
@@ -110,7 +110,7 @@ describe('zaxira va tiklash', () => {
   it('noto‘g‘ri fayl bilan tiklash rad etiladi va joriy baza buzilmaydi', async () => {
     const file = path.join(dir, 'delfin.db')
     const { svc, rooms } = await setup({ file })
-    await svc.sessions.open(rooms.s1, 1, 60, null)
+    await svc.sessions.open(rooms.s1, 1, 60)
     await expect(svc.restoreBytes(new TextEncoder().encode('bu baza emas'))).rejects.toThrow('zaxira nusxasi emas')
     // bo'sh (begona) SQLite baza ham rad etiladi
     const empty = await Db.open({ file: null })
@@ -123,7 +123,7 @@ describe('zaxira va tiklash', () => {
     const file = path.join(dir, 'delfin.db')
     const a = await setup({ file })
     const snapshot = a.svc.exportBytes()
-    await a.svc.sessions.open(a.rooms.s1, 1, 60, null)
+    await a.svc.sessions.open(a.rooms.s1, 1, 60)
     await a.svc.restoreBytes(snapshot)
     const re = await PosService.create({ file, clock: new FakeClock().now })
     await re.auth.login(a.staff.owner.id, '1234')

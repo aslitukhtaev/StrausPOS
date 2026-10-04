@@ -5,7 +5,7 @@
 import type { PayMethod, ReceiptData } from '../../src/shared/types'
 import { formatDuration, formatMoney } from '../../src/shared/billing'
 
-export const PAY_METHOD_LABELS: Record<PayMethod, string> = { cash: 'Naqd', card: 'Karta', debt: 'Qarz' }
+export const PAY_METHOD_LABELS: Record<PayMethod, string> = { cash: 'Naqd', card: 'Karta', terminal: 'Terminal', debt: 'Qarz' }
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? '')
@@ -45,10 +45,12 @@ export function renderReceiptHtml(data: ReceiptData): string {
   if (s.address) parts.push(`<div class="center">${e(s.address)}</div>`)
   if (s.phone) parts.push(`<div class="center">Tel: ${e(s.phone)}</div>`)
   parts.push('<div class="sep"></div>')
-  parts.push(row(data.receiptNo > 0 ? `Chek № ${data.receiptNo}` : 'Oldindan hisob', e(data.roomName)))
+  // Oraliq hisob (sessiya yopilmagan): raqamsiz, katta ogohlantirish
+  if (data.provisional) parts.push(`<div class="center provisional">TO'LANMAGAN · ORALIQ HISOB</div>`)
+  parts.push(row(!data.provisional && data.receiptNo > 0 ? `Chek № ${data.receiptNo}` : data.provisional ? 'Oraliq hisob' : 'Oldindan hisob', e(data.roomName)))
   if (s.showTimes) {
     parts.push(row('Kirish:', e(formatDateTime(data.openedAt))))
-    parts.push(row('Chiqish:', e(formatDateTime(data.closedAt))))
+    parts.push(row(data.provisional ? 'Hozir:' : 'Chiqish:', e(formatDateTime(data.closedAt))))
   }
   if (s.showStaff && data.cashier) parts.push(row('Kassir:', e(data.cashier)))
   parts.push('<div class="sep"></div>')
@@ -89,13 +91,17 @@ export function renderReceiptHtml(data: ReceiptData): string {
     parts.push(row('Qarzdor:', e(data.debtor.name)))
     parts.push(row('Telefon:', e(data.debtor.phone)))
   }
+  if (data.provisional) {
+    parts.push('<div class="sep"></div>')
+    parts.push(`<div class="center provisional">TO'LANMAGAN · ORALIQ HISOB</div>`)
+  }
   if (s.footer) {
     parts.push('<div class="sep"></div>')
     parts.push(`<div class="center footer">${e(s.footer)}</div>`)
   }
 
   return `<!doctype html>
-<html lang="uz"><head><meta charset="utf-8"><title>Chek ${data.receiptNo || ''}</title>
+<html lang="uz"><head><meta charset="utf-8"><title>${data.provisional ? 'Oraliq hisob' : `Chek ${data.receiptNo || ''}`}</title>
 <style>
 @page { size: ${width}mm auto; margin: 0; }
 * { box-sizing: border-box; }
@@ -113,6 +119,64 @@ body { width: ${width}mm; padding: 2mm ${(width - contentMm) / 2}mm 6mm; font-fa
 .muted { color: #333; }
 .sep { border-top: 1px dashed #000; margin: 1.5mm 0; }
 .footer { margin-top: 1mm; }
+.provisional { font-weight: 700; font-size: ${fontPx + 6}px; border: 2px solid #000; padding: 1mm; margin: 1mm 0; }
+</style></head>
+<body>
+${parts.join('\n')}
+</body></html>`
+}
+
+// ───────────── Oshxona cheki ─────────────
+export interface KitchenTicketData {
+  /** order — yangi buyurtma; cancel — qaytarish ("BEKOR"); reprint — qayta chop etish */
+  kind: 'order' | 'cancel' | 'reprint'
+  /** Buyurtma № (oshxona cheklari jurnali) */
+  orderNo: number
+  /** Xona nomi; xonasiz bar savdosi — "Bar" */
+  roomName: string
+  items: { name: string; qty: number }[]
+  /** Olib boruvchi ofitsiant (yo'q bo'lsa null) */
+  waiterName: string | null
+  /** Kim qo'shdi: "Ali (Kassir)" */
+  addedBy: string
+  at: number
+}
+
+/** Oshxona cheki HTML: katta shrift, narxsiz (oshxona uchun faqat nima va qancha). */
+export function renderKitchenHtml(data: KitchenTicketData & { paperWidth: 58 | 80 }): string {
+  const width = data.paperWidth === 58 ? 58 : 80
+  const contentMm = width === 58 ? 48 : 72
+  const fontPx = width === 58 ? 13 : 15
+  const e = escapeHtml
+  const title = data.kind === 'cancel' ? 'BEKOR' : 'OSHXONA'
+  const parts: string[] = []
+  parts.push(`<div class="center title">${title}</div>`)
+  if (data.kind === 'cancel') parts.push('<div class="center b">Quyidagilar BEKOR qilindi</div>')
+  if (data.kind === 'reprint') parts.push('<div class="center">(qayta chop etildi)</div>')
+  parts.push(`<div class="center room">${e(data.roomName)}</div>`)
+  parts.push('<div class="sep"></div>')
+  for (const it of data.items) {
+    parts.push(`<div class="item"><span class="q">${data.kind === 'cancel' ? '−' : ''}${it.qty} ×</span> <span class="n">${e(it.name)}</span></div>`)
+  }
+  parts.push('<div class="sep"></div>')
+  if (data.waiterName) parts.push(`<div>Ofitsiant: <b>${e(data.waiterName)}</b></div>`)
+  parts.push(`<div>Qo'shdi: ${e(data.addedBy)}</div>`)
+  parts.push(`<div>Vaqt: ${e(formatDateTime(data.at))}</div>`)
+  parts.push(`<div>Buyurtma № <b>${data.orderNo}</b></div>`)
+  return `<!doctype html>
+<html lang="uz"><head><meta charset="utf-8"><title>${title} ${data.orderNo}</title>
+<style>
+@page { size: ${width}mm auto; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; color: #000; }
+body { width: ${width}mm; padding: 2mm ${(width - contentMm) / 2}mm 8mm; font-family: "Consolas", "Courier New", monospace; font-size: ${fontPx}px; line-height: 1.3; }
+.center { text-align: center; }
+.b { font-weight: 700; }
+.title { font-size: ${fontPx + 12}px; font-weight: 700; letter-spacing: 2px; }
+.room { font-size: ${fontPx + 8}px; font-weight: 700; margin: 1mm 0; }
+.item { font-size: ${fontPx + 6}px; font-weight: 700; margin: 1mm 0; overflow-wrap: anywhere; }
+.item .q { white-space: nowrap; }
+.sep { border-top: 1px dashed #000; margin: 1.5mm 0; }
 </style></head>
 <body>
 ${parts.join('\n')}

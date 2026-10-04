@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import type { Database, SqlValue } from 'sql.js'
 import { loadSqlJs } from './sqljs'
-import { MIGRATIONS, SCHEMA_VERSION } from './schema'
+import { MIGRATIONS, MIGRATION_DATA, SCHEMA_VERSION, migrationDb } from './schema'
 
 export type Params = SqlValue[]
 export type Row = Record<string, SqlValue>
@@ -117,7 +117,11 @@ export class Db {
     try {
       this.db.run('BEGIN')
       try {
-        for (let v = cur; v < SCHEMA_VERSION; v++) this.db.exec(MIGRATIONS[v])
+        for (let v = cur; v < SCHEMA_VERSION; v++) {
+          this.db.exec(MIGRATIONS[v])
+          const data = MIGRATION_DATA[v + 1]
+          if (data) data(migrationDb(this.db))
+        }
         const bad = this.db.exec('PRAGMA foreign_key_check')
         if (bad.length > 0 && bad[0].values.length > 0) throw new Error("Ma'lumotlar bazasini yangilashda bog'lanish xatosi")
         this.db.run(`PRAGMA user_version = ${SCHEMA_VERSION}`)

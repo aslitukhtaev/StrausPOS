@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HOUR, T0, productByName, serviceByName, setup } from './helpers'
+import { HOUR, T0, kitchenSetup, productByName, serviceByName, setup } from './helpers'
 import type { Ctx } from './helpers'
 
 const DENIED = "Bu amal uchun ruxsatingiz yo'q"
@@ -17,109 +17,169 @@ function frozen(ctx: Ctx, sessionId: number) {
   )!
 }
 
-describe('ofitsiant biriktirish', () => {
-  it('open bilan biriktirish: foiz muzlatiladi, waiterName ko‘rinadi', async () => {
+describe('ofitsiant qatorda (2026-10: xonaga biriktirilmaydi)', () => {
+  it('xona ofitsiantsiz ochiladi; kassir/ega qo‘shganda "kim olib bordi" ixtiyoriy — qatorga yoziladi', async () => {
     const { svc, rooms, staff } = await setup()
-    const v = await svc.sessions.open(rooms.s1, 2, 60, staff.waiter.id)
-    expect(v.session).toMatchObject({ waiterId: staff.waiter.id, waiterPct: 10 })
-    expect(v.waiterName).toBe('Sardor')
-    const card = (await svc.rooms.board()).find((c) => c.room.id === rooms.s1)!
-    expect(card.session?.waiterName).toBe('Sardor')
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60)
+    expect(v0.session).toMatchObject({ waiterId: null, waiterPct: 0 })
+    expect(v0.waiterName).toBeNull()
+    await svc.lines.addProduct(v0.session.id, beer.id, 2, null, staff.waiter.id)
+    await svc.lines.addProduct(v0.session.id, beer.id, 1, null, staff.waiter.id) // o'sha qatorga qo'shiladi
+    await svc.lines.addProduct(v0.session.id, beer.id, 1, null) // ofitsiantsiz — alohida qator
+    const v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null, staff.waiter2.id) // boshqa ofitsiant — alohida
+    expect(v.lines.map((l) => [l.qty, l.waiterId, l.waiterPct, l.department])).toEqual([
+      [3, staff.waiter.id, 10, 'bar'],
+      [1, null, 0, 'bar'],
+      [1, staff.waiter2.id, 12, 'bar']
+    ])
+    expect(v.session.waiterId).toBeNull()
   })
 
-  it('faqat faol ofitsiant biriktiriladi (xato atomik)', async () => {
+  it('faqat faol ofitsiant tanlanadi (xato atomik: qator ham, ombor ham o‘zgarmaydi)', async () => {
     const { svc, rooms, staff } = await setup()
-    await expect(svc.sessions.open(rooms.s1, 1, 60, staff.cashier.id)).rejects.toThrow('Ofitsiant topilmadi')
-    await expect(svc.sessions.open(rooms.s1, 1, 60, 99999)).rejects.toThrow('Ofitsiant topilmadi')
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+    await expect(svc.lines.addProduct(v0.session.id, beer.id, 1, null, staff.cashier.id)).rejects.toThrow('Ofitsiant topilmadi')
+    await expect(svc.lines.addProduct(v0.session.id, beer.id, 1, null, 99999)).rejects.toThrow('Ofitsiant topilmadi')
     await svc.staff.save({ ...staff.waiter2, pin: '', active: false })
-    await expect(svc.sessions.open(rooms.s1, 1, 60, staff.waiter2.id)).rejects.toThrow('faol emas')
-    expect((await svc.rooms.board()).every((c) => c.session === null)).toBe(true)
+    await expect(svc.lines.addProducts(v0.session.id, [{ productId: beer.id, qty: 1 }], null, staff.waiter2.id)).rejects.toThrow('faol emas')
+    expect((await svc.sessions.get(v0.session.id)).lines).toEqual([])
+    expect((await productByName(svc, 'Pivo 0.5 L')).stock).toBe(beer.stock)
   })
 
-  it('setWaiter: almashtirish (yangi foiz muzlatiladi), olib tashlash, noto‘g‘ri xodim', async () => {
-    const ctx = await setup()
-    const { svc, rooms, staff } = ctx
-    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
-    let v = await svc.sessions.setWaiter(v0.session.id, staff.waiter.id)
-    expect(v.session).toMatchObject({ waiterId: staff.waiter.id, waiterPct: 10 })
-    v = await svc.sessions.setWaiter(v0.session.id, staff.waiter2.id) // kassir + isWaiter
-    expect(v.session).toMatchObject({ waiterId: staff.waiter2.id, waiterPct: 12 })
-    expect(v.waiterName).toBe('Bekzod')
-    await expect(svc.sessions.setWaiter(v0.session.id, staff.admin.id)).rejects.toThrow('Ofitsiant topilmadi')
-    expect((await svc.sessions.get(v0.session.id)).session.waiterId).toBe(staff.waiter2.id)
-    v = await svc.sessions.setWaiter(v0.session.id, null)
-    expect(v.session).toMatchObject({ waiterId: null, waiterPct: 0 })
-    expect(v.waiterName).toBeNull()
-    await payAll(ctx, v0.session.id)
-    await expect(svc.sessions.setWaiter(v0.session.id, staff.waiter.id)).rejects.toThrow('Sessiya yopilgan')
+  it('ofitsiant o‘zi kirsa — qator unga yoziladi (parametr e’tiborsiz); kassir+isWaiter ham o‘zi', async () => {
+    const { svc, rooms, staff, loginAs } = await setup()
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    await loginAs('waiter')
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+    let v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null, staff.waiter2.id)
+    expect(v.lines[0]).toMatchObject({ waiterId: staff.waiter.id, waiterPct: 10, createdBy: staff.waiter.id })
+    v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null, 99999) // noto'g'ri id ham e'tiborsiz
+    expect(v.lines).toHaveLength(1)
+    expect(v.lines[0].qty).toBe(2)
+    await loginAs('waiter2')
+    v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null, null)
+    expect(v.lines[1]).toMatchObject({ waiterId: staff.waiter2.id, waiterPct: 12 })
+  })
+
+  it('xonasiz bar savdosida ofitsiant yo‘q (waiterId e’tiborsiz, ofitsiant o‘zi qo‘shsa ham)', async () => {
+    const { svc, staff, loginAs } = await setup()
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const b = await svc.barSales.open()
+    let v = await svc.lines.addProduct(b.session.id, beer.id, 1, null, staff.waiter.id)
+    expect(v.lines[0]).toMatchObject({ waiterId: null, waiterPct: 0 })
+    await loginAs('waiter2')
+    v = await svc.lines.addProduct(b.session.id, beer.id, 1, null)
+    expect(v.lines.every((l) => l.waiterId === null)).toBe(true)
   })
 })
 
 describe('ofitsiant haqi', () => {
-  it('faqat bar mahsulotlaridan: xizmat va vaqt kirmaydi, qaytarish ayiriladi, chegirma ta’sir qilmaydi', async () => {
+  it('bar + oshxona mahsulotlari qatorlari: xizmat va vaqt kirmaydi, qaytarish ayiriladi, chegirma ta’sir qilmaydi', async () => {
     const ctx = await setup()
     const { svc, rooms, staff, clock, loginAs } = ctx
+    const k = await kitchenSetup(svc)
     const beer = await productByName(svc, 'Pivo 0.5 L') // 20 000
+    const chips = await productByName(svc, 'Chips') // 12 000
     const massage = await serviceByName(svc, 'Klassik massaj') // 150 000
-    const v0 = await svc.sessions.open(rooms.s1, 2, 60, staff.waiter.id)
-    await svc.lines.addProduct(v0.session.id, beer.id, 3, null)
-    await svc.lines.addProduct(v0.session.id, beer.id, 1, v0.guests[0].id)
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60)
+    await svc.lines.addProduct(v0.session.id, beer.id, 3, null, staff.waiter.id) // Sardor 10%
+    await svc.lines.addProduct(v0.session.id, k.lagmon.id, 1, v0.guests[0].id, staff.waiter.id) // 35 000
+    await svc.lines.addProduct(v0.session.id, chips.id, 1, null, staff.waiter2.id) // Bekzod 12%
+    await svc.lines.addProduct(v0.session.id, chips.id, 1, null) // ofitsiantsiz
     await svc.lines.addService(v0.session.id, massage.id, null, staff.provider.id)
     await loginAs('admin')
     const lineId = (await svc.sessions.get(v0.session.id)).lines[0].id
-    await svc.lines.returnLine(lineId, 1, 'Iliq') // 3 ta bar mahsuloti qoladi = 60 000
+    await svc.lines.returnLine(lineId, 1, 'Iliq') // Sardor pivosi: 2 × 20 000 = 40 000
     await svc.sessions.setDiscount(v0.session.id, 10_000)
     clock.advanceMin(30)
     const r = await payAll(ctx, v0.session.id)
-    expect(r.total).toBe(100_000 + 60_000 + 150_000 - 10_000)
-    expect(frozen(ctx, v0.session.id)).toMatchObject({ product_sales: 60_000, waiter_commission: 6_000, waiter_pct: 10 })
+    expect(r.total).toBe(100_000 + 40_000 + 35_000 + 12_000 + 12_000 + 150_000 - 10_000)
+    // Sardor: (40 000 + 35 000) × 10% = 7 500; Bekzod: 12 000 × 12% = 1 440
+    expect(frozen(ctx, v0.session.id)).toMatchObject({ product_sales: 99_000, waiter_commission: 7_500 + 1_440, waiter_id: null })
 
     const rep = await svc.reports.sales({ from: T0 - HOUR, to: T0 + HOUR })
-    expect(rep.byWaiter).toEqual([{ staffId: staff.waiter.id, name: 'Sardor', sessions: 1, productSales: 60_000, commission: 6_000 }])
-    const rows = await svc.waiters.sessions(staff.waiter.id, '2026-01')
-    expect(rows).toEqual([{ sessionId: v0.session.id, closedAt: clock.t, roomName: 'Sauna 1', productSales: 60_000, pct: 10, commission: 6_000 }])
+    expect(rep.byWaiter).toEqual([
+      { staffId: staff.waiter.id, name: 'Sardor', sessions: 1, productSales: 75_000, commission: 7_500 },
+      { staffId: staff.waiter2.id, name: 'Bekzod', sessions: 1, productSales: 12_000, commission: 1_440 }
+    ])
+    expect(await svc.waiters.sessions(staff.waiter.id, '2026-01')).toEqual([
+      { sessionId: v0.session.id, closedAt: clock.t, roomName: 'Sauna 1', productSales: 75_000, pct: 10, commission: 7_500 }
+    ])
+    expect((await svc.waiters.monthly('2026-01')).find((x) => x.staffId === staff.waiter2.id)).toMatchObject({
+      sessions: 1, productSales: 12_000, commission: 1_440
+    })
   })
 
   it('ofitsiantsiz sessiya: savdo yoziladi, haq 0, byWaiter ga kirmaydi', async () => {
     const ctx = await setup()
     const { svc, rooms } = ctx
-    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
     await svc.lines.addProduct(v0.session.id, (await productByName(svc, 'Suv 0.5 L')).id, 2, null)
     await payAll(ctx, v0.session.id)
     expect(frozen(ctx, v0.session.id)).toMatchObject({ product_sales: 10_000, waiter_commission: 0, waiter_id: null })
     expect((await svc.reports.sales({ from: 0, to: T0 + HOUR })).byWaiter).toEqual([])
   })
 
-  it('foiz muzlatiladi: xodim foizi keyin o‘zgarsa ham eski sessiya o‘zgarmaydi', async () => {
+  it('foiz qatorda muzlatiladi: xodim foizi keyin o‘zgarsa eski qator o‘zgarmaydi, yangisi alohida qator', async () => {
     const ctx = await setup()
     const { svc, rooms, staff } = ctx
     const beer = await productByName(svc, 'Pivo 0.5 L')
-    const a = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id) // 10%
-    await svc.lines.addProduct(a.session.id, beer.id, 5, null) // 100 000
+    const a = await svc.sessions.open(rooms.s1, 1, 60)
+    await svc.lines.addProduct(a.session.id, beer.id, 5, null, staff.waiter.id) // 100 000 × 10%
     await svc.staff.save({ ...staff.waiter, pin: '', commissionPct: 20 })
-    // ochiq sessiyada ham biriktirish paytidagi foiz
-    expect((await svc.sessions.get(a.session.id)).session.waiterPct).toBe(10)
+    const v = await svc.lines.addProduct(a.session.id, beer.id, 1, null, staff.waiter.id) // 20 000 × 20%
+    expect(v.lines.map((l) => [l.qty, l.waiterPct])).toEqual([[5, 10], [1, 20]])
     await payAll(ctx, a.session.id)
-    expect(frozen(ctx, a.session.id).waiter_commission).toBe(10_000)
-
-    const b = await svc.sessions.open(rooms.s2, 1, 60, staff.waiter.id) // endi 20%
-    await svc.lines.addProduct(b.session.id, beer.id, 1, null)
-    await payAll(ctx, b.session.id)
-    expect(frozen(ctx, b.session.id).waiter_commission).toBe(4_000)
-
+    expect(frozen(ctx, a.session.id).waiter_commission).toBe(10_000 + 4_000)
+    // sessiyada ikki xil foiz → samarali foiz 14 000 / 120 000 = 11.67%
+    expect(await svc.waiters.sessions(staff.waiter.id, '2026-01')).toEqual([
+      expect.objectContaining({ productSales: 120_000, pct: 11.67, commission: 14_000 })
+    ])
     await svc.staff.save({ ...staff.waiter, pin: '', commissionPct: 50 })
     const m = (await svc.waiters.monthly('2026-01')).find((x) => x.staffId === staff.waiter.id)!
-    expect(m).toMatchObject({ commissionPct: 50, sessions: 2, productSales: 120_000, commission: 14_000 })
+    expect(m).toMatchObject({ commissionPct: 50, sessions: 1, productSales: 120_000, commission: 14_000 })
   })
 
-  it('kasr foiz yaxlitlanadi (butun so‘m)', async () => {
+  it('kasr foiz qator bo‘yicha yaxlitlanadi (butun so‘m)', async () => {
     const ctx = await setup()
     const { svc, rooms, staff } = ctx
-    await svc.staff.save({ ...staff.waiter, pin: '', commissionPct: 7.5 })
-    const v0 = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
-    await svc.lines.addProduct(v0.session.id, (await productByName(svc, 'Chips')).id, 1, null) // 12 000
+    await svc.staff.save({ ...staff.waiter, pin: '', commissionPct: 3.33 })
+    const water = await productByName(svc, 'Suv 0.5 L') // 5 000
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60)
+    await svc.lines.addProduct(v0.session.id, water.id, 1, v0.guests[0].id, staff.waiter.id)
+    await svc.lines.addProduct(v0.session.id, water.id, 1, v0.guests[1].id, staff.waiter.id)
     await payAll(ctx, v0.session.id)
-    expect(frozen(ctx, v0.session.id).waiter_commission).toBe(900)
+    // har qator: 5 000 × 3.33% = 166.5 → 167; jami 334 (umumiy summadan 10 000 × 3.33% = 333 emas)
+    expect(frozen(ctx, v0.session.id).waiter_commission).toBe(334)
+    expect((await svc.waiters.monthly('2026-01')).find((x) => x.staffId === staff.waiter.id)!.commission).toBe(334)
+  })
+
+  it('eski sessiyalar (sessiyaga biriktirilgan, muzlatilgan haq) hisobotlarga kiradi', async () => {
+    const ctx = await setup()
+    const { svc, rooms, staff, clock } = ctx
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const old = await svc.sessions.open(rooms.s1, 1, 60)
+    await svc.lines.addProduct(old.session.id, beer.id, 2, null)
+    await payAll(ctx, old.session.id)
+    // 2026-10 gacha yopilgan sessiya ko'rinishi: sessiya darajasida ofitsiant va muzlatilgan haq
+    svc.db.run('UPDATE sessions SET waiter_id=?, waiter_pct=10, product_sales=40000, waiter_commission=4000 WHERE id=?', [staff.waiter.id, old.session.id])
+    clock.advanceMin(5)
+    const now = await svc.sessions.open(rooms.s2, 1, 60)
+    await svc.lines.addProduct(now.session.id, beer.id, 1, null, staff.waiter.id) // 2 000
+    await payAll(ctx, now.session.id)
+    expect((await svc.waiters.monthly('2026-01')).find((x) => x.staffId === staff.waiter.id)).toMatchObject({
+      sessions: 2, productSales: 60_000, commission: 6_000
+    })
+    expect((await svc.waiters.sessions(staff.waiter.id, '2026-01')).map((r) => [r.sessionId, r.roomName, r.commission])).toEqual([
+      [old.session.id, 'Sauna 1', 4_000],
+      [now.session.id, 'Sauna 2', 2_000]
+    ])
+    expect((await svc.reports.sales({ from: 0, to: T0 + HOUR })).byWaiter).toEqual([
+      { staffId: staff.waiter.id, name: 'Sardor', sessions: 2, productSales: 60_000, commission: 6_000 }
+    ])
+    expect((await svc.sessions.get(old.session.id)).waiterName).toBe('Sardor')
   })
 })
 
@@ -129,28 +189,28 @@ describe('oylik hisob-kitob', () => {
     const { svc, rooms, staff, clock } = ctx
     const beer = await productByName(svc, 'Pivo 0.5 L')
     // Yanvar: Sardor 2 sessiya, Bekzod 1 sessiya
-    const a = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
-    await svc.lines.addProduct(a.session.id, beer.id, 2, null) // 40 000 → 4 000
+    const a = await svc.sessions.open(rooms.s1, 1, 60)
+    await svc.lines.addProduct(a.session.id, beer.id, 2, null, staff.waiter.id) // 40 000 → 4 000
     await payAll(ctx, a.session.id)
-    const b = await svc.sessions.open(rooms.s2, 1, 60, staff.waiter2.id)
-    await svc.lines.addProduct(b.session.id, beer.id, 5, null) // 100 000 → 12 000
+    const b = await svc.sessions.open(rooms.s2, 1, 60)
+    await svc.lines.addProduct(b.session.id, beer.id, 5, null, staff.waiter2.id) // 100 000 → 12 000
     await payAll(ctx, b.session.id)
     // Yanvarning oxirgi daqiqasi (mahalliy vaqt) — yanvarga
     clock.t = new Date(2026, 0, 31, 23, 0).getTime()
-    const c = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
-    await svc.lines.addProduct(c.session.id, beer.id, 1, null) // 20 000 → 2 000
+    const c = await svc.sessions.open(rooms.s1, 1, 60)
+    await svc.lines.addProduct(c.session.id, beer.id, 1, null, staff.waiter.id) // 20 000 → 2 000
     clock.t = new Date(2026, 0, 31, 23, 59, 59).getTime()
     await payAll(ctx, c.session.id)
     // Fevral 1 00:00 — fevralga
-    const d = await svc.sessions.open(rooms.vip, 1, 60, staff.waiter.id)
-    await svc.lines.addProduct(d.session.id, beer.id, 3, null) // 60 000 → 6 000
+    const d = await svc.sessions.open(rooms.vip, 1, 60)
+    await svc.lines.addProduct(d.session.id, beer.id, 3, null, staff.waiter.id) // 60 000 → 6 000
     clock.t = new Date(2026, 1, 1, 0, 0, 0).getTime()
     await payAll(ctx, d.session.id)
     // Bekor qilingan va ochiq sessiyalar hisobga kirmaydi
-    const e = await svc.sessions.open(rooms.s2, 1, 60, staff.waiter.id)
+    const e = await svc.sessions.open(rooms.s2, 1, 60)
     await svc.sessions.cancel(e.session.id)
-    const f = await svc.sessions.open(rooms.s2, 1, 60, staff.waiter.id)
-    await svc.lines.addProduct(f.session.id, beer.id, 1, null)
+    const f = await svc.sessions.open(rooms.s2, 1, 60)
+    await svc.lines.addProduct(f.session.id, beer.id, 1, null, staff.waiter.id)
     return { ...ctx, ids: { a: a.session.id, c: c.session.id, d: d.session.id } }
   }
 
@@ -230,11 +290,13 @@ describe('ruxsatlar: ofitsiant roli', () => {
     expect(login.permissions).toEqual(['session.open', 'session.manage'])
     await loginAs('waiter')
     expect((await svc.waiters.list()).length).toBe(2)
-    const v0 = await svc.sessions.open(rooms.s1, 2, 60, staff.waiter.id)
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60)
     const beer = await productByName(svc, 'Pivo 0.5 L')
     const v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null)
+    expect(v.lines[0].waiterId).toBe(staff.waiter.id)
+    await svc.lines.addProducts(v0.session.id, [{ productId: beer.id, qty: 1 }], null)
     await svc.sessions.extendAll(v0.session.id, 60)
-    await svc.sessions.setWaiter(v0.session.id, staff.waiter2.id)
+    await svc.checkout.preBill(v0.session.id)
     clock.advanceMin(10)
     await expect(svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: 1 }], null)).rejects.toThrow(DENIED)
     await expect(svc.lines.returnLine(v.lines[0].id, 1, '')).rejects.toThrow(DENIED)

@@ -131,7 +131,7 @@ describe('bar savdosi: rad etilgan amallar', () => {
     await ctx.loginAs('cashier')
     const pivo = await productByName(svc, 'Pivo 0.5 L')
     const massaj = await serviceByName(svc, 'Klassik massaj')
-    const room = await svc.sessions.open(rooms.s1, 1, 60, null)
+    const room = await svc.sessions.open(rooms.s1, 1, 60)
     const roomGuest = room.guests[0].id
     const id = (await svc.barSales.open()).session.id
     await svc.lines.addProduct(id, pivo.id, 1, null)
@@ -139,8 +139,6 @@ describe('bar savdosi: rad etilgan amallar', () => {
 
     await expect(svc.sessions.addGuest(id, 60)).rejects.toThrow("Bar savdosiga mehmon qo'shib bo'lmaydi")
     await expect(svc.sessions.extendAll(id, 60)).rejects.toThrow('Bar savdosida vaqt hisoblanmaydi')
-    await expect(svc.sessions.setWaiter(id, staff.waiter.id)).rejects.toThrow('Bar savdosiga ofitsiant biriktirilmaydi')
-    await expect(svc.sessions.setWaiter(id, null)).rejects.toThrow('Bar savdosiga ofitsiant biriktirilmaydi')
     await expect(svc.sessions.moveRoom(id, rooms.s2)).rejects.toThrow("Bar savdosini xonaga o'tkazib bo'lmaydi")
     await expect(svc.lines.addService(id, massaj.id, null, staff.provider.id)).rejects.toThrow("Bar savdosiga xizmat qo'shib bo'lmaydi")
     // Mahsulot mehmonga bog'lanmaydi (hatto boshqa sessiya mehmoni bilan ham)
@@ -149,7 +147,7 @@ describe('bar savdosi: rad etilgan amallar', () => {
     await expect(svc.sessions.extendGuest(999, 60)).rejects.toThrow('Mehmon topilmadi')
     await expect(svc.sessions.guestPause(999)).rejects.toThrow('Mehmon topilmadi')
     // Xona ochishda "Bar" (id 0) xona emas
-    await expect(svc.sessions.open(0, 1, 60, null)).rejects.toThrow('Xona topilmadi')
+    await expect(svc.sessions.open(0, 1, 60)).rejects.toThrow('Xona topilmadi')
 
     expect(await svc.sessions.get(id)).toEqual(before)
     expect(await stockOf(ctx, 'Pivo 0.5 L')).toBe(pivo.stock - 1)
@@ -158,7 +156,7 @@ describe('bar savdosi: rad etilgan amallar', () => {
 
     // Xona sessiyasi odatdagidek ishlaydi
     expect((await svc.sessions.extendGuest(roomGuest, 60)).guests[0].paidMinutes).toBe(120)
-    expect((await svc.sessions.setWaiter(room.session.id, staff.waiter.id)).waiterName).toBe('Sardor')
+    expect((await svc.lines.addProduct(room.session.id, pivo.id, 1, null, staff.waiter.id)).lines[0].waiterId).toBe(staff.waiter.id)
   })
 
   it('bazada ham: bar savdosida room_id yoki ofitsiant bo‘lishi mumkin emas (CHECK)', async () => {
@@ -212,7 +210,7 @@ describe('bar savdosi: xonalar paneli va bir nechta ochiq savdo', () => {
     expect(board).toHaveLength(3)
     expect(board.every((c) => c.session === null && c.currentTotal === 0)).toBe(true)
     // Xonalar odatdagidek ochiladi va boshqariladi
-    const room = await svc.sessions.open(rooms.s1, 2, 60, null)
+    const room = await svc.sessions.open(rooms.s1, 2, 60)
     board = await svc.rooms.board()
     expect(board.filter((c) => c.session).map((c) => c.session!.session.id)).toEqual([room.session.id])
     await svc.rooms.save({ id: rooms.s2, name: 'Sauna 2', pricePerHour: 60_000, capacity: 8, active: false })
@@ -227,7 +225,7 @@ describe('bar savdosi: xonalar paneli va bir nechta ochiq savdo', () => {
     await ctx.loginAs('cashier')
     const pivo = await productByName(svc, 'Pivo 0.5 L')
     const cola = await productByName(svc, 'Coca-Cola 1 L')
-    await svc.sessions.open(rooms.s1, 1, 60, null)
+    await svc.sessions.open(rooms.s1, 1, 60)
     const a = (await svc.barSales.open()).session.id
     clock.advanceMin(1)
     const b = (await svc.barSales.open()).session.id
@@ -257,8 +255,8 @@ describe('bar savdosi: ofitsiant haqi yo‘q', () => {
     const { svc, rooms, staff } = ctx
     const pivo = await productByName(svc, 'Pivo 0.5 L')
     // Xona: Sardor (10%), Pivo 2 → 40 000 mahsulot → haq 4 000
-    const room = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
-    await svc.lines.addProduct(room.session.id, pivo.id, 2, null)
+    const room = await svc.sessions.open(rooms.s1, 1, 60)
+    await svc.lines.addProduct(room.session.id, pivo.id, 2, null, staff.waiter.id)
     const rv = await svc.sessions.get(room.session.id)
     await svc.checkout.pay(room.session.id, [{ method: 'cash', amount: rv.total }], null)
     // Bar: ofitsiant (Sardor) o'zi sotsa ham haq yo'q
@@ -290,8 +288,8 @@ describe('bar savdosi: hisobotlar (qo‘lda hisoblangan)', () => {
     const non = await productByName(svc, 'Non') // 4 000
 
     // 1) Xona (ega yopadi): 1 mehmon × 1 soat × 50 000 + Pivo 1 = 70 000, karta, ofitsiant Bekzod 12%
-    const room = (await svc.sessions.open(rooms.s1, 1, 60, staff.waiter2.id)).session.id
-    await svc.lines.addProduct(room, pivo.id, 1, null)
+    const room = (await svc.sessions.open(rooms.s1, 1, 60)).session.id
+    await svc.lines.addProduct(room, pivo.id, 1, null, staff.waiter2.id)
     clock.advanceMin(30)
     expect((await svc.sessions.get(room)).total).toBe(70_000)
     await svc.checkout.pay(room, [{ method: 'card', amount: 70_000 }], null)
@@ -330,7 +328,7 @@ describe('bar savdosi: hisobotlar (qo‘lda hisoblangan)', () => {
     expect(rep.productRevenue).toBe(20_000 + 55_000 + 27_000 + 20_000)
     expect(rep.serviceRevenue).toBe(0)
     expect(rep.discounts).toBe(2_000)
-    expect(rep.byMethod).toEqual({ cash: 65_000, card: 85_000, debt: 20_000 })
+    expect(rep.byMethod).toEqual({ cash: 65_000, card: 85_000, terminal: 0, debt: 20_000 })
     expect(rep.returnsAmount).toBe(15_000)
     expect(rep.barSales).toEqual({ count: 3, total: 100_000 })
     expect(rep.byDay).toEqual([{ day: '2026-01-15', total: 170_000 }])

@@ -62,7 +62,7 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     fs.writeFileSync(file, await buildV1())
     const svc = await PosService.create({ file, clock: new FakeClock().now })
     expect(svc.db.version).toBe(SCHEMA_VERSION)
-    expect(SCHEMA_VERSION).toBe(3)
+    expect(SCHEMA_VERSION).toBe(4)
     // FK yoqilgan va buzilmagan
     expect(svc.db.get<{ foreign_keys: number }>('PRAGMA foreign_keys')!.foreign_keys).toBe(1)
     expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])
@@ -74,7 +74,8 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
 
     // Sozlamalar: eski qiymatlar + yangi standartlar
     const s = await svc.settings.get()
-    expect(s).toMatchObject({ roundTo: 500, blockMinutes: 60, graceMinutes: 0, defaultHours: 1, warnBeforeMinutes: 10, theme: 'auto' })
+    // blockMinutes yo'q edi → yangi standart 1 (daqiqalik)
+    expect(s).toMatchObject({ roundTo: 500, blockMinutes: 1, graceMinutes: 0, defaultHours: 1, warnBeforeMinutes: 10, theme: 'auto' })
     expect(s.receipt).toMatchObject({ businessName: 'Eski Sauna', paperWidth: 58 })
 
     // Yopilgan sessiya: muzlatilgan hisobot summalari o'zgarmaydi; ofitsiant yo'q
@@ -85,17 +86,17 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     expect(closed.guests[0].paidMinutes).toBe(0)
     expect(closed.payments.map((p) => p.amount)).toEqual([130_000])
 
-    // Ochiq sessiya: paidMinutes=0 → blok qoidasi (30 daq → 1 soat), ishni davom ettirish mumkin
+    // Ochiq sessiya: paidMinutes=0 → aynan o'tirilgan daqiqa (30 daq × 30 000/60 = 15 000), ishni davom ettirish mumkin
     let open = await svc.sessions.get(2)
-    expect(open.guests[0]).toMatchObject({ paidMinutes: 0, billedMinutes: 60, timeAmount: 30_000 })
+    expect(open.guests[0]).toMatchObject({ paidMinutes: 0, billedMinutes: 30, timeAmount: 15_000 })
     open = await svc.sessions.extendGuest(open.guests[0].id, 60)
     expect(open.guests[0].paidMinutes).toBe(60)
 
     // Yangi imkoniyatlar: ofitsiant roli, biriktirish; staff id lar davom etadi
     const w = await svc.staff.save({ name: 'Sardor', role: 'waiter', pin: '5555', isProvider: false, isWaiter: true, commissionPct: 10, active: true })
     expect(w.id).toBe(3)
-    open = await svc.sessions.setWaiter(2, w.id)
-    expect(open.waiterName).toBe('Sardor')
+    open = await svc.lines.addProduct(2, 1, 1, null, w.id)
+    expect(open.lines[0]).toMatchObject({ waiterId: w.id, waiterPct: 10, department: 'bar' })
     const r = await svc.checkout.pay(2, [{ method: 'card', amount: open.total }], null)
     expect(r.receiptNo).toBe(2)
     svc.db.close()
@@ -180,7 +181,7 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
     fs.writeFileSync(file, await buildV2())
     const clock = new FakeClock()
     const svc = await PosService.create({ file, clock: clock.now })
-    expect(svc.db.version).toBe(3)
+    expect(svc.db.version).toBe(SCHEMA_VERSION)
     expect(svc.db.get<{ foreign_keys: number }>('PRAGMA foreign_keys')!.foreign_keys).toBe(1)
     expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])
     expect(svc.db.all("SELECT name FROM sqlite_master WHERE name='sessions_v3'")).toEqual([])
@@ -209,7 +210,7 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
 
     // Hisobot va ofitsiant hisobi (muzlatilgan qiymatlar) o'zgarmaydi
     const rep = await svc.reports.sales({ from: 0, to: T0 + HOUR })
-    expect(rep).toMatchObject({ sessionsCount: 1, total: 90_000, byMethod: { cash: 0, card: 0, debt: 90_000 }, returnsAmount: 20_000, barSales: { count: 0, total: 0 } })
+    expect(rep).toMatchObject({ sessionsCount: 1, total: 90_000, byMethod: { cash: 0, card: 0, terminal: 0, debt: 90_000 }, returnsAmount: 20_000, barSales: { count: 0, total: 0 } })
     expect(rep.byRoom).toEqual([{ roomId: 1, roomName: 'Sauna 1', sessions: 1, total: 90_000 }])
     expect((await svc.waiters.monthly('2026-01')).find((w) => w.staffId === 2)).toMatchObject({ sessions: 1, productSales: 40_000, commission: 4_000 })
     expect((await svc.reports.returns({ from: 0, to: T0 + HOUR }))[0]).toMatchObject({ roomName: 'Sauna 1', qty: 1 })
@@ -217,7 +218,7 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
     // Ochiq sessiya panelda va davom etadi
     const board = await svc.rooms.board()
     expect(board.find((c) => c.room.id === 2)!.session!.session.id).toBe(3)
-    await expect(svc.sessions.open(2, 1, 60, null)).rejects.toThrow('Xona band')
+    await expect(svc.sessions.open(2, 1, 60)).rejects.toThrow('Xona band')
 
     // Yangi sessiyalar AUTOINCREMENT hisoblagichidan davom etadi (id qayta ishlatilmaydi)
     const bar = await svc.barSales.open()
@@ -232,7 +233,7 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
 
     // Qayta ochish: migratsiya qayta ishlamaydi, bar savdosi joyida
     const again = await PosService.create({ file, clock: clock.now })
-    expect(again.db.version).toBe(3)
+    expect(again.db.version).toBe(SCHEMA_VERSION)
     await again.auth.login(1, '1234')
     expect((await again.sessions.get(11)).room.name).toBe('Bar')
     expect((await again.barSales.history({ from: 0, to: T0 + HOUR })).map((h) => h.sessionId)).toEqual([11])
@@ -243,7 +244,7 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
     const svc = await PosService.create({ file: path.join(dir, 'delfin.db'), clock: new FakeClock().now })
     await svc.auth.setupOwner('Yangi', '9999', 'Delfin Sauna')
     await svc.restoreBytes(await buildV2())
-    expect(svc.db.version).toBe(3)
+    expect(svc.db.version).toBe(SCHEMA_VERSION)
     await svc.auth.login(1, '1234')
     expect((await svc.sessions.get(3)).session.kind).toBe('room')
     expect((await svc.barSales.open()).session.kind).toBe('bar')

@@ -12,16 +12,18 @@ import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow
+  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout
 } from '../../src/shared/types'
-import { ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
+import { ROLE_LABELS, ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
 import {
-  MS_MIN, buildGuestView, buildLineView, computeTotals, waiterCommission, waiterProductSales
+  MS_MIN, buildGuestView, buildLineView, computeTotals, lineAmount, waiterCommission, waiterProductSales
 } from '../../src/shared/billing'
 import type { BillingOptions } from '../../src/shared/billing'
 import { Db } from './db'
+import { normalizePhone } from './db/phone'
 import { hashPin, isValidPin, verifyPin } from './pin'
-import { renderReceiptHtml } from './receipt'
+import { renderKitchenHtml, renderReceiptHtml } from './receipt'
+import type { KitchenTicketData } from './receipt'
 
 // ───────────── Tashqi muhit (Electron / dev-server) ─────────────
 export interface PosHost {
@@ -82,9 +84,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   roundTo: 1000,
   defaultHours: 1,
-  blockMinutes: 60,
+  // 2026-10: aynan o'tirilgan daqiqa uchun (1 soat olingan, 01:01:00 → 61 daq)
+  blockMinutes: 1,
   graceMinutes: 0,
   warnBeforeMinutes: 10,
+  kitchen: { sharePct: 100, printerName: '', paperWidth: 80, autoPrint: true },
   theme: 'auto',
   lockEnabled: true,
   autoLockMinutes: 0,
@@ -112,7 +116,7 @@ interface StaffRow {
   id: number; name: string; role: Role; pin_hash: string; active: number; is_provider: number; is_waiter: number; commission_pct: number
 }
 interface RoomRow { id: number; name: string; price_per_hour: number; capacity: number; active: number; sort_order: number; deleted: number }
-interface CategoryRow { id: number; name: string; sort_order: number }
+interface CategoryRow { id: number; name: string; sort_order: number; department: Department }
 interface ProductRow { id: number; category_id: number; name: string; price: number; stock: number; track_stock: number; low_stock_at: number; active: number; deleted: number }
 interface ServiceRow { id: number; name: string; price: number; duration_min: number | null; active: number; deleted: number }
 interface SessionRow {
@@ -120,16 +124,28 @@ interface SessionRow {
   closed_by: number | null; discount: number; note: string; cancelled: number; receipt_no: number | null
   time_total: number | null; lines_total: number | null; discount_applied: number | null; total: number | null
   waiter_id: number | null; waiter_pct: number; product_sales: number | null; waiter_commission: number | null
+  kitchen_sales: number | null; kitchen_share_pct: number | null
 }
 interface GuestRow { id: number; session_id: number; label: string; state: GuestState; paid_minutes: number }
 interface IntervalRow { id: number; guest_id: number; room_id: number; rate: number; start: number; end: number | null }
 interface LineRow {
   id: number; session_id: number; guest_id: number | null; kind: 'product' | 'service'; ref_id: number; name: string
   unit_price: number; qty: number; returned_qty: number; provider_id: number | null; created_at: number; created_by: number
+  department: Department | null; waiter_id: number | null; waiter_pct: number
 }
 interface PaymentRow { id: number; session_id: number; method: PayMethod; amount: number; at: number; by: number }
-interface DebtRow { id: number; session_id: number | null; customer_name: string; phone: string; amount: number; paid: number; created_at: number; closed_at: number | null }
-interface DebtPaymentRow { id: number; debt_id: number; method: 'cash' | 'card'; amount: number; at: number; by: number }
+interface DebtRow {
+  id: number; debtor_id: number | null; session_id: number | null; customer_name: string; phone: string; amount: number; paid: number
+  created_at: number; closed_at: number | null
+  /** JOIN debtors (DEBT_SELECT) — qarzdorning hozirgi ismi/telefoni */
+  debtor_name?: string | null; debtor_phone?: string | null
+}
+interface DebtPaymentRow { id: number; debt_id: number; method: DebtPayMethod; amount: number; at: number; by: number }
+interface DebtorRow {
+  id: number; name: string; phone: string; phone_key: string | null; created_at: number
+  total: number | null; paid: number | null; n: number | null; last_at: number | null
+}
+interface KitchenPayoutRow { id: number; day: string; amount: number; note: string; at: number; by: number }
 interface ReturnRow { id: number; line_id: number; session_id: number; qty: number; reason: string; at: number; by: number }
 interface PayoutRow { id: number; staff_id: number; month: string; amount: number; note: string; at: number; by: number }
 
@@ -137,7 +153,9 @@ const toStaff = (r: StaffRow): Staff => ({
   id: r.id, name: r.name, role: r.role, active: !!r.active, isProvider: !!r.is_provider, isWaiter: !!r.is_waiter, commissionPct: r.commission_pct ?? 0
 })
 const toRoom = (r: RoomRow): Room => ({ id: r.id, name: r.name, pricePerHour: r.price_per_hour, capacity: r.capacity, active: !!r.active, sortOrder: r.sort_order })
-const toCategory = (r: CategoryRow): ProductCategory => ({ id: r.id, name: r.name, sortOrder: r.sort_order })
+const toCategory = (r: CategoryRow): ProductCategory => ({
+  id: r.id, name: r.name, sortOrder: r.sort_order, department: r.department === 'kitchen' ? 'kitchen' : 'bar'
+})
 const toProduct = (r: ProductRow): Product => ({
   id: r.id, categoryId: r.category_id, name: r.name, price: r.price, stock: r.stock, trackStock: !!r.track_stock, lowStockAt: r.low_stock_at, active: !!r.active
 })
@@ -149,12 +167,26 @@ const toSession = (r: SessionRow): Session => ({
 const toInterval = (r: IntervalRow): TimeInterval => ({ roomId: r.room_id, rate: r.rate, start: r.start, end: r.end })
 const toLine = (r: LineRow): OrderLine => ({
   id: r.id, sessionId: r.session_id, guestId: r.guest_id, kind: r.kind, refId: r.ref_id, name: r.name, unitPrice: r.unit_price,
-  qty: r.qty, returnedQty: r.returned_qty, providerId: r.provider_id, createdAt: r.created_at, createdBy: r.created_by
+  qty: r.qty, returnedQty: r.returned_qty, providerId: r.provider_id, createdAt: r.created_at, createdBy: r.created_by,
+  department: r.kind === 'product' ? (r.department === 'kitchen' ? 'kitchen' : 'bar') : null,
+  waiterId: r.waiter_id ?? null, waiterPct: r.waiter_pct ?? 0
 })
 const toPayment = (r: PaymentRow): Payment => ({ id: r.id, sessionId: r.session_id, method: r.method, amount: r.amount, at: r.at, by: r.by })
 const toDebt = (r: DebtRow): Debt => ({
-  id: r.id, sessionId: r.session_id, customerName: r.customer_name, phone: r.phone, amount: r.amount, paid: r.paid, createdAt: r.created_at, closedAt: r.closed_at
+  id: r.id, debtorId: r.debtor_id ?? 0, sessionId: r.session_id, customerName: r.debtor_name ?? r.customer_name, phone: r.debtor_phone ?? r.phone,
+  amount: r.amount, paid: r.paid, createdAt: r.created_at, closedAt: r.closed_at
 })
+/** Qarz + qarzdorning hozirgi ismi/telefoni (qarzdor tahrirlansa barcha qarzlarida yangi ism ko'rinadi) */
+const DEBT_SELECT = 'SELECT d.*, dr.name AS debtor_name, dr.phone AS debtor_phone FROM debts d LEFT JOIN debtors dr ON dr.id=d.debtor_id'
+/** Qarzdor + yig'indilar */
+const DEBTOR_SELECT = `SELECT dr.*, SUM(d.amount) AS total, SUM(d.paid) AS paid, COUNT(d.id) AS n, MAX(d.created_at) AS last_at
+  FROM debtors dr LEFT JOIN debts d ON d.debtor_id=dr.id`
+const toDebtor = (r: DebtorRow): Debtor => {
+  const total = r.total ?? 0
+  const paid = r.paid ?? 0
+  return { id: r.id, name: r.name, phone: r.phone, total, paid, balance: total - paid, debtsCount: r.n ?? 0, lastAt: r.last_at ?? r.created_at }
+}
+const toKitchenPayout = (r: KitchenPayoutRow): KitchenPayout => ({ id: r.id, day: r.day, amount: r.amount, note: r.note, at: r.at, by: r.by })
 const toDebtPayment = (r: DebtPaymentRow): DebtPayment => ({ id: r.id, debtId: r.debt_id, method: r.method, amount: r.amount, at: r.at, by: r.by })
 const toReturn = (r: ReturnRow): ReturnRecord => ({ id: r.id, lineId: r.line_id, sessionId: r.session_id, qty: r.qty, reason: r.reason, at: r.at, by: r.by })
 const toPayout = (r: PayoutRow): WaiterPayout => ({ id: r.id, staffId: r.staff_id, month: r.month, amount: r.amount, note: r.note, at: r.at, by: r.by })
@@ -203,6 +235,31 @@ function reqPct(v: unknown): number {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 100) fail("Foiz 0 dan 100 gacha bo'lishi kerak")
   return Math.round(v * 100) / 100
 }
+const DAY_RE = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
+/** 'YYYY-MM-DD' → mahalliy kun boshi (ms). Noto'g'ri sana — xato */
+function dayStart(day: unknown): { day: string; from: number } {
+  const m = typeof day === 'string' ? DAY_RE.exec(day) : null
+  if (!m) fail("Kun noto'g'ri (YYYY-MM-DD ko'rinishida bo'lishi kerak)")
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  if (d.getDate() !== Number(m[3])) fail("Kun noto'g'ri (YYYY-MM-DD ko'rinishida bo'lishi kerak)")
+  return { day: m[0], from: d.getTime() }
+}
+const PAY_METHODS: readonly PayMethod[] = ['cash', 'card', 'terminal', 'debt']
+const DEBT_PAY_METHODS: readonly DebtPayMethod[] = ['cash', 'card', 'terminal']
+const PHONE_RE = /^[+\d][\d\s()-]{4,}$/
+/** Qarzdor telefoni: shakl tekshiruvi + normallashtirilgan kalit */
+function reqPhone(v: unknown): { phone: string; key: string } {
+  const phone = reqText(v, 'Qarzdorning telefonini kiriting', 30)
+  const key = normalizePhone(phone)
+  if (!PHONE_RE.test(phone) || !key || key.length < 5) fail("Telefon raqami noto'g'ri")
+  return { phone, key }
+}
+/** Qator bo'yicha ofitsiant haqi (yaxlitlash har bir qatorda) */
+function lineCommission(l: Pick<LineRow, 'qty' | 'returned_qty' | 'unit_price' | 'waiter_pct'>): number {
+  return waiterCommission(Math.max(0, l.qty - l.returned_qty) * l.unit_price, l.waiter_pct ?? 0)
+}
+const MAX_ADD_ITEMS = 200
+
 function reqMinutes(v: unknown, what: string): number {
   return reqInt(v, `${what} 1 dan ${MAX_PAID_MINUTES} daqiqagacha butun son bo'lishi kerak`, 1, MAX_PAID_MINUTES)
 }
@@ -225,6 +282,12 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   const theme = pick('theme')
   if (theme !== 'light' && theme !== 'dark' && theme !== 'auto') fail("Interfeys rejimi noto'g'ri")
   const str = (v: unknown, d: string, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : d)
+  const k = (s.kitchen && typeof s.kitchen === 'object' ? s.kitchen : {}) as Partial<AppSettings['kitchen']>
+  const bk = base.kitchen ?? DEFAULT_SETTINGS.kitchen
+  const kitchenPaper = k.paperWidth === undefined ? bk.paperWidth : k.paperWidth
+  if (kitchenPaper !== 58 && kitchenPaper !== 80) fail("Oshxona cheki qog'ozi kengligi 58 yoki 80 mm bo'lishi kerak")
+  const sharePct = k.sharePct === undefined ? bk.sharePct : k.sharePct
+  if (typeof sharePct !== 'number' || !Number.isFinite(sharePct) || sharePct < 0 || sharePct > 100) fail("Oshxona ulushi 0 dan 100 foizgacha bo'lishi kerak")
   return {
     receipt: {
       businessName: str(r.businessName, b.businessName, 100),
@@ -243,6 +306,12 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
     blockMinutes,
     graceMinutes,
     warnBeforeMinutes,
+    kitchen: {
+      sharePct: Math.round(sharePct * 100) / 100,
+      printerName: str(k.printerName, bk.printerName, 200),
+      paperWidth: kitchenPaper,
+      autoPrint: bool(k.autoPrint, bk.autoPrint)
+    },
     theme,
     lockEnabled: bool(s.lockEnabled, base.lockEnabled),
     autoLockMinutes: autoLock,
@@ -281,6 +350,22 @@ export class PosService implements PosApi {
   get isViewer(): boolean {
     return this.viewer
   }
+
+  /**
+   * TERMINAL konteksti (LAN server, har bir terminal uchun bittadan): o'sha Db va host ustida alohida servis,
+   * O'Z login holati (currentId) bilan — asosiy kompyuterdagi login'ga ta'sir qilmaydi (va aksincha).
+   * Ruxsatlar odatdagidek kirgan xodim roliga qarab. Qulf o'chirilgan bo'lsa ham avtomatik kirish YO'Q (PIN shart).
+   * PIN brute-force hisoblagichi asosiy kontekst bilan umumiy.
+   */
+  forTerminal(): PosService {
+    const t = new PosService(this.db, { clock: () => this.clock(), host: this.host })
+    t.loginFails = this.loginFails
+    t.terminal = true
+    return t
+  }
+
+  /** true → LAN terminal konteksti (forTerminal) */
+  private terminal = false
 
   /** Lokal kalit-qiymat (masalan tarmoq sozlamasi). Ruxsat tekshiruvi chaqiruvchida. */
   readKv(key: string): string | null {
@@ -376,7 +461,7 @@ export class PosService implements PosApi {
 
   /** Qulf o'chirilgan bo'lsa — birinchi faol ega avtomatik kiritiladi. */
   private autoLoginIfUnlocked(): Staff | null {
-    if (this.viewer) return null
+    if (this.viewer || this.terminal) return null
     if (this.loadSettings().lockEnabled) return null
     const r = this.db.get<StaffRow>("SELECT * FROM staff WHERE role='owner' AND active=1 ORDER BY id LIMIT 1")
     if (!r) return null
@@ -501,23 +586,24 @@ export class PosService implements PosApi {
     }
   }
 
-  private buildReceipt(sessionId: Id): ReceiptData {
+  private buildReceipt(sessionId: Id, provisional: { by: Staff } | null = null): ReceiptData {
     const v = this.view(sessionId)
     const sr = this.sessionRow(sessionId)
     const settings = this.loadSettings()
     const names = this.staffNames()
     const labelOf = new Map(v.guests.map((g) => [g.id, g.label]))
-    const debtRow = this.db.get<DebtRow>('SELECT * FROM debts WHERE session_id=? ORDER BY id LIMIT 1', [sessionId])
+    const debtRow = this.db.get<DebtRow>(`${DEBT_SELECT} WHERE d.session_id=? ORDER BY d.id LIMIT 1`, [sessionId])
     // Bir xil usuldagi to'lovlarni birlashtiramiz
     const byMethod = new Map<PayMethod, number>()
     for (const p of v.payments) byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amount)
     return {
       settings: settings.receipt,
-      receiptNo: sr.receipt_no ?? 0,
+      // Oraliq chekda raqam YO'Q (chek raqami faqat to'lovda beriladi)
+      receiptNo: provisional ? 0 : sr.receipt_no ?? 0,
       roomName: v.room.name,
       openedAt: sr.opened_at,
       closedAt: sr.closed_at ?? v.computedAt,
-      cashier: names.get(sr.closed_by ?? sr.opened_by) ?? '',
+      cashier: provisional ? provisional.by.name : names.get(sr.closed_by ?? sr.opened_by) ?? '',
       guests: v.guests.map((g) => ({ label: g.label, elapsedMs: g.elapsedMs, timeAmount: g.timeAmount })),
       lines: v.lines
         .filter((l) => l.activeQty > 0)
@@ -534,7 +620,10 @@ export class PosService implements PosApi {
       discount: v.discount,
       total: v.total,
       payments: Array.from(byMethod, ([method, amount]) => ({ method, amount })),
-      debtor: debtRow ? { name: debtRow.customer_name, phone: debtRow.phone } : null
+      debtor: debtRow
+        ? { debtorId: debtRow.debtor_id ?? null, name: debtRow.debtor_name ?? debtRow.customer_name, phone: debtRow.debtor_phone ?? debtRow.phone }
+        : null,
+      provisional: !!provisional
     }
   }
 
@@ -542,6 +631,74 @@ export class PosService implements PosApi {
     this.db.run('INSERT INTO stock_moves(product_id, delta, reason, line_id, at, by) VALUES(?,?,?,?,?,?)', [
       productId, delta, reason, lineId, this.now(), by
     ])
+  }
+
+  // ───── Oshxona cheklari ─────
+  /** Chop etish navbati (ketma-ket; amal javobini kutdirmaydi). Testlar: `await svc.flushKitchenPrints()` */
+  private kitchenQueue: Promise<unknown> = Promise.resolve()
+
+  /** Xodim yorlig'i chek uchun: "Sardor (Ofitsiant)" */
+  private staffLabel(st: Staff): string {
+    return `${st.name} (${ROLE_LABELS[st.role] ?? st.role})`
+  }
+
+  /** Oshxona cheki uchun xona nomi (xonasiz bar savdosi — "Bar") */
+  private sessionRoomName(sessionId: Id): string {
+    const r = this.db.get<{ kind: SessionKind; name: string | null }>(
+      'SELECT s.kind, rm.name FROM sessions s LEFT JOIN rooms rm ON rm.id=s.room_id WHERE s.id=?',
+      [sessionId]
+    )
+    return !r || r.kind === 'bar' ? BAR_ROOM.name : r.name ?? ''
+  }
+
+  /** Oshxona cheki jurnaliga yozuv (tranzaksiya ichida). Qaytaradi: buyurtma № */
+  private insertKitchenTicket(sessionId: Id, kind: KitchenTicketData['kind'], items: { name: string; qty: number }[], by: Id, at: number): number {
+    return this.db.insert('INSERT INTO kitchen_tickets(session_id, kind, items, at, by, printed, error) VALUES(?,?,?,?,?,0,NULL)', [
+      sessionId, kind, JSON.stringify(items), at, by
+    ])
+  }
+
+  /**
+   * Oshxona chekini oshxona printeriga yuborish (host.printReceipt, printer/qog'oz — settings.kitchen).
+   * Xato amalni bekor qilmaydi: jurnalga (kitchen_tickets.error) yoziladi va log qilinadi; keyin kitchen.reprint.
+   * Natija: xato matni yoki null.
+   */
+  private printKitchenTicket(ticketId: number, settings: AppSettings, data: KitchenTicketData): Promise<string | null> {
+    const job = async (): Promise<string | null> => {
+      if (!this.host.printReceipt) return null
+      let error: string | null = null
+      try {
+        const html = renderKitchenHtml({ ...data, paperWidth: settings.kitchen.paperWidth })
+        await this.host.printReceipt(html, { ...settings.receipt, printerName: settings.kitchen.printerName, paperWidth: settings.kitchen.paperWidth })
+      } catch (e) {
+        error = (e instanceof Error ? e.message : String(e)) || 'Chop etishda xato'
+        console.warn(`[oshxona] chek №${ticketId} chop etilmadi: ${error}`)
+      }
+      try {
+        this.db.run('UPDATE kitchen_tickets SET printed=?, error=? WHERE id=?', [error ? 0 : 1, error ? error.slice(0, 300) : null, ticketId])
+      } catch {
+        /* baza yopilgan/almashtirilgan bo'lishi mumkin */
+      }
+      return error
+    }
+    const p = this.kitchenQueue.then(job, job)
+    this.kitchenQueue = p.catch(() => undefined)
+    return p
+  }
+
+  /** Navbatdagi oshxona cheklari tugashini kutish (testlar va yopishdan oldin). */
+  async flushKitchenPrints(): Promise<void> {
+    await this.kitchenQueue
+  }
+
+  /** Oshxona cheklari jurnali (testlar/diagnostika uchun). */
+  listKitchenTickets(sessionId: Id): { id: number; kind: string; items: { name: string; qty: number }[]; printed: boolean; error: string | null }[] {
+    return this.db
+      .all<{ id: number; kind: string; items: string; printed: number; error: string | null }>(
+        'SELECT id, kind, items, printed, error FROM kitchen_tickets WHERE session_id=? ORDER BY id',
+        [sessionId]
+      )
+      .map((r) => ({ id: r.id, kind: r.kind, items: JSON.parse(r.items) as { name: string; qty: number }[], printed: !!r.printed, error: r.error }))
   }
 
   /** Standart xonalar, kategoriyalar, mahsulotlar, xizmatlar (faqat bo'sh bazaga). */
@@ -732,7 +889,7 @@ export class PosService implements PosApi {
 
   // ═════════════ SESSIONS ═════════════
   sessions: PosApi['sessions'] = {
-    open: async (roomId, guestCount, paidMinutes, waiterId) => {
+    open: async (roomId, guestCount, paidMinutes) => {
       const me = this.need('session.open')
       const room = this.roomRow(roomId)
       if (!room.active) fail('Xona faol emas')
@@ -740,12 +897,12 @@ export class PosService implements PosApi {
       if (!isInt(guestCount) || guestCount < 1) fail("Mehmonlar soni kamida 1 bo'lishi kerak")
       if (guestCount > room.capacity) fail(`Xona sig'imi ${room.capacity} kishi`)
       const paid = reqMinutes(paidMinutes, 'Olingan vaqt')
-      const waiter = waiterId == null ? null : this.waiterRow(waiterId)
       const now = this.now()
+      // 2026-10: ofitsiant xonaga biriktirilmaydi (qatorga yoziladi — lines.addProduct/addProducts)
       const id = this.db.tx(() => {
         const sid = this.db.insert(
-          "INSERT INTO sessions(kind, room_id, status, opened_at, opened_by, waiter_id, waiter_pct) VALUES('room', ?, 'open', ?, ?, ?, ?)",
-          [room.id, now, me.id, waiter ? waiter.id : null, waiter ? waiter.commission_pct : 0]
+          "INSERT INTO sessions(kind, room_id, status, opened_at, opened_by, waiter_id, waiter_pct) VALUES('room', ?, 'open', ?, ?, NULL, 0)",
+          [room.id, now, me.id]
         )
         for (let i = 1; i <= guestCount; i++) {
           const gid = this.db.insert("INSERT INTO guests(session_id, label, state, paid_minutes) VALUES(?, ?, 'running', ?)", [
@@ -798,16 +955,6 @@ export class PosService implements PosApi {
       if (this.activeGuestCount(s.id) === 0) fail("Sessiyada faol mehmon yo'q")
       this.db.tx(() =>
         this.db.run("UPDATE guests SET paid_minutes=paid_minutes+? WHERE session_id=? AND state<>'finished'", [add, s.id])
-      )
-      return this.view(s.id)
-    },
-
-    setWaiter: async (sessionId, waiterId) => {
-      this.need('session.manage')
-      const s = this.requireRoomSession(this.openSessionRow(sessionId), "Bar savdosiga ofitsiant biriktirilmaydi (ofitsiant haqi faqat xonalar uchun)")
-      const waiter = waiterId == null ? null : this.waiterRow(waiterId)
-      this.db.tx(() =>
-        this.db.run('UPDATE sessions SET waiter_id=?, waiter_pct=? WHERE id=?', [waiter ? waiter.id : null, waiter ? waiter.commission_pct : 0, s.id])
       )
       return this.view(s.id)
     },
@@ -937,45 +1084,105 @@ export class PosService implements PosApi {
   }
 
   // ═════════════ LINES ═════════════
-  lines: PosApi['lines'] = {
-    addProduct: async (sessionId, productId, qty, guestId) => {
-      const me = this.need('session.manage')
-      const s = this.openSessionRow(sessionId)
-      reqInt(qty, "Miqdor musbat butun son bo'lishi kerak", 1, 10_000)
-      if (s.kind === 'bar' && guestId != null) fail("Bar savdosida mahsulot mehmonga bog'lanmaydi")
-      const p = this.db.get<ProductRow>('SELECT * FROM products WHERE id=? AND deleted=0', [productId])
+  /**
+   * Mahsulot(lar)ni qo'shish — bitta tranzaksiya (ombor hammasi uchun oldindan tekshiriladi).
+   * Ofitsiant: joriy xodim isWaiter bo'lsa — u o'zi (parametr e'tiborsiz); aks holda `waiterId` (faol ofitsiant) yoki null.
+   * Bar savdosida ofitsiant yo'q. Oshxona mahsulotlari bo'lsa — bitta oshxona cheki (autoPrint yoqilgan bo'lsa).
+   */
+  private addItems(sessionId: Id, rawItems: unknown, guestId: Id | null, waiterId: Id | null | undefined): SessionView {
+    const me = this.need('session.manage')
+    const s = this.openSessionRow(sessionId)
+    if (!Array.isArray(rawItems) || rawItems.length === 0) fail('Hech qanday mahsulot tanlanmagan')
+    if (rawItems.length > MAX_ADD_ITEMS) fail(`Bir martada ko'pi bilan ${MAX_ADD_ITEMS} xil mahsulot qo'shish mumkin`)
+    const wanted = new Map<number, number>()
+    for (const it of rawItems as { productId?: unknown; qty?: unknown }[]) {
+      if (!it || typeof it !== 'object') fail("Mahsulot ma'lumotlari noto'g'ri")
+      const qty = reqInt(it.qty, "Miqdor musbat butun son bo'lishi kerak", 1, 10_000)
+      if (!isInt(it.productId)) fail('Mahsulot topilmadi')
+      const sum = (wanted.get(it.productId) ?? 0) + qty
+      if (sum > 10_000) fail("Miqdor juda katta (ko'pi bilan 10 000)")
+      wanted.set(it.productId, sum)
+    }
+    if (s.kind === 'bar' && guestId != null) fail("Bar savdosida mahsulot mehmonga bog'lanmaydi")
+    if (guestId != null) {
+      const g = this.guestRow(guestId)
+      if (g.session_id !== s.id) fail('Mehmon bu sessiyaga tegishli emas')
+    }
+    const items: { p: ProductRow; dep: Department; qty: number }[] = []
+    for (const [productId, qty] of wanted) {
+      const p = this.db.get<ProductRow & { department: Department | null }>(
+        'SELECT p.*, c.department FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.id=? AND p.deleted=0',
+        [productId]
+      )
       if (!p) fail('Mahsulot topilmadi')
-      if (!p.active) fail('Mahsulot sotuvda emas')
-      if (guestId != null) {
-        const g = this.guestRow(guestId)
-        if (g.session_id !== s.id) fail('Mehmon bu sessiyaga tegishli emas')
+      // Bitta mahsulot — eski (qisqa) matn; bir nechta bo'lsa qaysi biri ekanini aytamiz
+      const who = wanted.size > 1 ? `"${p.name}": ` : ''
+      if (!p.active) fail(who ? `${who}sotuvda emas` : 'Mahsulot sotuvda emas')
+      if (p.track_stock && p.stock < qty) fail(`${who}${who ? 'omborda' : 'Omborda'} yetarli emas (qoldi: ${p.stock})`)
+      items.push({ p, dep: p.department === 'kitchen' ? 'kitchen' : 'bar', qty })
+    }
+    // Kim olib bordi
+    let waiter: { id: Id; pct: number; name: string } | null = null
+    if (s.kind !== 'bar') {
+      if (me.isWaiter) waiter = { id: me.id, pct: me.commissionPct, name: me.name }
+      else if (waiterId != null) {
+        const w = this.waiterRow(waiterId)
+        waiter = { id: w.id, pct: w.commission_pct ?? 0, name: w.name }
       }
-      if (p.track_stock && p.stock < qty) fail(`Omborda yetarli emas (qoldi: ${p.stock})`)
-      const now = this.now()
-      this.db.tx(() => {
-        const existing = this.db.get<LineRow>(
-          `SELECT * FROM order_lines WHERE session_id=? AND kind='product' AND ref_id=? AND unit_price=?
-             AND ${guestId == null ? 'guest_id IS NULL' : 'guest_id=?'} ORDER BY id DESC LIMIT 1`,
-          guestId == null ? [s.id, p.id, p.price] : [s.id, p.id, p.price, guestId]
-        )
+    }
+    const settings = this.loadSettings()
+    const kitchenItems = items.filter((x) => x.dep === 'kitchen').map((x) => ({ name: x.p.name, qty: x.qty }))
+    const now = this.now()
+    const ticketId = this.db.tx(() => {
+      for (const { p, dep, qty } of items) {
+        const params: (number | string)[] = [s.id, p.id, p.price, dep]
+        let where = 'session_id=? AND kind=\'product\' AND ref_id=? AND unit_price=? AND department=?'
+        if (guestId == null) where += ' AND guest_id IS NULL'
+        else {
+          where += ' AND guest_id=?'
+          params.push(guestId)
+        }
+        if (waiter == null) where += ' AND waiter_id IS NULL'
+        else {
+          where += ' AND waiter_id=? AND waiter_pct=?'
+          params.push(waiter.id, waiter.pct)
+        }
+        const existing = this.db.get<LineRow>(`SELECT * FROM order_lines WHERE ${where} ORDER BY id DESC LIMIT 1`, params)
         let lineId: number
         if (existing) {
           this.db.run('UPDATE order_lines SET qty=qty+? WHERE id=?', [qty, existing.id])
           lineId = existing.id
         } else {
           lineId = this.db.insert(
-            `INSERT INTO order_lines(session_id, guest_id, kind, ref_id, name, unit_price, qty, returned_qty, provider_id, created_at, created_by)
-             VALUES(?,?,'product',?,?,?,?,0,NULL,?,?)`,
-            [s.id, guestId ?? null, p.id, p.name, p.price, qty, now, me.id]
+            `INSERT INTO order_lines(session_id, guest_id, kind, ref_id, name, unit_price, qty, returned_qty, provider_id, created_at, created_by,
+               department, waiter_id, waiter_pct)
+             VALUES(?,?,'product',?,?,?,?,0,NULL,?,?,?,?,?)`,
+            [s.id, guestId ?? null, p.id, p.name, p.price, qty, now, me.id, dep, waiter ? waiter.id : null, waiter ? waiter.pct : 0]
           )
         }
         if (p.track_stock) {
-          this.db.run('UPDATE products SET stock=stock-? WHERE id=?', [qty, p.id])
+          // Shart bilan: parallel o'zgarishda ham ombor manfiy bo'lmasin
+          const r = this.db.run('UPDATE products SET stock=stock-? WHERE id=? AND stock>=?', [qty, p.id, qty])
+          if (r.changes !== 1) fail(`"${p.name}" omborda yetarli emas`)
           this.addStockMove(p.id, -qty, 'Sotuv', lineId, me.id)
         }
+      }
+      return kitchenItems.length > 0 && settings.kitchen.autoPrint ? this.insertKitchenTicket(s.id, 'order', kitchenItems, me.id, now) : null
+    })
+    if (ticketId != null) {
+      void this.printKitchenTicket(ticketId, settings, {
+        kind: 'order', orderNo: ticketId, roomName: this.sessionRoomName(s.id), items: kitchenItems,
+        waiterName: waiter ? waiter.name : null, addedBy: this.staffLabel(me), at: now
       })
-      return this.view(s.id)
-    },
+    }
+    return this.view(s.id)
+  }
+
+  lines: PosApi['lines'] = {
+    addProduct: async (sessionId, productId, qty, guestId, waiterId) =>
+      this.addItems(sessionId, [{ productId, qty }], guestId, waiterId),
+
+    addProducts: async (sessionId, items, guestId, waiterId) => this.addItems(sessionId, items, guestId, waiterId),
 
     addService: async (sessionId, serviceId, guestId, providerId) => {
       const me = this.need('session.manage')
@@ -1015,7 +1222,9 @@ export class PosService implements PosApi {
       reqInt(qty, `Qaytarish miqdori 1 dan ${active} gacha bo'lishi kerak`, 1, active)
       const why = optText(reason, 200)
       const now = this.now()
-      this.db.tx(() => {
+      const settings = this.loadSettings()
+      const cancelKitchen = l.kind === 'product' && l.department === 'kitchen' && settings.kitchen.autoPrint
+      const ticketId = this.db.tx(() => {
         this.db.run('UPDATE order_lines SET returned_qty=returned_qty+? WHERE id=?', [qty, l.id])
         this.db.insert('INSERT INTO returns(line_id, session_id, qty, reason, at, by) VALUES(?,?,?,?,?,?)', [l.id, s.id, qty, why, now, me.id])
         if (l.kind === 'product') {
@@ -1029,12 +1238,38 @@ export class PosService implements PosApi {
         const v = this.view(s.id, now)
         const gross = v.timeTotal + v.linesTotal
         if (v.session.discount > gross) this.db.run('UPDATE sessions SET discount=? WHERE id=?', [gross, s.id])
+        // Oshxona mahsuloti qaytarilsa — oshxonaga "BEKOR" cheki
+        return cancelKitchen ? this.insertKitchenTicket(s.id, 'cancel', [{ name: l.name, qty }], me.id, now) : null
       })
+      if (ticketId != null) {
+        void this.printKitchenTicket(ticketId, settings, {
+          kind: 'cancel', orderNo: ticketId, roomName: this.sessionRoomName(s.id), items: [{ name: l.name, qty }],
+          waiterName: l.waiter_id != null ? this.staffRow(l.waiter_id)?.name ?? null : null, addedBy: this.staffLabel(me), at: now
+        })
+      }
       return this.view(s.id)
     }
   }
 
   // ═════════════ CHECKOUT ═════════════
+  /**
+   * Qarz yoziladigan odam (tranzaksiya ichida): debtorId berilsa — shu qarzdor; aks holda telefon bo'yicha mavjudi
+   * (ism farq qilsa ham — eski ism saqlanadi) yoki yangisi yaratiladi.
+   */
+  private resolveDebtor(input: { debtorId: Id | null; name: string; phone: string; key: string }): DebtorRow {
+    if (input.debtorId != null) return this.debtorRow(input.debtorId)
+    const found = this.db.get<DebtorRow>('SELECT * FROM debtors WHERE phone_key=?', [input.key])
+    if (found) return found
+    const id = this.db.insert('INSERT INTO debtors(name, phone, phone_key, created_at) VALUES(?,?,?,?)', [input.name, input.phone, input.key, this.now()])
+    return this.debtorRow(id)
+  }
+
+  private debtorRow(id: unknown): DebtorRow {
+    const r = isInt(id) ? this.db.get<DebtorRow>('SELECT * FROM debtors WHERE id=?', [id]) : undefined
+    if (!r) fail('Qarzdor topilmadi')
+    return r
+  }
+
   checkout: PosApi['checkout'] = {
     pay: async (sessionId, payments, debtor) => {
       const me = this.need('session.pay')
@@ -1045,7 +1280,7 @@ export class PosService implements PosApi {
       if (!Array.isArray(payments)) fail("To'lov ma'lumotlari noto'g'ri")
       const merged = new Map<PayMethod, number>()
       for (const p of payments as PaymentInput[]) {
-        if (!p || (p.method !== 'cash' && p.method !== 'card' && p.method !== 'debt')) fail("To'lov usuli noto'g'ri")
+        if (!p || !PAY_METHODS.includes(p.method)) fail("To'lov usuli noto'g'ri")
         if (!isInt(p.amount) || p.amount < 0) fail("To'lov summasi musbat butun son bo'lishi kerak")
         if (p.amount === 0) continue
         merged.set(p.method, (merged.get(p.method) ?? 0) + p.amount)
@@ -1053,15 +1288,20 @@ export class PosService implements PosApi {
       const sum = Array.from(merged.values()).reduce((a, b) => a + b, 0)
       if (sum !== v.total) fail(`To'lov summasi jami summaga teng emas (jami: ${v.total}, kiritildi: ${sum})`)
       const debtAmount = merged.get('debt') ?? 0
-      let debtorClean: DebtorInput | null = null
+      let debtorInput: { debtorId: Id | null; name: string; phone: string; key: string } | null = null
       if (debtAmount > 0) {
         if (!can(me.role, 'debt.manage')) fail(PERMISSION_DENIED)
-        if (!debtor) fail('Qarzdorning ismi va telefoni majburiy')
-        const name = reqText(debtor.name, 'Qarzdorning ismini kiriting', 80)
-        const phone = reqText(debtor.phone, 'Qarzdorning telefonini kiriting', 30)
-        if (!/^[+\d][\d\s()-]{4,}$/.test(phone)) fail("Telefon raqami noto'g'ri")
-        debtorClean = { name, phone }
+        if (!debtor || typeof debtor !== 'object') fail('Qarzdorning ismi va telefoni majburiy')
+        if (debtor.debtorId != null) {
+          const d = this.debtorRow(debtor.debtorId)
+          debtorInput = { debtorId: d.id, name: d.name, phone: d.phone, key: d.phone_key ?? '' }
+        } else {
+          const name = reqText(debtor.name, 'Qarzdorning ismini kiriting', 80)
+          const ph = reqPhone(debtor.phone)
+          debtorInput = { debtorId: null, name, phone: ph.phone, key: ph.key }
+        }
       }
+      const kitchenPct = this.loadSettings().kitchen.sharePct
 
       this.db.tx(() => {
         this.db.run(
@@ -1071,18 +1311,33 @@ export class PosService implements PosApi {
         this.db.run("UPDATE guests SET state='finished' WHERE session_id=?", [s.id])
         for (const [method, amount] of merged)
           this.db.insert('INSERT INTO payments(session_id, method, amount, at, by) VALUES(?,?,?,?,?)', [s.id, method, amount, now, me.id])
-        if (debtorClean)
-          this.db.insert('INSERT INTO debts(session_id, customer_name, phone, amount, paid, created_at, closed_at) VALUES(?,?,?,?,0,?,NULL)', [
-            s.id, debtorClean.name, debtorClean.phone, debtAmount, now
-          ])
+        if (debtorInput) {
+          const d = this.resolveDebtor(debtorInput)
+          this.db.insert(
+            'INSERT INTO debts(debtor_id, session_id, customer_name, phone, amount, paid, created_at, closed_at) VALUES(?,?,?,?,?,0,?,NULL)',
+            [d.id, s.id, d.name, d.phone, debtAmount, now]
+          )
+        }
         const next = (this.db.get<{ m: number | null }>('SELECT MAX(receipt_no) AS m FROM sessions')?.m ?? 0) + 1
-        // Ofitsiant haqi: faqat bar mahsulotlari (qaytarishlar ayirilgan) × muzlatilgan foiz
+        // Mahsulotlar savdosi (bar + oshxona, qaytarishlar ayirilgan) va ofitsiant haqi:
+        //  - eski (2026-10 gacha ochilgan, sessiyaga biriktirilgan) — sessiya foizi bilan;
+        //  - yangi — har bir qator o'z ofitsianti va muzlatilgan foizi bilan (yaxlitlash qator bo'yicha).
+        const rows = this.db.all<LineRow>("SELECT * FROM order_lines WHERE session_id=? AND kind='product'", [s.id])
         const productSales = waiterProductSales(v.lines)
-        const commission = s.kind !== 'bar' && s.waiter_id != null ? waiterCommission(productSales, s.waiter_pct ?? 0) : 0
+        const commission =
+          s.kind === 'bar'
+            ? 0
+            : s.waiter_id != null
+              ? waiterCommission(productSales, s.waiter_pct ?? 0)
+              : rows.filter((l) => l.waiter_id != null).reduce((a, l) => a + lineCommission(l), 0)
+        const kitchenSales = rows
+          .filter((l) => l.department === 'kitchen')
+          .reduce((a, l) => a + lineAmount({ qty: l.qty, returnedQty: l.returned_qty, unitPrice: l.unit_price }), 0)
         this.db.run(
           `UPDATE sessions SET status='closed', closed_at=?, closed_by=?, receipt_no=?, discount=?,
-             time_total=?, lines_total=?, discount_applied=?, total=?, product_sales=?, waiter_commission=? WHERE id=?`,
-          [now, me.id, next, v.discount, v.timeTotal, v.linesTotal, v.discount, v.total, productSales, commission, s.id]
+             time_total=?, lines_total=?, discount_applied=?, total=?, product_sales=?, waiter_commission=?,
+             kitchen_sales=?, kitchen_share_pct=? WHERE id=?`,
+          [now, me.id, next, v.discount, v.timeTotal, v.linesTotal, v.discount, v.total, productSales, commission, kitchenSales, kitchenPct, s.id]
         )
       })
       return this.buildReceipt(s.id)
@@ -1093,6 +1348,13 @@ export class PosService implements PosApi {
       const s = this.sessionRow(sessionId)
       if (s.cancelled) fail('Sessiya bekor qilingan')
       return this.buildReceipt(s.id)
+    },
+
+    preBill: async (sessionId) => {
+      const me = this.need('session.manage')
+      const s = this.sessionRow(sessionId)
+      if (s.status !== 'open') fail("Sessiya yopilgan — to'langan chekni qayta chop eting")
+      return this.buildReceipt(s.id, { by: me })
     }
   }
 
@@ -1153,17 +1415,20 @@ export class PosService implements PosApi {
     saveCategory: async (c) => {
       this.need('settings.manage')
       const name = reqText(c.name, 'Kategoriya nomini kiriting', 60)
+      if (c.department !== undefined && c.department !== 'bar' && c.department !== 'kitchen') fail("Bo'lim noto'g'ri (bar yoki oshxona)")
       if (c.id != null) {
         const cur = this.db.get<CategoryRow>('SELECT * FROM categories WHERE id=? AND deleted=0', [c.id])
         if (!cur) fail('Kategoriya topilmadi')
         const sortOrder = c.sortOrder === undefined ? cur.sort_order : reqInt(c.sortOrder, "Tartib raqami noto'g'ri", -1_000_000, 1_000_000)
-        this.db.tx(() => this.db.run('UPDATE categories SET name=?, sort_order=? WHERE id=?', [name, sortOrder, cur.id]))
-        return toCategory({ id: cur.id, name, sort_order: sortOrder })
+        const department: Department = c.department ?? (cur.department === 'kitchen' ? 'kitchen' : 'bar')
+        this.db.tx(() => this.db.run('UPDATE categories SET name=?, sort_order=?, department=? WHERE id=?', [name, sortOrder, department, cur.id]))
+        return toCategory({ id: cur.id, name, sort_order: sortOrder, department })
       }
       const max = this.db.get<{ m: number | null }>('SELECT MAX(sort_order) AS m FROM categories WHERE deleted=0')?.m ?? 0
       const sortOrder = c.sortOrder === undefined ? (max ?? 0) + 1 : reqInt(c.sortOrder, "Tartib raqami noto'g'ri", -1_000_000, 1_000_000)
-      const id = this.db.tx(() => this.db.insert('INSERT INTO categories(name, sort_order) VALUES(?,?)', [name, sortOrder]))
-      return toCategory({ id, name, sort_order: sortOrder })
+      const department: Department = c.department ?? 'bar'
+      const id = this.db.tx(() => this.db.insert('INSERT INTO categories(name, sort_order, department) VALUES(?,?,?)', [name, sortOrder, department]))
+      return toCategory({ id, name, sort_order: sortOrder, department })
     },
 
     removeCategory: async (id) => {
@@ -1280,11 +1545,24 @@ export class PosService implements PosApi {
   }
 
   // ═════════════ DEBTS ═════════════
+  /** Bitta qarzga to'lov (tranzaksiya ichida). */
+  private applyDebtPayment(d: DebtRow, method: DebtPayMethod, amount: number, by: Id, now: number): void {
+    this.db.insert('INSERT INTO debt_payments(debt_id, method, amount, at, by) VALUES(?,?,?,?,?)', [d.id, method, amount, now, by])
+    const paid = d.paid + amount
+    this.db.run('UPDATE debts SET paid=?, closed_at=? WHERE id=?', [paid, paid >= d.amount ? now : null, d.id])
+  }
+
+  private debtorById(id: Id): Debtor {
+    const r = this.db.get<DebtorRow>(`${DEBTOR_SELECT} WHERE dr.id=? GROUP BY dr.id`, [id])
+    if (!r) fail('Qarzdor topilmadi')
+    return toDebtor(r)
+  }
+
   debts: PosApi['debts'] = {
     list: async (onlyOpen) => {
       this.needRead('debt.manage')
       return this.db
-        .all<DebtRow>(`SELECT * FROM debts ${onlyOpen ? 'WHERE closed_at IS NULL' : ''} ORDER BY created_at DESC, id DESC`)
+        .all<DebtRow>(`${DEBT_SELECT} ${onlyOpen ? 'WHERE d.closed_at IS NULL' : ''} ORDER BY d.created_at DESC, d.id DESC`)
         .map(toDebt)
     },
 
@@ -1293,21 +1571,164 @@ export class PosService implements PosApi {
       const d = this.db.get<DebtRow>('SELECT * FROM debts WHERE id=?', [debtId])
       if (!d) fail('Qarz topilmadi')
       if (d.closed_at != null) fail('Qarz allaqachon to‘langan')
-      if (method !== 'cash' && method !== 'card') fail("To'lov usuli noto'g'ri")
+      if (!DEBT_PAY_METHODS.includes(method)) fail("To'lov usuli noto'g'ri")
       const left = d.amount - d.paid
       reqInt(amount, `To'lov summasi 1 dan ${left} gacha bo'lishi kerak`, 1, left)
       const now = this.now()
-      this.db.tx(() => {
-        this.db.insert('INSERT INTO debt_payments(debt_id, method, amount, at, by) VALUES(?,?,?,?,?)', [d.id, method, amount, now, me.id])
-        const paid = d.paid + amount
-        this.db.run('UPDATE debts SET paid=?, closed_at=? WHERE id=?', [paid, paid >= d.amount ? now : null, d.id])
-      })
-      return toDebt(this.db.get<DebtRow>('SELECT * FROM debts WHERE id=?', [d.id])!)
+      this.db.tx(() => this.applyDebtPayment(d, method, amount, me.id, now))
+      return toDebt(this.db.get<DebtRow>(`${DEBT_SELECT} WHERE d.id=?`, [d.id])!)
     },
 
     payments: async (debtId) => {
       this.needRead('debt.manage')
       return this.db.all<DebtPaymentRow>('SELECT * FROM debt_payments WHERE debt_id=? ORDER BY at, id', [debtId]).map(toDebtPayment)
+    }
+  }
+
+  // ═════════════ QARZDORLAR ═════════════
+  debtors: PosApi['debtors'] = {
+    search: async (query) => {
+      this.needRead('debt.manage')
+      const q = typeof query === 'string' ? query.trim().slice(0, 60) : ''
+      if (!q) return []
+      const digits = q.replace(/\D/g, '')
+      const like = '%' + q.toLowerCase().replace(/[\\%_]/g, (m) => '\\' + m) + '%'
+      const params: (string | number)[] = [like]
+      let where = "LOWER(dr.name) LIKE ? ESCAPE '\\'"
+      if (digits.length >= 2) {
+        where += ' OR dr.phone_key LIKE ?'
+        params.push('%' + digits + '%')
+      }
+      return this.db
+        .all<DebtorRow>(`${DEBTOR_SELECT} WHERE ${where} GROUP BY dr.id ORDER BY COALESCE(MAX(d.created_at), dr.created_at) DESC, dr.id DESC LIMIT 20`, params)
+        .map(toDebtor)
+    },
+
+    list: async (onlyOpen) => {
+      this.needRead('debt.manage')
+      return this.db
+        .all<DebtorRow>(
+          `${DEBTOR_SELECT} GROUP BY dr.id ${onlyOpen ? 'HAVING COALESCE(SUM(d.amount), 0) - COALESCE(SUM(d.paid), 0) > 0' : ''}
+           ORDER BY COALESCE(MAX(d.created_at), dr.created_at) DESC, dr.id DESC`
+        )
+        .map(toDebtor)
+    },
+
+    debts: async (debtorId) => {
+      this.needRead('debt.manage')
+      const dr = this.debtorRow(debtorId)
+      return this.db.all<DebtRow>(`${DEBT_SELECT} WHERE d.debtor_id=? ORDER BY d.created_at DESC, d.id DESC`, [dr.id]).map(toDebt)
+    },
+
+    pay: async (debtorId, method, amount) => {
+      const me = this.need('debt.manage')
+      const dr = this.debtorRow(debtorId)
+      if (!DEBT_PAY_METHODS.includes(method)) fail("To'lov usuli noto'g'ri")
+      const open = this.db.all<DebtRow>('SELECT * FROM debts WHERE debtor_id=? AND closed_at IS NULL ORDER BY created_at, id', [dr.id])
+      const balance = open.reduce((a, d) => a + (d.amount - d.paid), 0)
+      if (balance <= 0) fail("Bu odamning to'lanmagan qarzi yo'q")
+      reqInt(amount, `To'lov summasi 1 dan ${balance} gacha bo'lishi kerak`, 1, balance)
+      const now = this.now()
+      // FIFO: eng eski qarzdan boshlab yopiladi
+      this.db.tx(() => {
+        let left = amount
+        for (const d of open) {
+          if (left <= 0) break
+          const part = Math.min(left, d.amount - d.paid)
+          if (part <= 0) continue
+          this.applyDebtPayment(d, method, part, me.id, now)
+          left -= part
+        }
+      })
+      return this.debtorById(dr.id)
+    },
+
+    rename: async (debtorId, name, phone) => {
+      this.need('debt.manage')
+      const dr = this.debtorRow(debtorId)
+      const n = reqText(name, 'Qarzdorning ismini kiriting', 80)
+      const ph = reqPhone(phone)
+      const other = this.db.get<{ id: number; name: string }>('SELECT id, name FROM debtors WHERE phone_key=? AND id<>?', [ph.key, dr.id])
+      if (other) fail(`Bu telefon raqami boshqa qarzdorga tegishli (${other.name})`)
+      this.db.tx(() => this.db.run('UPDATE debtors SET name=?, phone=?, phone_key=? WHERE id=?', [n, ph.phone, ph.key, dr.id]))
+      return this.debtorById(dr.id)
+    }
+  }
+
+  // ═════════════ OSHXONA ═════════════
+  kitchen: PosApi['kitchen'] = {
+    daily: async (month) => {
+      this.needRead('reports.view')
+      const r = monthRange(month)
+      const days = new Map<string, KitchenDayRow>()
+      const row = (day: string): KitchenDayRow => {
+        let x = days.get(day)
+        if (!x) {
+          x = { day, sales: 0, due: 0, paid: 0, balance: 0, orders: 0 }
+          days.set(day, x)
+        }
+        return x
+      }
+      for (const s of this.db.all<{ closed_at: number; kitchen_sales: number; kitchen_share_pct: number | null }>(
+        `SELECT closed_at, kitchen_sales, kitchen_share_pct FROM sessions
+         WHERE status='closed' AND cancelled=0 AND kitchen_sales > 0 AND closed_at>=? AND closed_at<?`,
+        [r.from, r.to]
+      )) {
+        const x = row(localDay(s.closed_at))
+        x.sales += s.kitchen_sales
+        // Sessiya yopilgan paytdagi (muzlatilgan) ulush
+        x.due += waiterCommission(s.kitchen_sales, s.kitchen_share_pct ?? 100)
+        x.orders++
+      }
+      for (const p of this.db.all<{ day: string; a: number }>(
+        'SELECT day, SUM(amount) AS a FROM kitchen_payouts WHERE day LIKE ? GROUP BY day',
+        [r.month + '-%']
+      )) row(p.day).paid += p.a ?? 0
+      for (const x of days.values()) x.balance = x.due - x.paid
+      return Array.from(days.values()).sort((a, b) => a.day.localeCompare(b.day))
+    },
+
+    payout: async (day, amount, note) => {
+      const me = this.need('staff.manage')
+      const d = dayStart(day)
+      if (d.from > this.now()) fail("Kelajak kun uchun pul berib bo'lmaydi")
+      reqInt(amount, "Summa musbat butun son bo'lishi kerak", 1, 1_000_000_000)
+      const id = this.db.tx(() =>
+        this.db.insert('INSERT INTO kitchen_payouts(day, amount, note, at, by) VALUES(?,?,?,?,?)', [d.day, amount, optText(note, 200), this.now(), me.id])
+      )
+      return toKitchenPayout(this.db.get<KitchenPayoutRow>('SELECT * FROM kitchen_payouts WHERE id=?', [id])!)
+    },
+
+    payouts: async (month) => {
+      this.needRead('reports.view')
+      const r = monthRange(month)
+      return this.db
+        .all<KitchenPayoutRow>('SELECT * FROM kitchen_payouts WHERE day LIKE ? ORDER BY day, at, id', [r.month + '-%'])
+        .map(toKitchenPayout)
+    },
+
+    reprint: async (sessionId) => {
+      const me = this.need('session.manage')
+      const s = this.sessionRow(sessionId)
+      if (s.cancelled) fail('Sessiya bekor qilingan')
+      const lines = this.db.all<LineRow>(
+        "SELECT * FROM order_lines WHERE session_id=? AND kind='product' AND department='kitchen' AND qty>returned_qty ORDER BY id",
+        [s.id]
+      )
+      if (lines.length === 0) fail("Bu buyurtmada oshxona mahsulotlari yo'q")
+      const byName = new Map<string, number>()
+      for (const l of lines) byName.set(l.name, (byName.get(l.name) ?? 0) + (l.qty - l.returned_qty))
+      const items = Array.from(byName, ([name, qty]) => ({ name, qty }))
+      const names = this.staffNames()
+      const waiterIds = Array.from(new Set(lines.map((l) => l.waiter_id).filter((x): x is number => x != null)))
+      const waiterName = waiterIds.length ? waiterIds.map((id) => names.get(id) ?? '').join(', ') : null
+      const settings = this.loadSettings()
+      const now = this.now()
+      const ticketId = this.db.tx(() => this.insertKitchenTicket(s.id, 'reprint', items, me.id, now))
+      const err = await this.printKitchenTicket(ticketId, settings, {
+        kind: 'reprint', orderNo: ticketId, roomName: this.sessionRoomName(s.id), items, waiterName, addedBy: this.staffLabel(me), at: now
+      })
+      if (err) fail(err)
     }
   }
 
@@ -1370,6 +1791,45 @@ export class PosService implements PosApi {
     }
   }
 
+  /**
+   * Ofitsiantlar haqi oraliq bo'yicha (yopilgan, bekor qilinmagan sessiyalar):
+   *  - eski sessiyalar (sessions.waiter_id) — muzlatilgan product_sales/waiter_commission;
+   *  - yangi — qatorlar (order_lines.waiter_id): faol summa × qator foizi (yaxlitlash qator bo'yicha). Bar savdosi kirmaydi.
+   */
+  private waiterAgg(from: number, to: number): Map<Id, { sessions: Set<number>; productSales: number; commission: number }> {
+    const m = new Map<Id, { sessions: Set<number>; productSales: number; commission: number }>()
+    const get = (id: Id) => {
+      let x = m.get(id)
+      if (!x) {
+        x = { sessions: new Set<number>(), productSales: 0, commission: 0 }
+        m.set(id, x)
+      }
+      return x
+    }
+    for (const s of this.db.all<{ id: number; waiter_id: number; product_sales: number | null; waiter_commission: number | null }>(
+      `SELECT id, waiter_id, product_sales, waiter_commission FROM sessions
+       WHERE kind='room' AND waiter_id IS NOT NULL AND status='closed' AND cancelled=0 AND closed_at>=? AND closed_at<?`,
+      [from, to]
+    )) {
+      const x = get(s.waiter_id)
+      x.sessions.add(s.id)
+      x.productSales += s.product_sales ?? 0
+      x.commission += s.waiter_commission ?? 0
+    }
+    for (const l of this.db.all<LineRow>(
+      `SELECT l.* FROM order_lines l JOIN sessions s ON s.id=l.session_id
+       WHERE l.kind='product' AND l.waiter_id IS NOT NULL AND l.qty>l.returned_qty AND s.kind='room' AND s.waiter_id IS NULL
+         AND s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<?`,
+      [from, to]
+    )) {
+      const x = get(l.waiter_id!)
+      x.sessions.add(l.session_id)
+      x.productSales += (l.qty - l.returned_qty) * l.unit_price
+      x.commission += lineCommission(l)
+    }
+    return m
+  }
+
   // ═════════════ WAITERS ═════════════
   waiters: PosApi['waiters'] = {
     list: async () => {
@@ -1380,32 +1840,28 @@ export class PosService implements PosApi {
     monthly: async (month) => {
       this.need('reports.view')
       const r = monthRange(month)
-      const agg = this.db.all<{ waiter_id: number; n: number; sales: number | null; comm: number | null }>(
-        `SELECT waiter_id, COUNT(*) AS n, SUM(product_sales) AS sales, SUM(waiter_commission) AS comm FROM sessions
-         WHERE kind='room' AND waiter_id IS NOT NULL AND status='closed' AND cancelled=0 AND closed_at>=? AND closed_at<? GROUP BY waiter_id`,
-        [r.from, r.to]
-      )
+      const agg = this.waiterAgg(r.from, r.to)
       const paidRows = this.db.all<{ staff_id: number; a: number | null }>(
         'SELECT staff_id, SUM(amount) AS a FROM waiter_payouts WHERE month=? GROUP BY staff_id',
         [r.month]
       )
       const ids = new Set<number>()
       for (const w of this.db.all<{ id: number }>('SELECT id FROM staff WHERE is_waiter=1 AND active=1')) ids.add(w.id)
-      for (const a of agg) ids.add(a.waiter_id)
+      for (const id of agg.keys()) ids.add(id)
       for (const p of paidRows) ids.add(p.staff_id)
       const rows: WaiterMonthRow[] = []
       for (const id of ids) {
         const st = this.staffRow(id)
         if (!st) continue
-        const a = agg.find((x) => x.waiter_id === id)
-        const commission = a?.comm ?? 0
+        const a = agg.get(id)
+        const commission = a?.commission ?? 0
         const paid = paidRows.find((x) => x.staff_id === id)?.a ?? 0
         rows.push({
           staffId: id,
           name: st.name,
           commissionPct: st.commission_pct ?? 0,
-          sessions: a?.n ?? 0,
-          productSales: a?.sales ?? 0,
+          sessions: a?.sessions.size ?? 0,
+          productSales: a?.productSales ?? 0,
           commission,
           paid,
           balance: commission - paid
@@ -1417,24 +1873,43 @@ export class PosService implements PosApi {
     sessions: async (staffId, month) => {
       this.need('reports.view')
       const r = monthRange(month)
-      return this.db
-        .all<{ id: number; closed_at: number; room_name: string; product_sales: number | null; waiter_pct: number; waiter_commission: number | null }>(
-          `SELECT s.id, s.closed_at, rm.name AS room_name, s.product_sales, s.waiter_pct, s.waiter_commission
-           FROM sessions s JOIN rooms rm ON rm.id=s.room_id
-           WHERE s.kind='room' AND s.waiter_id=? AND s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<?
-           ORDER BY s.closed_at, s.id`,
-          [isInt(staffId) ? staffId : -1, r.from, r.to]
-        )
-        .map(
-          (x): WaiterSessionRow => ({
-            sessionId: x.id,
-            closedAt: x.closed_at,
-            roomName: x.room_name,
-            productSales: x.product_sales ?? 0,
-            pct: x.waiter_pct ?? 0,
-            commission: x.waiter_commission ?? 0
-          })
-        )
+      const sid = isInt(staffId) ? staffId : -1
+      const out: WaiterSessionRow[] = []
+      // Eski (sessiyaga biriktirilgan) — muzlatilgan summalar
+      for (const x of this.db.all<{ id: number; closed_at: number; room_name: string | null; product_sales: number | null; waiter_pct: number; waiter_commission: number | null }>(
+        `SELECT s.id, s.closed_at, rm.name AS room_name, s.product_sales, s.waiter_pct, s.waiter_commission
+         FROM sessions s LEFT JOIN rooms rm ON rm.id=s.room_id
+         WHERE s.kind='room' AND s.waiter_id=? AND s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<?`,
+        [sid, r.from, r.to]
+      ))
+        out.push({
+          sessionId: x.id, closedAt: x.closed_at, roomName: x.room_name ?? '', productSales: x.product_sales ?? 0,
+          pct: x.waiter_pct ?? 0, commission: x.waiter_commission ?? 0
+        })
+      // Yangi — ofitsiantning qatorlari, sessiya (xona) bo'yicha
+      const bySession = new Map<number, WaiterSessionRow & { pcts: Set<number> }>()
+      for (const l of this.db.all<LineRow & { closed_at: number; room_name: string | null; skind: SessionKind }>(
+        `SELECT l.*, s.closed_at, rm.name AS room_name, s.kind AS skind FROM order_lines l JOIN sessions s ON s.id=l.session_id
+         LEFT JOIN rooms rm ON rm.id=s.room_id
+         WHERE l.kind='product' AND l.waiter_id=? AND l.qty>l.returned_qty AND s.waiter_id IS NULL
+           AND s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<?`,
+        [sid, r.from, r.to]
+      )) {
+        if (l.skind === 'bar') continue
+        const x = bySession.get(l.session_id) ?? {
+          sessionId: l.session_id, closedAt: l.closed_at, roomName: l.room_name ?? '', productSales: 0, pct: l.waiter_pct ?? 0, commission: 0, pcts: new Set<number>()
+        }
+        x.productSales += (l.qty - l.returned_qty) * l.unit_price
+        x.commission += lineCommission(l)
+        x.pcts.add(l.waiter_pct ?? 0)
+        bySession.set(l.session_id, x)
+      }
+      for (const { pcts, ...x } of bySession.values()) {
+        // Sessiya ichida foiz o'zgargan bo'lsa — samarali foiz
+        if (pcts.size > 1) x.pct = x.productSales > 0 ? Math.round((x.commission * 10000) / x.productSales) / 100 : 0
+        out.push(x)
+      }
+      return out.sort((a, b) => a.closedAt - b.closedAt || a.sessionId - b.sessionId)
     },
 
     payout: async (staffId, month, amount, note) => {
@@ -1443,7 +1918,11 @@ export class PosService implements PosApi {
       if (r.from > this.now()) fail("Kelajak oy uchun pul berib bo'lmaydi")
       const st = isInt(staffId) ? this.staffRow(staffId) : undefined
       if (!st) fail('Xodim topilmadi')
-      const hasSessions = (this.db.get<{ n: number }>('SELECT COUNT(*) AS n FROM sessions WHERE waiter_id=?', [st.id])?.n ?? 0) > 0
+      const hasSessions =
+        (this.db.get<{ n: number }>(
+          'SELECT (SELECT COUNT(*) FROM sessions WHERE waiter_id=?) + (SELECT COUNT(*) FROM order_lines WHERE waiter_id=?) AS n',
+          [st.id, st.id]
+        )?.n ?? 0) > 0
       if (!st.is_waiter && !hasSessions) fail('Xodim ofitsiant emas')
       reqInt(amount, "Summa musbat butun son bo'lishi kerak", 1, 1_000_000_000)
       const id = this.db.tx(() =>
@@ -1504,8 +1983,8 @@ export class PosService implements PosApi {
         serviceRevenue: 0,
         discounts: 0,
         total: 0,
-        byMethod: { cash: 0, card: 0, debt: 0 },
-        debtPayments: { cash: 0, card: 0 },
+        byMethod: { cash: 0, card: 0, terminal: 0, debt: 0 },
+        debtPayments: { cash: 0, card: 0, terminal: 0 },
         returnsAmount: 0,
         byDay: [],
         byRoom: [],
@@ -1518,18 +1997,13 @@ export class PosService implements PosApi {
       const byDay = new Map<string, number>()
       const byRoom = new Map<Id, { roomId: Id; roomName: string; sessions: number; total: number }>()
       const byStaff = new Map<Id, { staffId: Id; name: string; sessions: number; total: number }>()
-      const byWaiter = new Map<Id, SalesReport['byWaiter'][number]>()
       const names = this.staffNames()
+      // Ofitsiantlar: qatorlar bo'yicha (eski sessiyalar — muzlatilgan sessiya haqi); xonasiz bar savdosi kirmaydi
+      const byWaiter: SalesReport['byWaiter'] = Array.from(this.waiterAgg(from, to), ([staffId, a]) => ({
+        staffId, name: names.get(staffId) ?? '', sessions: a.sessions.size, productSales: a.productSales, commission: a.commission
+      }))
       for (const s of sessions) {
         const isBar = s.kind === 'bar'
-        // Xonasiz bar savdosi: ofitsiant haqi yo'q (byWaiter ga kirmaydi), alohida ko'rsatkich
-        if (!isBar && s.waiter_id != null) {
-          const w = byWaiter.get(s.waiter_id) ?? { staffId: s.waiter_id, name: names.get(s.waiter_id) ?? '', sessions: 0, productSales: 0, commission: 0 }
-          w.sessions++
-          w.productSales += s.product_sales ?? 0
-          w.commission += s.waiter_commission ?? 0
-          byWaiter.set(s.waiter_id, w)
-        }
         const total = s.total ?? 0
         report.timeRevenue += s.time_total ?? 0
         report.discounts += s.discount_applied ?? 0
@@ -1573,11 +2047,11 @@ export class PosService implements PosApi {
           }
         }
       }
-      for (const p of pays) report.byMethod[p.method] += p.amount
-      for (const d of this.db.all<{ method: 'cash' | 'card'; a: number }>(
+      for (const p of pays) if (p.method in report.byMethod) report.byMethod[p.method] += p.amount
+      for (const d of this.db.all<{ method: DebtPayMethod; a: number }>(
         'SELECT method, SUM(amount) AS a FROM debt_payments WHERE at>=? AND at<? GROUP BY method',
         [from, to]
-      )) report.debtPayments[d.method] += d.a ?? 0
+      )) if (d.method in report.debtPayments) report.debtPayments[d.method] += d.a ?? 0
       const ret = this.db.get<{ a: number | null }>(
         `SELECT SUM(r.qty * l.unit_price) AS a FROM returns r JOIN order_lines l ON l.id=r.line_id
          JOIN sessions s ON s.id=r.session_id WHERE s.cancelled=0 AND r.at>=? AND r.at<?`,
@@ -1589,7 +2063,7 @@ export class PosService implements PosApi {
       report.byProduct = Array.from(byProduct.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
       report.byProvider = Array.from(byProvider.values()).sort((a, b) => b.amount - a.amount)
       report.byStaff = Array.from(byStaff.values()).sort((a, b) => b.total - a.total)
-      report.byWaiter = Array.from(byWaiter.values()).sort((a, b) => b.commission - a.commission || a.name.localeCompare(b.name))
+      report.byWaiter = byWaiter.sort((a, b) => b.commission - a.commission || a.name.localeCompare(b.name))
       return report
     },
 
@@ -1698,12 +2172,12 @@ export class PosService implements PosApi {
       this.noViewer()
       return this.host.connection ? this.host.connection.discover() : []
     },
-    connectViewer: async (host, port, code) => {
+    connectTerminal: async (host, port, code) => {
       this.noViewer()
       if (!this.host.connection) fail('Ulanish bu muhitda mavjud emas')
-      // Sozlangan asosiy kompyuterni ko'ruvchiga aylantirish — faqat ega (bazasi bor kompyuterni tasodifan "o'chirib qo'ymaslik")
+      // Sozlangan asosiy kompyuterni terminalga aylantirish — faqat ega (bazasi bor kompyuterni tasodifan "o'chirib qo'ymaslik")
       if (!(await this.auth.needsSetup())) this.need('settings.manage')
-      return this.host.connection.connectViewer(host, port, code)
+      return this.host.connection.connectTerminal(host, port, code)
     },
     disconnect: async () => {
       this.noViewer()

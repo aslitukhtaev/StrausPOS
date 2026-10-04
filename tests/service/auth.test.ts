@@ -117,7 +117,7 @@ describe('ruxsatlar', () => {
     await expect(svc.catalog.adjustStock(1, 5, '')).rejects.toThrow(denied)
     await expect(svc.catalog.saveProduct({ name: 'Z', categoryId: 1, price: 1 })).rejects.toThrow(denied)
     await expect(svc.staff.changePin(staff.owner.id, '9999')).rejects.toThrow(denied)
-    const v = await svc.sessions.open(rooms.s1, 1, 60, null)
+    const v = await svc.sessions.open(rooms.s1, 1, 60)
     await expect(svc.sessions.setDiscount(v.session.id, 1000)).rejects.toThrow(denied)
     // o'z PINini o'zgartira oladi
     await svc.staff.changePin(staff.cashier.id, '7777')
@@ -139,7 +139,7 @@ describe('ruxsatlar', () => {
   it('kirmagan foydalanuvchi hech narsa qila olmaydi', async () => {
     const { svc, rooms } = await setup()
     await svc.auth.logout()
-    await expect(svc.sessions.open(rooms.s1, 1, 60, null)).rejects.toThrow('Avval tizimga kiring')
+    await expect(svc.sessions.open(rooms.s1, 1, 60)).rejects.toThrow('Avval tizimga kiring')
     await expect(svc.catalog.products()).rejects.toThrow('Avval tizimga kiring')
     // Ochiq metodlar
     await expect(svc.settings.get()).resolves.toBeTruthy()

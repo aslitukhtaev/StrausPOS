@@ -11,12 +11,12 @@ const MAP: MethodMap = {
   auth: { listLoginStaff: true, login: true, logout: true, current: true, needsSetup: true, setupOwner: true },
   rooms: { board: true, list: true, save: true, remove: true },
   sessions: {
-    open: true, get: true, addGuest: true, extendGuest: true, extendAll: true, setWaiter: true,
+    open: true, get: true, addGuest: true, extendGuest: true, extendAll: true,
     guestPause: true, guestResume: true, guestFinish: true,
     renameGuest: true, moveRoom: true, setDiscount: true, stopAll: true, cancel: true
   },
-  lines: { addProduct: true, addService: true, returnLine: true },
-  checkout: { pay: true, receipt: true },
+  lines: { addProduct: true, addProducts: true, addService: true, returnLine: true },
+  checkout: { pay: true, receipt: true, preBill: true },
   barSales: { open: true, openList: true, history: true },
   license: { status: true, activate: true },
   catalog: {
@@ -24,12 +24,14 @@ const MAP: MethodMap = {
     removeProduct: true, adjustStock: true, services: true, saveService: true, removeService: true
   },
   debts: { list: true, pay: true, payments: true },
+  debtors: { search: true, list: true, debts: true, pay: true, rename: true },
+  kitchen: { daily: true, payout: true, payouts: true, reprint: true },
   staff: { list: true, save: true, changePin: true },
   waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
   settings: { get: true, save: true },
   reports: { sales: true, returns: true },
   network: { status: true, setEnabled: true, regenerateCode: true },
-  connection: { info: true, discover: true, connectViewer: true, disconnect: true },
+  connection: { info: true, discover: true, connectTerminal: true, disconnect: true },
   system: { printReceipt: true, receiptHtml: true, backup: true, restore: true, now: true, listPrinters: true }
 }
 

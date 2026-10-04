@@ -76,3 +76,27 @@ export async function serviceByName(svc: PosService, name: string) {
   if (!s) throw new Error('Xizmat yo‘q: ' + name)
   return s
 }
+
+/**
+ * Oshxona bo'limi: "Oshxona" kategoriyasi (department='kitchen') va ombor hisobisiz ovqatlar.
+ * Lag'mon 35 000, Osh 40 000, Manti 30 000. Ega (settings.manage) sifatida chaqiring.
+ */
+export async function kitchenSetup(svc: PosService) {
+  const cat = await svc.catalog.saveCategory({ name: 'Oshxona', department: 'kitchen' })
+  const mk = (name: string, price: number) => svc.catalog.saveProduct({ name, price, categoryId: cat.id, trackStock: false })
+  return { cat, lagmon: await mk("Lag'mon", 35_000), osh: await mk('Osh', 40_000), manti: await mk('Manti', 30_000) }
+}
+
+/** Chop etishni yozib oluvchi soxta host (chek va oshxona cheklari) */
+export function recordingHost() {
+  const printed: { html: string; printerName: string; paperWidth: number }[] = []
+  /** fail.kitchen = true → oshxona cheklari (Buyurtma №) xato bilan tugaydi */
+  const fail = { kitchen: false }
+  const host: PosHost = {
+    printReceipt: async (html, settings) => {
+      if (fail.kitchen && html.includes('Buyurtma №')) throw new Error('Printer topilmadi')
+      printed.push({ html, printerName: settings.printerName, paperWidth: settings.paperWidth })
+    }
+  }
+  return { host, printed, fail }
+}

@@ -5,7 +5,7 @@ import { productByName, serviceByName, setup } from './helpers'
 async function sessionWithBill() {
   const ctx = await setup()
   const { svc, rooms, clock, staff } = ctx
-  const v0 = await svc.sessions.open(rooms.s1, 2, 90, null) // 50 000/soat, har biriga 90 daqiqa olingan
+  const v0 = await svc.sessions.open(rooms.s1, 2, 90) // 50 000/soat, har biriga 90 daqiqa olingan
   const beer = await productByName(svc, 'Pivo 0.5 L') // 20 000
   await svc.lines.addProduct(v0.session.id, beer.id, 2, v0.guests[0].id)
   await svc.lines.addService(v0.session.id, (await serviceByName(svc, 'Peeling')).id, null, staff.provider.id) // 80 000
@@ -77,7 +77,7 @@ describe('to‘lov', () => {
     const { svc, rooms, clock } = await setup()
     const nos: number[] = []
     for (const room of [rooms.s1, rooms.s2, rooms.s1]) {
-      const v0 = await svc.sessions.open(room, 1, 60, null)
+      const v0 = await svc.sessions.open(room, 1, 60)
       clock.advanceMin(60)
       const v = await svc.sessions.get(v0.session.id)
       nos.push((await svc.checkout.pay(v0.session.id, [{ method: 'card', amount: v.total }], null)).receiptNo)
@@ -87,7 +87,7 @@ describe('to‘lov', () => {
 
   it('olingan vaqt darhol to‘lanadi (bo‘sh to‘lov bilan yopilmaydi); bepul xona — bo‘sh to‘lov bilan', async () => {
     const { svc, rooms } = await setup()
-    const v0 = await svc.sessions.open(rooms.s1, 1, 60, null)
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
     expect(v0.total).toBe(50_000)
     await expect(svc.checkout.pay(v0.session.id, [], null)).rejects.toThrow('jami: 50000')
     const r = await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: 50_000 }], null)
@@ -95,7 +95,7 @@ describe('to‘lov', () => {
     expect(r.guests[0]).toEqual({ label: 'Mehmon 1', elapsedMs: 0, timeAmount: 50_000 })
 
     const free = await svc.rooms.save({ name: 'Bepul', pricePerHour: 0, capacity: 2 })
-    const v1 = await svc.sessions.open(free.id, 1, 60, null)
+    const v1 = await svc.sessions.open(free.id, 1, 60)
     const r1 = await svc.checkout.pay(v1.session.id, [], null)
     expect(r1.total).toBe(0)
     expect(r1.payments).toEqual([])
@@ -115,7 +115,8 @@ describe('qarz', () => {
     await expect(svc.checkout.pay(sessionId, pays, { name: '', phone: '+998901234567' })).rejects.toThrow('ismini')
 
     const r = await svc.checkout.pay(sessionId, pays, { name: ' Jasur ', phone: '+998 90 123 45 67' })
-    expect(r.debtor).toEqual({ name: 'Jasur', phone: '+998 90 123 45 67' })
+    expect(r.debtor).toEqual({ debtorId: expect.any(Number), name: 'Jasur', phone: '+998 90 123 45 67' })
+    expect(r.provisional).toBe(false)
     expect(r.payments).toEqual(pays)
 
     let debts = await svc.debts.list(true)
@@ -197,7 +198,7 @@ describe('chek ma’lumotlari', () => {
   it('printReceipt host orqali chaqiriladi', async () => {
     const printed: { html: string; printer: string }[] = []
     const ctx = await setup({ host: { printReceipt: async (html, s) => void printed.push({ html, printer: s.printerName }) } })
-    const v0 = await ctx.svc.sessions.open(ctx.rooms.s1, 1, 60, null)
+    const v0 = await ctx.svc.sessions.open(ctx.rooms.s1, 1, 60)
     const r = await ctx.svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: v0.total }], null)
     await ctx.svc.system.printReceipt({ ...r, settings: { ...r.settings, printerName: 'XP-80' } })
     expect(printed).toHaveLength(1)

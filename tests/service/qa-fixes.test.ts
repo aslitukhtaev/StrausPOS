@@ -8,7 +8,7 @@ describe('QA tuzatishlari', () => {
     const s1 = list.find((r) => r.id === rooms.s1)!.pricePerHour
     const vip = list.find((r) => r.id === rooms.vip)!.pricePerHour
     expect(vip).not.toBe(s1)
-    const v0 = await svc.sessions.open(rooms.s1, 2, 60, null)
+    const v0 = await svc.sessions.open(rooms.s1, 2, 60)
     const [a, b] = v0.guests
     clock.advanceMin(10)
     await svc.sessions.guestPause(b.id)

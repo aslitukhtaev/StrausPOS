@@ -48,8 +48,13 @@ const guest = (id: number, intervals: TimeInterval[], state: Guest['state'] = 'f
   intervals,
   paidMinutes
 })
-/** Standart: yaxlitlash 1000, blok 60, imtiyoz 0 */
-const OPT: BillingOptions = { ...DEFAULT_BILLING }
+/**
+ * Blok mexanizmi testlari: yaxlitlash 1000, blok 60, imtiyoz 0 (shared DEFAULT_BILLING).
+ * DIQQAT: 2026-10 dan ilova standarti blockMinutes=1 (PosService DEFAULT_SETTINGS) — pastdagi "daqiqalik" bo'limi.
+ */
+const OPT: BillingOptions = { ...DEFAULT_BILLING, blockMinutes: 60 }
+/** 2026-10 ilova standarti: aynan o'tirilgan daqiqa uchun (1 soat olingan, 01:01:00 → 61 daq) */
+const PER_MIN: BillingOptions = { ...DEFAULT_BILLING, blockMinutes: 1 }
 const opt = (o: Partial<BillingOptions> = {}): BillingOptions => ({ ...OPT, ...o })
 const line = (o: Partial<OrderLine> = {}): OrderLine => ({
   id: 1,
@@ -64,6 +69,9 @@ const line = (o: Partial<OrderLine> = {}): OrderLine => ({
   providerId: null,
   createdAt: 0,
   createdBy: 1,
+  department: 'bar',
+  waiterId: null,
+  waiterPct: 0,
   ...o
 })
 
@@ -528,5 +536,52 @@ describe('Real senariylar (qo‘lda hisoblangan)', () => {
     // uzaytirilmaganda 100 daqiqa ham 2 soat (blok), 121 da farq: 3 soat
     expect(guestTimeAmount(ivs, 60, m(100), OPT)).toBe(120000)
     expect(guestTimeAmount(ivs, 120, m(121), OPT)).toBe(180000)
+  })
+})
+
+describe('2026-10: daqiqalik ortiqcha vaqt (blockMinutes=1 — ilova standarti)', () => {
+  const RATE = 60000 // 1 000 so'm/daqiqa
+  it('1 soat olingan, 01:01:00 → 61 daqiqa (avtomatik 2 soat EMAS)', () => {
+    expect(billedMinutes(m(61), 60, PER_MIN)).toBe(61)
+    expect(guestTimeAmount([iv(RATE, 0, null)], 60, m(61), PER_MIN)).toBe(61000)
+  })
+  it('olingan vaqt ichida — to‘liq soat (5 daqiqa ham 60 daqiqa)', () => {
+    expect(billedMinutes(m(5), 60, PER_MIN)).toBe(60)
+    expect(guestTimeAmount([iv(RATE, 0, null)], 60, m(5), PER_MIN)).toBe(60000)
+  })
+  it('boshlangan daqiqa to‘liq: 01:00:01 → 61 daq; 01:30:59 → 91 daq', () => {
+    expect(billedMinutes(m(60) + s(1), 60, PER_MIN)).toBe(61)
+    expect(billedMinutes(m(90) + s(59), 60, PER_MIN)).toBe(91)
+    expect(billedMinutes(m(120), 60, PER_MIN)).toBe(120)
+  })
+  it('imtiyoz bilan: 10 daqiqagacha qo‘shilmaydi, 71-daqiqada 71 daq', () => {
+    const G = { ...PER_MIN, graceMinutes: 10 }
+    expect(billedMinutes(m(70), 60, G)).toBe(60)
+    expect(billedMinutes(m(70) + s(1), 60, G)).toBe(71)
+  })
+  it('summa: 50 000/soat, 75 daqiqa → 62 500 → yaxlitlash 1000 bilan 63 000; roundTo=1 → 62 500', () => {
+    expect(guestTimeAmount([iv(50000, 0, 75)], 60, m(80), PER_MIN)).toBe(63000)
+    expect(guestTimeAmount([iv(50000, 0, 75)], 60, m(80), { ...PER_MIN, roundTo: 1 })).toBe(62500)
+  })
+  it('xona almashtirish: 60@50k + 61 daq @100k (oshgan daqiqa yangi narxda)', () => {
+    const g = guest(1, [iv(50000, 0, 60, 1), iv(100000, 60, null, 2)], 'running', 120)
+    // 121 daq: 60 × 50k/60 + 61 × 100k/60 = 50 000 + 101 666.7 = 151 666.7 → 152 000
+    expect(buildGuestView(g, [], m(121), PER_MIN).timeAmount).toBe(152000)
+    expect(buildGuestView(g, [], m(121), PER_MIN).billedMinutes).toBe(121)
+  })
+  it('paidMinutes=0 (eski sessiya): aynan o‘tirilgan daqiqa', () => {
+    expect(billedMinutes(m(30), 0, PER_MIN)).toBe(30)
+    expect(guestTimeAmount([iv(30000, 0, 30)], 0, m(30), PER_MIN)).toBe(15000)
+  })
+  it('4 mehmon (yuqoridagi real senariy) daqiqalik hisobda', () => {
+    const NOW = m(127)
+    const gs = [
+      guest(1, [iv(RATE, 0, 25)]), // 25 daq → 60
+      guest(2, [iv(RATE, 0, 40), iv(RATE, 50, null)], 'running'), // 117 daq
+      guest(3, [iv(RATE, 0, null)], 'running'), // 127 daq
+      guest(4, [iv(RATE, 0, null)], 'running', 180) // 180 olingan
+    ].map((g) => buildGuestView(g, [], NOW, PER_MIN))
+    expect(gs.map((g) => g.billedMinutes)).toEqual([60, 117, 127, 180])
+    expect(gs.map((g) => g.timeAmount)).toEqual([60000, 117000, 127000, 180000])
   })
 })
