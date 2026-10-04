@@ -1,19 +1,20 @@
 /**
  * "Bar savdo" — xonaga bog'lanmagan oddiy kassa (barSales.*).
  *
- * Chapda: kategoriya tablari, qidiruv va katta mahsulot plitalari (bosish = +1).
+ * Chapda: Bar / Oshxona tablari (kategoriya `department`), kategoriyalar, qidiruv va katta mahsulot plitalari (bosish = +1).
+ * Oshxona mahsuloti qo'shilsa backend oshxona chekini avtomatik chiqaradi — UI toast bilan bildiradi.
  * O'ngda: savat (ochiq savdolar tablari, qatorlar, X, JAMI, "To'lash" → CheckoutDialog).
  * Savdo birinchi mahsulot qo'shilganda yaratiladi (bo'sh savdo yaratilmaydi); oxirgi mahsulot olib tashlansa — bekor qilinadi.
  * Ofitsiant ulushi bu savdolarda hisoblanmaydi (backend). Mantiq yo'q — faqat PosApi.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { LineView, Product, ProductCategory, ReceiptData, SessionView } from '@shared/types'
+import type { Department, LineView, Product, ProductCategory, ReceiptData, SessionView } from '@shared/types'
 import { api } from '@/api'
 import { useApp } from '@/store/app'
 import { useCan } from '@/store/auth'
 import { CheckoutDialog } from '@/screens/checkout'
 import {
-  Button, EmptyState, Icon, IconButton, Input, Money, PageHeader, Spinner, confirmDialog, cx, formatClock, formatMoney, toast
+  Button, EmptyState, Icon, IconButton, Input, Money, PageHeader, Segmented, Spinner, confirmDialog, cx, formatClock, formatMoney, toast
 } from '@/ui'
 import { RemoveDialog } from './RemoveDialog'
 import { HistoryDialog } from './HistoryDialog'
@@ -31,7 +32,10 @@ export default function SaleScreen() {
   // ── Katalog ──
   const [categories, setCategories] = useState<ProductCategory[] | null>(null)
   const [products, setProducts] = useState<Product[]>([])
-  const [cat, setCat] = useState(0)
+  const [dept, setDept] = useState<Department>('bar')
+  const [catByDept, setCatByDept] = useState<Record<Department, number>>({ bar: 0, kitchen: 0 })
+  const cat = catByDept[dept]
+  const setCat = (id: number) => setCatByDept((m) => ({ ...m, [dept]: id }))
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -123,11 +127,25 @@ export default function SaleScreen() {
     if (sales && activeId != null && !sales.some((s) => s.session.id === activeId)) setActive(null)
   }, [sales, activeId])
 
+  const deptOf = useMemo(() => {
+    const m = new Map<number, Department>()
+    for (const c of categories || []) m.set(c.id, c.department === 'kitchen' ? 'kitchen' : 'bar')
+    return m
+  }, [categories])
+  const isKitchen = useCallback((productId: number) => {
+    const p = products.find((x) => x.id === productId)
+    return !!p && deptOf.get(p.categoryId) === 'kitchen'
+  }, [products, deptOf])
+  const deptCats = useMemo(() => (categories || []).filter((c) => (deptOf.get(c.id) ?? 'bar') === dept), [categories, deptOf, dept])
+  const hasKitchen = useMemo(() => (categories || []).some((c) => c.department === 'kitchen'), [categories])
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
+    // Qidiruv ikkala bo'lim bo'yicha
     if (q) return products.filter((p) => p.name.toLowerCase().indexOf(q) >= 0)
-    return cat === 0 ? products : products.filter((p) => p.categoryId === cat)
-  }, [products, cat, query])
+    const inDept = products.filter((p) => (deptOf.get(p.categoryId) ?? 'bar') === dept)
+    return cat === 0 ? inDept : inDept.filter((p) => p.categoryId === cat)
+  }, [products, cat, query, dept, deptOf])
 
   const qtyInCart = useMemo(() => {
     const m: Record<number, number> = {}
@@ -154,6 +172,15 @@ export default function SaleScreen() {
     return creating.current
   }
 
+  // Oshxona cheki haqida bildirish (tez-tez bosilganda ketma-ket toastlar to'planib qolmasin)
+  const kitchenAt = useRef(0)
+  const kitchenToast = () => {
+    const t = Date.now()
+    if (t - kitchenAt.current < 4000) return
+    kitchenAt.current = t
+    toast.info('Oshxonaga chek yuborildi')
+  }
+
   const bump = (id: number, d: number) => setPending((p) => ({ ...p, [id]: Math.max(0, (p[id] || 0) + d) }))
 
   const addProduct = async (productId: number) => {
@@ -163,6 +190,7 @@ export default function SaleScreen() {
       const seq = ++reqSeq.current
       const v = await api.lines.addProduct(sid, productId, 1, null)
       apply(v, seq)
+      if (isKitchen(productId)) kitchenToast()
     } catch (e) {
       toast.error(e)
     } finally {
@@ -283,7 +311,7 @@ export default function SaleScreen() {
       <div className="sale__body">
         {/* ───── Katalog ───── */}
         <section className="sale-cat" aria-label="Mahsulotlar">
-          <div className="sale-cat__bar">
+          <div className={cx('sale-cat__bar', hasKitchen && 'has-dept')}>
             <Input
               ref={searchRef}
               className="sale-cat__search"
@@ -306,6 +334,21 @@ export default function SaleScreen() {
                 ) : undefined
               }
             />
+            {hasKitchen && (
+              <Segmented<Department>
+                className="sale-dept"
+                value={query ? ('' as Department) : dept}
+                onChange={(d) => {
+                  setDept(d)
+                  setQuery('')
+                }}
+                options={[
+                  { value: 'bar', label: 'Bar', icon: 'bar' },
+                  { value: 'kitchen', label: 'Oshxona', icon: 'flame' }
+                ]}
+              />
+            )}
+            {deptCats.length > 1 && (
             <div className="sale-cat__chips" role="tablist" aria-label="Kategoriyalar">
               <button
                 type="button"
@@ -319,7 +362,7 @@ export default function SaleScreen() {
               >
                 Hammasi
               </button>
-              {(categories || []).map((c) => (
+              {deptCats.map((c) => (
                 <button
                   key={c.id}
                   type="button"
@@ -335,6 +378,7 @@ export default function SaleScreen() {
                 </button>
               ))}
             </div>
+            )}
           </div>
 
           <div className="sale-cat__scroll">
@@ -342,6 +386,8 @@ export default function SaleScreen() {
               <div className="sale-center"><Spinner size={40} /></div>
             ) : noProducts ? (
               <EmptyState icon="box" title="Mahsulotlar yo'q" description="Bar bo'limida mahsulot qo'shing." />
+            ) : !query && shown.length === 0 && dept === 'kitchen' && cat === 0 ? (
+              <EmptyState icon="flame" title="Oshxona taomlari yo'q" description="Bar bo'limida «Oshxona» kategoriyasiga taom qo'shing." />
             ) : shown.length === 0 ? (
               <EmptyState
                 icon="search"

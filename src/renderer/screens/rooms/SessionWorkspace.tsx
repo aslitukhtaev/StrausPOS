@@ -1,6 +1,7 @@
 /**
  * Sessiya ish oynasi: tepada xona va jami summa; chapda mehmonlar (taymer, pauza, tugatish), o'ngda hisob qatorlari
- * (bar/xizmat, X bilan qaytarish), chegirma va "Hisobni yopish / To'lov".
+ * (bar/oshxona/xizmat, kim olib borgani, X bilan qaytarish), "Qo'shish" yonida "Chek" (oraliq hisob), chegirma va
+ * "Hisobni yopish / To'lov".
  * Har amaldan keyin API qaytargan SessionView ko'rsatiladi (optimistik emas). Xatolar — toast.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -8,15 +9,16 @@ import type { GuestView, LineView, ReceiptData, SessionView } from '@shared/type
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
 import { useApp } from '@/store/app'
-import { MS_MIN, formatCountdown, formatHours } from '@shared/billing'
+import { MS_MIN, formatHours } from '@shared/billing'
 import {
-  Avatar, Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, confirmDialog, cx, formatClock,
+  Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, confirmDialog, cx, formatClock,
   formatMoney, getNow, isAnyModalOpen, toast
 } from '@/ui'
 import { alertLabel, roomTone, useLive, useWarnMs } from './live'
 import { GuestCard } from './GuestCard'
 import { AddGuestDialog } from './AddGuestDialog'
-import { WaiterDialog } from './WaiterPicker'
+import { PreBillDialog } from './PreBillDialog'
+import { staffName, useStaffList } from './staffNames'
 import { useBoard } from './boardStore'
 import { AddItemsDialog } from './AddItemsDialog'
 import { DiscountDialog, MoveRoomDialog, RenameGuestDialog, ReturnLineDialog } from './Dialogs'
@@ -33,7 +35,7 @@ type DialogState =
   | { kind: 'discount' }
   | { kind: 'checkout' }
   | { kind: 'addGuest' }
-  | { kind: 'waiter' }
+  | { kind: 'prebill' }
   | null
 
 export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onBack: () => void }) {
@@ -46,6 +48,9 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
 
   // Ko'ruvchi kompyuter: faqat ko'rish — hech qanday o'zgartirish tugmasi yo'q
   const readOnly = useApp((st) => st.readOnly)
+  // Terminal (ikkinchi kompyuter) bilan sinxron bo'lishi uchun asosiy bo'lmagan rejimda tezroq yangilanadi
+  const fastPoll = useApp((st) => st.mode !== 'main')
+  const staffList = useStaffList()
   const canManage = useCan('session.manage') && !readOnly
   const warnMs = useWarnMs()
   const canPay = useCan('session.pay') && !readOnly
@@ -77,9 +82,9 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
     void load()
     const id = setInterval(() => {
       if (!isAnyModalOpen()) void load()
-    }, readOnly ? VIEWER_POLL_MS : POLL_MS)
+    }, readOnly || fastPoll ? VIEWER_POLL_MS : POLL_MS)
     return () => clearInterval(id)
-  }, [load, readOnly])
+  }, [load, readOnly, fastPoll])
 
   // Esc — xonalarga qaytish (modal ochiq bo'lmasa); "+" — qo'shish paneli
   useEffect(() => {
@@ -270,15 +275,6 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
         </div>
       </header>
 
-      <WaiterStrip
-        name={view.waiterName}
-        pct={view.session.waiterPct}
-        assigned={view.session.waiterId != null}
-        canManage={canManage}
-        minRemaining={live.minRemainingMs}
-        onChange={() => setDialog({ kind: 'waiter' })}
-      />
-
       <div className="rooms-ws__body">
         {/* ───── Mehmonlar ───── */}
         <section className="rooms-ws__guests">
@@ -343,9 +339,20 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
               {activeLines.length > 0 && <Badge size="md">{activeLines.length}</Badge>}
             </div>
             {canManage && (
-              <Button variant="primary" icon="plus" onClick={() => setDialog({ kind: 'add' })} className="rooms-bill__add">
-                Qo'shish
-              </Button>
+              <div className="rooms-bill__headbtns">
+                <Button
+                  icon="receipt"
+                  onClick={() => setDialog({ kind: 'prebill' })}
+                  disabled={live.total <= 0}
+                  title="Oraliq hisob cheki (sessiya yopilmaydi)"
+                  data-testid="prebill"
+                >
+                  Chek
+                </Button>
+                <Button variant="primary" icon="plus" onClick={() => setDialog({ kind: 'add' })} className="rooms-bill__add">
+                  Qo'shish
+                </Button>
+              </div>
             )}
           </div>
 
@@ -362,6 +369,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
                   key={l.id}
                   line={l}
                   who={guestLabel(l.guestId)}
+                  waiter={staffName(staffList, l.waiterId)}
                   canReturn={canReturn}
                   onReturn={() => setDialog({ kind: 'return', line: l })}
                 />
@@ -446,9 +454,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
       {dialog && dialog.kind === 'addGuest' && (
         <AddGuestDialog view={view} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />
       )}
-      {dialog && dialog.kind === 'waiter' && (
-        <WaiterDialog view={view} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />
-      )}
+      {dialog && dialog.kind === 'prebill' && <PreBillDialog sessionId={view.session.id} onClose={() => setDialog(null)} />}
       {dialog && dialog.kind === 'checkout' && CheckoutDialog && (
         <CheckoutDialog
           sessionId={view.session.id}
@@ -463,60 +469,6 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   )
 }
 
-function WaiterStrip({
-  name, pct, assigned, canManage, minRemaining, onChange
-}: {
-  name: string | null
-  pct: number
-  assigned: boolean
-  canManage: boolean
-  minRemaining: number | null
-  onChange: () => void
-}) {
-  return (
-    <div className={cx('rooms-wstrip', !assigned && 'is-missing')} data-testid="waiter-strip">
-      {assigned ? (
-        <>
-          <Avatar name={name || '?'} size={40} />
-          <div className="rooms-wstrip__text">
-            <span className="rooms-wstrip__label">Ofitsiant</span>
-            <span className="rooms-wstrip__name">
-              {name} <span className="rooms-wstrip__pct num">· {pct}% bardan</span>
-            </span>
-          </div>
-          {canManage && (
-            <Button size="sm" variant="ghost" icon="swap" onClick={onChange}>
-              Almashtirish
-            </Button>
-          )}
-        </>
-      ) : (
-        <>
-          <span className="rooms-wstrip__warnicon">
-            <Icon name="alert" size={26} />
-          </span>
-          <div className="rooms-wstrip__text">
-            <span className="rooms-wstrip__name">Ofitsiant biriktirilmagan</span>
-            <span className="rooms-wstrip__label">Bar savdosidan foiz hech kimga yozilmaydi</span>
-          </div>
-          {canManage && (
-            <Button size="md" icon="userPlus" onClick={onChange} className="rooms-wstrip__btn">
-              Biriktirish
-            </Button>
-          )}
-        </>
-      )}
-      <div className="spacer" />
-      {minRemaining != null && (
-        <div className={cx('rooms-wstrip__left', minRemaining <= 0 && 'is-over')}>
-          <span className="rooms-wstrip__label">{minRemaining <= 0 ? 'Vaqt oshdi' : 'Eng kam qolgan'}</span>
-          <span className="rooms-wstrip__time num">{formatCountdown(minRemaining)}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function Stat({ label, value, tone }: { label: string; value: number; tone?: 'success' }) {
   return (
     <div className="rooms-stat">
@@ -526,12 +478,15 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: 'su
   )
 }
 
-function LineRow({ line: l, who, canReturn, onReturn }: { line: LineView; who: string | null; canReturn: boolean; onReturn: () => void }) {
+function LineRow({
+  line: l, who, waiter, canReturn, onReturn
+}: { line: LineView; who: string | null; waiter: string | null; canReturn: boolean; onReturn: () => void }) {
   const gone = l.activeQty <= 0
+  const kitchen = l.kind === 'product' && l.department === 'kitchen'
   return (
     <div className={cx('rooms-line', gone && 'is-returned')} data-line={l.name}>
-      <span className={cx('rooms-line__icon', l.kind === 'service' && 'is-service')}>
-        <Icon name={l.kind === 'service' ? 'sparkles' : 'bar'} size={20} />
+      <span className={cx('rooms-line__icon', l.kind === 'service' && 'is-service', kitchen && 'is-kitchen')} title={kitchen ? 'Oshxona' : l.kind === 'service' ? 'Xizmat' : 'Bar'}>
+        <Icon name={l.kind === 'service' ? 'sparkles' : kitchen ? 'flame' : 'bar'} size={20} />
       </span>
       <div className="rooms-line__main">
         <div className="rooms-line__name">{l.name}</div>
@@ -540,6 +495,11 @@ function LineRow({ line: l, who, canReturn, onReturn }: { line: LineView; who: s
             {l.activeQty} × {formatMoney(l.unitPrice)}
           </span>
           <span className={cx('rooms-line__who', who && 'is-guest')}>{who || 'Butun guruh'}</span>
+          {waiter && (
+            <span className="rooms-line__waiter" title="Olib bordi" data-testid="line-waiter">
+              <Icon name="user" size={15} /> {waiter}
+            </span>
+          )}
           {l.providerName && (
             <span className="rooms-line__prov">
               <Icon name="user" size={15} /> {l.providerName}

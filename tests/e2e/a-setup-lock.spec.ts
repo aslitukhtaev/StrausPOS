@@ -44,7 +44,7 @@ test('Setup: biznes va ega → PIN tasdig\'i → avtomatik kirish → qulf → P
   // Standart xonalar yaratilgan
   await expect(page.locator('[data-room="Sauna 1"]')).toBeVisible()
   // Ega barcha bo'limlarni ko'radi
-  for (const l of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
+  for (const l of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Oshxona', 'Xodimlar', 'Sozlamalar']) {
     await expect(page.locator('.side__item', { hasText: new RegExp('^' + l + '$') })).toBeVisible()
   }
   // Setup qayta chaqirilmaydi

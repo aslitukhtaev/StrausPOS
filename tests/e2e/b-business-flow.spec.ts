@@ -1,13 +1,13 @@
 /**
  * b) Asosiy biznes oqimi — hamma summa QO'LDA hisoblangan. "Qattiq" tizim (docs/ARCHITECTURE.md, src/shared/billing.ts):
  *    har mehmonga vaqt OLDINDAN olinadi (paidMinutes); kam o'tirsa ham to'liq; oshsa graceMinutes(0) dan keyin
- *    har BOSHLANGAN blockMinutes(60) to'liq qo'shiladi. Hisoblanadigan daqiqalar intervallar bo'ylab xronologik
+ *    har BOSHLANGAN blockMinutes to'liq qo'shiladi (bu testda 1 soatlik bloklar — `useHourBlocks`; daqiqalik standart h-spec'da). Hisoblanadigan daqiqalar intervallar bo'ylab xronologik
  *    taqsimlanadi (har interval o'z tarifi bilan), ishlatilmagan qismi — oxirgi tarifda. roundTo = 1000.
  *
  * Standart xonalar: Sauna 1 = 50 000/soat (6 kishi), Sauna 2 = 60 000 (8), VIP xona = 100 000 (10).
  * Ofitsiantlar: Sardor 10%, Bekzod 12%. T0 = 10:00.
  *
- *  A) Sauna 1, 4 mehmon × 1 soat, ofitsiant Sardor (T0). Ochilishi bilan: 4 × 50 000 = 200 000.
+ *  A) Sauna 1, 4 mehmon × 1 soat (T0; ofitsiant xonaga biriktirilmaydi — mahsulotlarni Sardor olib boradi). Ochilishi bilan: 4 × 50 000 = 200 000.
  *     +30 daq  Mehmon 2 pauza          → M2 = 50 000 (olingan 1 soat to'liq)
  *     +45 daq  Mehmon 3 tugatadi       → M3 = 50 000 (45 daq o'tirdi, 1 soat to'lanadi)
  *     +60 daq  Sauna 2 ga o'tish (60 000) — M1, M4 ning olingan vaqti aynan tugadi (qoldi 00:00:00)
@@ -15,7 +15,7 @@
  *                 60 daq × 50 000/60 (Sauna 1) + 10 daq × 60 000/60 (Sauna 2) + ishlatilmagan 50 daq × 60 000/60
  *                 = 50 000 + 10 000 + 50 000 = 110 000
  *              Mehmon 2 davom (Sauna 2 narxida)
- *              Coca-Cola 1 L ×2 (guruh, 15 000), Chips ×1 (Mehmon 1, 12 000), Klassik massaj (Mehmon 4, Massajchi, 150 000)
+ *              Coca-Cola 1 L ×2 (guruh, 15 000), Chips ×1 (Mehmon 1, 12 000) — "Kim olib bordi: Sardor"; Klassik massaj (Mehmon 4, Massajchi, 150 000)
  *              X: Coca-Cola 1 dona qaytariladi → 15 000; chegirma 25 000
  *     +100 daq to'lov:
  *        M1 = M4 = 100 daq o'tirdi → 2 soat: 60 × 50 000/60 + 40 × 60 000/60 + 20 × 60 000/60 = 50 000 + 40 000 + 20 000 = 110 000
@@ -38,10 +38,10 @@
  *    karta 400 000 + 80 000 = 480 000; qarz 50 000 (647 + 480 + 50 = 1 177 ✓); qaytarishlar 15 000 (Coca-Cola × 1);
  *    qarzdan undirilgan: naqd 30 000, karta 20 000; byWaiter: Sardor — 1 sessiya, 27 000, haq 2 700.
  */
-import { test, expect, fm, money, T0, MIN } from './fixtures'
+import { test, expect, money, T0, MIN } from './fixtures'
 import {
   addProduct, addService, backToBoard, checkoutTotal, closeAdd, confirm, enterSession, expectWsTotal, finishReceipt, guest,
-  expectGuest, line, moveTo, openAdd, openRoom, returnLine, setDiscount, startCheckout, tile, wsStat
+  expectGuest, line, moveTo, openAdd, openRoom, returnLine, setDiscount, startCheckout, tile, useHourBlocks, wsStat
 } from './ui'
 
 interface SalesReport {
@@ -53,16 +53,16 @@ interface SalesReport {
 
 test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 4 xil to\'lov, qarz, hisobot', async ({ pos, page }) => {
   test.setTimeout(240_000)
+  await useHourBlocks(pos)
   await pos.open()
   await pos.login('admin')
 
   // ───── A va B ochiladi (T0) ─────
-  await openRoom(pos, 'Sauna 1', 4, { waiter: 'Sardor' })
+  await openRoom(pos, 'Sauna 1', 4)
   // Oldindan olingan vaqt darhol hisobda: 4 × 1 soat × 50 000
   await expectWsTotal(pos, 200_000)
   await expectGuest(pos, 'Mehmon 1', 50_000)
   await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toHaveText('01:00:00')
-  await expect(page.getByTestId('waiter-strip')).toContainText('Sardor')
   await backToBoard(pos)
   await openRoom(pos, 'VIP xona', 2, { minutes: 120 })
   await expectWsTotal(pos, 400_000)
@@ -102,7 +102,7 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   // M1: 10 daq oshdi → keyingi soat: 50 000 + 10 000 + 50 000 = 110 000
   await expectGuest(pos, 'Mehmon 1', 110_000)
   await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('+00:10:00')
-  await expect(guest(pos, 'Mehmon 1')).toContainText('Keyingi 1 soat hisoblandi')
+  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("+00:10:00 oshdi · 1 soat qo'shildi")
   await expect(guest(pos, 'Mehmon 1')).toHaveClass(/rooms-guest--over/)
   await guest(pos, 'Mehmon 2').getByRole('button', { name: /Davom/ }).click()
   await expect(guest(pos, 'Mehmon 2')).toHaveClass(/rooms-guest--running/)
@@ -112,11 +112,12 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
 
   // ───── Bar va xizmat ─────
   const add = await openAdd(pos)
-  await addProduct(pos, add, 'Coca-Cola 1 L', 2)
-  await addProduct(pos, add, 'Chips', 1, 'Mehmon 1')
+  await addProduct(pos, add, 'Coca-Cola 1 L', 2, 'Butun guruh', 'Sardor')
+  await addProduct(pos, add, 'Chips', 1, 'Mehmon 1', 'Sardor')
   await addService(pos, add, 'Klassik massaj', 'Massajchi', 'Mehmon 4')
-  await expect(add.locator('.rooms-add__summary')).toContainText(fm(15_000 * 2 + 12_000 + 150_000))
   await closeAdd(pos, add)
+  await expect(line(pos, 'Coca-Cola 1 L').getByTestId('line-waiter')).toHaveText('Sardor')
+  await expect(line(pos, 'Klassik massaj').getByTestId('line-waiter')).toHaveCount(0)
   await expect(line(pos, 'Coca-Cola 1 L')).toContainText('2 × 15 000')
   await expect(line(pos, 'Klassik massaj')).toContainText('Massajchi')
   await expect(line(pos, 'Klassik massaj')).toContainText('Mehmon 4')
@@ -188,7 +189,7 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   expect(receiptA).toMatchObject({ total: 477_000, timeTotal: 325_000, linesTotal: 177_000, discount: 25_000 })
   expect(receiptA.lines.find((l) => l.name === 'Coca-Cola 1 L')).toMatchObject({ qty: 1, amount: 15_000 })
   expect(receiptA.payments).toEqual([{ method: 'cash', amount: 477_000 }])
-  // Ofitsiant haqi sessiyaga yozilgan: faqat bar mahsulotlari (27 000 × 10%)
+  // Ofitsiant haqi: Sardor olib borgan mahsulot qatorlari (27 000 × 10%), massaj kirmaydi
   const wsA = await pos.backend.rpc<{ sessionId: number; productSales: number; pct: number; commission: number }[]>(
     'waiters.sessions', pos.ids.waiter1, '2026-10'
   )

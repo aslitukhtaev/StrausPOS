@@ -12,7 +12,7 @@ const theme = (page: Page) => page.locator('html')
 
 async function tourScreens(pos: Parameters<typeof openRoom>[0]): Promise<void> {
   const { page } = pos
-  for (const s of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
+  for (const s of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Oshxona', 'Xodimlar', 'Sozlamalar']) {
     await pos.nav(s)
     await page.waitForTimeout(400)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)
@@ -31,7 +31,7 @@ test('Ega: kunduzgi ↔ tungi, saqlanadi (reload, qulf ekrani), ikkala rejimda k
   // Standart: auto → tizim (yorug')
   await expect(theme(page)).toHaveAttribute('data-theme', 'light')
   await pos.login('owner')
-  await openRoom(pos, 'Sauna 1', 2, { waiter: 'Sardor' })
+  await openRoom(pos, 'Sauna 1', 2)
   const add = await openAdd(pos)
   await addProduct(pos, add, 'Chips', 1)
   await closeAdd(pos, add)

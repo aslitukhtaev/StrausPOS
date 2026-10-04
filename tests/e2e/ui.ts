@@ -18,8 +18,6 @@ export function tile(pos: Pos, room: string): Locator {
 export interface OpenOpts {
   /** Har mehmonga olinadigan vaqt, daqiqa (standart 60 = sozlamalardagi defaultHours=1). 60/120/180/240 — tezkor tugma, boshqasi "Boshqa" */
   minutes?: number
-  /** Ofitsiant ismi (masalan "Sardor"); null/yo'q — "Ofitsiant biriktirilmadi!" ogohlantirishi → "Ofitsiantsiz boshlash" */
-  waiter?: string | null
 }
 
 /** "2 soat", "1 soat 30 daq", "45 daq" — billing.formatHours bilan bir xil */
@@ -55,48 +53,24 @@ export async function pickTime(d: Locator, minutes: number): Promise<void> {
 }
 
 /**
- * Bosh ekrandan bo'sh xonani N mehmon bilan ochadi (vaqt + ofitsiant tanlab) va sessiya oynasiga kiradi.
- * Ofitsiant berilmasa — "Ofitsiant biriktirilmadi!" ogohlantirishi chiqishi tekshiriladi va "Ofitsiantsiz boshlash" bosiladi.
+ * Bosh ekrandan bo'sh xonani N mehmon bilan ochadi (vaqt tanlab) va sessiya oynasiga kiradi.
+ * 2026-10: ofitsiant xonaga biriktirilmaydi — ochish oynasida ofitsiant tanlovi ham, ogohlantirish ham YO'Q.
  */
 export async function openRoom(pos: Pos, room: string, guests: number, opts: OpenOpts = {}): Promise<void> {
   const { page } = pos
   const minutes = opts.minutes ?? 60
-  const waiter = opts.waiter ?? null
   await tile(pos, room).click()
   const d = pos.dialog(room + ' — xonani ochish')
   await expect(d).toBeVisible()
-  // Ofitsiantlar ro'yxati yuklanguncha kutamiz (aks holda ogohlantirish mantiqi hali ishlamaydi)
-  await expect(d.locator('.rooms-waiter').first()).toBeVisible()
+  await expect(d.locator('.rooms-waiter')).toHaveCount(0)
   await d.locator('.rooms-open__n', { hasText: new RegExp('^' + guests + '$') }).click()
   await pickTime(d, minutes)
-  if (waiter) {
-    const w = d.locator(`.rooms-waiter[data-waiter="${waiter}"]`)
-    await w.click()
-    await expect(w).toHaveAttribute('aria-checked', 'true')
-  }
   await d.getByRole('button', { name: `Boshlash · ${guests} kishi · ${hoursText(minutes)}` }).click()
-  if (!waiter) {
-    const warn = page.locator('.ui-modal.rooms-nowaiter')
-    await expect(warn).toContainText('Ofitsiant biriktirilmadi!')
-    await warn.getByRole('button', { name: 'Ofitsiantsiz boshlash' }).click()
-  }
   await expect(pos.toast(`${room} ochildi`)).toBeVisible()
   await expect(d).toHaveCount(0)
+  await expect(page.locator('.ui-modal')).toHaveCount(0)
   await enterSession(pos, room)
   await expect(page.locator('.rooms-guest')).toHaveCount(guests)
-}
-
-/** Sessiya oynasidagi ofitsiant tasmasi orqali biriktirish / almashtirish */
-export async function setWaiterUi(pos: Pos, name: string): Promise<void> {
-  const strip = pos.page.getByTestId('waiter-strip')
-  await strip.getByRole('button', { name: /Biriktirish|Almashtirish/ }).click()
-  const d = pos.dialog(/Ofitsiant(ni)? (biriktirish|almashtirish)/i)
-  await expect(d).toBeVisible()
-  await d.locator(`.rooms-waiter[data-waiter="${name}"]`).click()
-  await d.getByRole('button', { name: 'Biriktirish', exact: true }).click()
-  await expect(pos.toast(`Ofitsiant biriktirildi: ${name}`)).toBeVisible()
-  await expect(d).toHaveCount(0)
-  await expect(strip).toContainText(name)
 }
 
 /** "Mehmon qo'shish" → vaqt tanlash → "Qo'shish · …" */
@@ -161,18 +135,60 @@ export async function moveTo(pos: Pos, room: string): Promise<void> {
   await expect(pos.page.locator('.rooms-ws__room')).toHaveText(room)
 }
 
-/** "Qo'shish" panelini ochadi */
+export const ADD_TITLE = "Buyurtma qo'shish"
+
+/** "Qo'shish" oynasini ochadi (Bar tabi) */
 export async function openAdd(pos: Pos): Promise<Locator> {
   await pos.page.locator('.rooms-bill__add').click()
-  const d = pos.dialog("Bar va xizmat qo'shish")
+  const d = pos.dialog(ADD_TITLE)
   await expect(d.locator('.rooms-add__grid')).toBeVisible()
   return d
 }
 
-export async function addProduct(pos: Pos, d: Locator, name: string, times = 1, who = 'Butun guruh'): Promise<void> {
+/** Mahsulot plitasini topadi (Bar yoki Oshxona tabida) */
+async function productTile(d: Locator, name: string): Promise<Locator> {
+  const t = d.locator(`.rooms-ptile[data-product="${name}"]`)
+  if ((await t.count()) === 0) {
+    for (const tab of ['Bar', 'Oshxona']) {
+      await d.getByRole('tab', { name: new RegExp('^' + tab) }).click()
+      if ((await t.count()) > 0) break
+    }
+  }
+  await expect(t).toBeVisible()
+  return t
+}
+
+/** Mahsulotni tanlaydi: plitadagi "+" ni `times` marta bosadi (hech narsa qo'shilmaydi — faqat tanlov) */
+export async function selectProduct(d: Locator, name: string, times = 1): Promise<void> {
+  const t = await productTile(d, name)
+  const before = Number(await t.getByTestId('qty').textContent())
+  for (let i = 0; i < times; i++) await t.locator('[data-act="plus"]').click()
+  await expect(t.getByTestId('qty')).toHaveText(String(before + times))
+}
+
+/** "Kim olib bordi" (kassir/admin/ega) — null = "—" */
+export async function chooseCarrier(d: Locator, waiter: string | null): Promise<void> {
+  const box = d.getByTestId('add-waiter')
+  if (waiter == null) await box.locator('.rooms-chip', { hasText: /^—$/ }).click()
+  else await box.locator(`.rooms-chip[data-waiter="${waiter}"]`).click()
+}
+
+/** Tanlanganlarni bitta "Qo'shish (N ta · summa)" bilan qo'shadi → lines.addProducts; oyna yopiladi */
+export async function submitAdd(pos: Pos, d: Locator): Promise<void> {
+  await rpcClick(pos, d.getByTestId('add-submit'), 'lines.addProducts')
+  await expect(d).toHaveCount(0)
+}
+
+/**
+ * Bitta mahsulotni qo'shish (eski testlar uchun qulay): tanlash (+ × times) → "Qo'shish" → oyna yopiladi →
+ * zanjir davom etishi uchun oyna qayta ochiladi. `waiter` — "Kim olib bordi" (undefined — tegilmaydi).
+ */
+export async function addProduct(pos: Pos, d: Locator, name: string, times = 1, who = 'Butun guruh', waiter?: string | null): Promise<void> {
   await d.locator('.rooms-add__who .rooms-chip', { hasText: who }).click()
-  const btn = d.locator(`[data-product="${name}"]`)
-  for (let i = 0; i < times; i++) await rpcClick(pos, btn, 'lines.addProduct')
+  await selectProduct(d, name, times)
+  if (waiter !== undefined) await chooseCarrier(d, waiter)
+  await submitAdd(pos, d)
+  await openAdd(pos)
 }
 
 export async function addService(pos: Pos, d: Locator, name: string, provider: string | null, who = 'Butun guruh'): Promise<void> {
@@ -180,11 +196,11 @@ export async function addService(pos: Pos, d: Locator, name: string, provider: s
   await d.locator('.rooms-add__who .rooms-chip', { hasText: who }).click()
   if (provider) await d.getByRole('radio', { name: provider }).click()
   await rpcClick(pos, d.locator(`[data-service="${name}"]`), 'lines.addService')
-  await d.getByRole('tab', { name: 'Bar' }).click()
+  await d.getByRole('tab', { name: /^Bar/ }).click()
 }
 
 export async function closeAdd(pos: Pos, d: Locator): Promise<void> {
-  await d.getByRole('button', { name: 'Tayyor' }).click()
+  await d.getByRole('button', { name: 'Yopish', exact: true }).click()
   await expect(d).toHaveCount(0)
 }
 
@@ -245,4 +261,15 @@ export async function finishReceipt(pos: Pos, total: number): Promise<string> {
   await expect(r).toHaveCount(0)
   await expect(pos.page.locator('.rooms-board')).toBeVisible()
   return text
+}
+
+/**
+ * 2026-10 dan standart blockMinutes = 1 (aynan o'tirilgan daqiqa). Eski "soatlik blok" hisoblari bilan yozilgan testlar uchun:
+ * UI ga kirishdan OLDIN ega nomidan blockMinutes = 60 qo'yadi va chiqadi (server sessiyasi bo'sh qoladi).
+ */
+export async function useHourBlocks(pos: Pos, blockMinutes = 60): Promise<void> {
+  await pos.backend.loginAs('owner', pos.ids)
+  const s = await pos.backend.rpc<Record<string, unknown>>('settings.get')
+  await pos.backend.rpc('settings.save', { ...s, blockMinutes })
+  await pos.backend.rpc('auth.logout')
 }

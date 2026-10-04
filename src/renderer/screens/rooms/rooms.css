@@ -65,10 +65,6 @@
 .rooms-tile--warn .rooms-tile__countdown, .rooms-tile--warn .rooms-tile__since { color: var(--warning); }
 .rooms-tile--over .rooms-tile__countdown, .rooms-tile--over .rooms-tile__since { color: var(--danger-text); }
 .rooms-tile--warn .rooms-tile__countdown, .rooms-tile--over .rooms-tile__countdown { animation: rooms-pulse 1.6s ease-in-out infinite; }
-.rooms-tile__waiter {
-  display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); font-weight: var(--fw-semibold);
-}
-.rooms-tile__waiter.is-missing { color: var(--warning); }
 .rooms-tile__info { display: flex; align-items: center; gap: 14px; min-width: 0; max-width: 100%; }
 .rooms-tile__people { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--text-2); flex: none; }
 .rooms-tile__total {
@@ -129,35 +125,8 @@
 .rooms-time__u { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
 .rooms-time__custom { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
 
-/* Ofitsiant plitalari */
-.rooms-waiters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; border-radius: var(--r-lg); }
-.rooms-waiters.is-highlight { box-shadow: 0 0 0 3px var(--warning-line); padding: 6px; margin: -6px; }
-.rooms-waiter {
-  position: relative; display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 14px; text-align: left;
-  border-radius: var(--r-lg); border: 1.5px solid var(--line); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer;
-  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
-}
-.rooms-waiter:hover { background: var(--surface-3); border-color: var(--line-strong); }
-.rooms-waiter:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.rooms-waiter.is-active { background: var(--accent-soft); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.rooms-waiter__text { display: flex; flex-direction: column; min-width: 0; }
-.rooms-waiter__name { font-size: var(--fs-lg); font-weight: var(--fw-bold); }
-.rooms-waiter__pct { font-size: var(--fs-sm); color: var(--text-2); }
-.rooms-waiter__check {
-  margin-left: auto; flex: none; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: var(--accent-fill); color: var(--accent-ink);
-}
-.rooms-waiters__empty {
-  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 14px; border-radius: var(--r-md);
-  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-md);
-}
-
-/* "Ofitsiant biriktirilmadi!" ogohlantirishi */
-.rooms-nowaiter__icon { background: var(--warning-soft); color: var(--warning); }
-.rooms-nowaiter__actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }
-
 /* ───────────── Sessiya ish oynasi ───────────── */
-.rooms-ws { height: 100%; min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 12px; }
+.rooms-ws { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 12px; }
 .rooms-ws--loading { grid-template-rows: auto 1fr; }
 .rooms-ws__backrow { display: flex; }
 
@@ -261,28 +230,6 @@
 .rooms-guest__actions .ui-btn { padding: 0 12px; }
 .rooms-guest__actions--one { display: flex; }
 
-/* Ofitsiant chizig'i (sessiya oynasi tepasida) */
-.rooms-wstrip {
-  display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px 8px 14px; border-radius: var(--r-lg);
-  background: var(--surface); border: 1.5px solid var(--line-soft);
-}
-.rooms-wstrip.is-missing {
-  background: linear-gradient(90deg, var(--warning-soft), transparent 70%), var(--surface); border-color: var(--warning-line);
-}
-.rooms-wstrip__warnicon {
-  flex: none; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  background: var(--warning-fill); color: var(--accent-ink);
-}
-.rooms-wstrip__text { display: flex; flex-direction: column; min-width: 0; }
-.rooms-wstrip__label { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
-.rooms-wstrip__name { font-size: var(--fs-lg); font-weight: var(--fw-bold); white-space: nowrap; }
-.rooms-wstrip.is-missing .rooms-wstrip__name { color: var(--warning); }
-.rooms-wstrip__pct { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text-2); }
-.rooms-wstrip__btn.ui-btn { border-color: var(--warning-line); }
-.rooms-wstrip__left { display: flex; flex-direction: column; align-items: flex-end; padding: 0 6px; }
-.rooms-wstrip__time { font-family: var(--font-num); font-size: var(--fs-2xl); font-weight: var(--fw-bold); line-height: 1.05; }
-.rooms-wstrip__left.is-over .rooms-wstrip__time, .rooms-wstrip__left.is-over .rooms-wstrip__label { color: var(--danger-text); }
-
 /* ───────────── Hisob paneli ───────────── */
 .rooms-bill {
   min-height: 0; display: flex; flex-direction: column;
@@ -290,6 +237,8 @@
 }
 .rooms-bill__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px 12px 20px; border-bottom: 1px solid var(--line-soft); }
 .rooms-bill__add { min-width: 150px; }
+.rooms-bill__headbtns { display: flex; gap: 10px; }
+.rooms-bill__headbtns .ui-btn { padding: 0 18px; }
 .rooms-bill__list { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 6px 8px; }
 .rooms-bill__list .ui-empty { padding-top: 28px; padding-bottom: 28px; }
 
@@ -308,6 +257,8 @@
 .rooms-line__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; }
 .rooms-line__who { color: var(--text-3); }
 .rooms-line__who.is-guest { color: var(--text-2); font-weight: var(--fw-semibold); }
+.rooms-line__waiter { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-weight: var(--fw-semibold); }
+.rooms-line__icon.is-kitchen { background: var(--warning-soft); color: var(--warning); }
 .rooms-line__prov { display: inline-flex; align-items: center; gap: 4px; color: var(--info); }
 .rooms-line__ret { color: var(--danger-text); font-weight: var(--fw-semibold); }
 .rooms-line .ui-money { white-space: nowrap; }
@@ -385,6 +336,44 @@
   background: var(--accent-fill); color: var(--accent-ink); font-size: var(--fs-sm); font-weight: var(--fw-bold);
 }
 .rooms-tilebtn--service .rooms-tilebtn__foot .ui-money { color: var(--info); }
+
+/* Mahsulot plitasi: tanlash (− son +), darhol qo'shmaydi */
+.rooms-ptile {
+  display: flex; flex-direction: column; border-radius: var(--r-lg); border: 1.5px solid var(--line); background: var(--surface-2);
+  overflow: hidden; transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.rooms-ptile.is-selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+.rooms-ptile.is-out { opacity: 0.45; }
+.rooms-ptile__main {
+  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-height: 84px;
+  padding: 12px 14px 8px; text-align: left; border: 0; background: transparent; color: var(--text); font: inherit; cursor: pointer;
+}
+.rooms-ptile__main:disabled { cursor: not-allowed; }
+.rooms-ptile__main:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.rooms-ptile__name { font-size: var(--fs-md); font-weight: var(--fw-semibold); line-height: 1.2; overflow-wrap: anywhere; }
+.rooms-ptile__qty { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; border-top: 1px solid var(--line-soft); }
+.rooms-ptile__btn {
+  height: 56px; display: flex; align-items: center; justify-content: center; border: 0; background: var(--surface-3); color: var(--text);
+  font: inherit; cursor: pointer; transition: background var(--dur) var(--ease), transform 90ms var(--ease);
+}
+.rooms-ptile__btn.is-plus { background: var(--accent-fill); color: var(--accent-ink); }
+.rooms-ptile__btn:hover:not(:disabled) { filter: brightness(1.06); }
+.rooms-ptile__btn:active:not(:disabled) { transform: scale(0.94); }
+.rooms-ptile__btn:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.rooms-ptile__btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.rooms-ptile__n { text-align: center; font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--text-3); }
+.rooms-ptile__n.is-on { color: var(--accent); }
+.rooms-add__tabsrow { display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.rooms-add__tabsrow > .ui-tabs { flex: 0 1 auto; border-bottom: 0; }
+.rooms-add__tabsrow > .rooms-add__waiter { margin-left: auto; padding-bottom: 4px; }
+.rooms-add__waiter .rooms-chip { padding: 0 14px; }
+.rooms-add__waiter { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rooms-add__waitersel { max-width: 320px; }
+.rooms-add__clear.ui-btn { flex: none; }
+.rooms-add__submit.ui-btn { min-width: 280px; }
+
+/* Oraliq chek */
+.rooms-prebill { display: flex; justify-content: center; padding: 4px 0; }
 
 /* ───────────── Dialoglar ───────────── */
 .rooms-ret { display: flex; flex-direction: column; gap: 18px; }
@@ -478,6 +467,11 @@
   .rooms-guest__actions .ui-btn { padding: 0 16px; }
 
   .rooms-bill__pay.ui-btn--lg { padding: 0 16px; }
+  .rooms-bill__head { padding: 12px 12px 10px 14px; gap: 8px; }
+  .rooms-bill__head .rooms-sec__title .ui-badge { display: none; }
+  .rooms-bill__headbtns { gap: 8px; }
+  .rooms-bill__headbtns .ui-btn { padding: 0 14px; }
+  .rooms-bill__add { min-width: 0; }
   .rooms-line { grid-template-columns: minmax(0, 1fr) auto 48px; gap: 10px; padding-left: 12px; }
   .rooms-line__icon { display: none; }
 }

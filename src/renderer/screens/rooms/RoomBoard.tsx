@@ -136,8 +136,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
             setOpening(null)
             useBoard.getState().patchSession(v)
             toast.success(`${v.room.name} ochildi`, {
-              description: `${v.guests.length} mehmon · ${formatHours(v.guests[0] ? v.guests[0].paidMinutes : 0)}` +
-                (v.waiterName ? ` · ofitsiant ${v.waiterName}` : ' · ofitsiantsiz')
+              description: `${v.guests.length} mehmon · ${formatHours(v.guests[0] ? v.guests[0].paidMinutes : 0)}`
             })
             void load()
           }}
@@ -152,7 +151,6 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
   const tone = roomTone(live)
   const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'busy' : tone === 'warn' ? 'warning' : 'danger'
   const people = live ? live.running + live.paused : 0
-  const waiter = session ? session.waiterName : null
   const left = live ? live.minRemainingMs : null
   return (
     <Card
@@ -202,7 +200,7 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
               </span>
               <span>
                 <span className="rooms-tile__freetitle">Xonani ochish</span>
-                <span className="rooms-tile__freehint">Bosing: mehmonlar, vaqt, ofitsiant</span>
+                <span className="rooms-tile__freehint">Bosing: mehmonlar va vaqt</span>
               </span>
             </div>
           )
@@ -223,10 +221,6 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
                 <span className="rooms-tile__people" title="Xonadagi mehmonlar">
                   <Icon name="users" size={16} />
                   <span className="num">{people}/{room.capacity}</span>
-                </span>
-                <span className={cx('rooms-tile__waiter', !waiter && 'is-missing')} title={waiter ? 'Ofitsiant' : 'Ofitsiant biriktirilmagan'}>
-                  <Icon name={waiter ? 'user' : 'alert'} size={16} />
-                  <span className="ellipsis">{waiter || 'Ofitsiant yo‘q'}</span>
                 </span>
               </span>
               <Money value={live.due} size="3xl" tone={tone === 'alert' || tone === 'over' ? 'danger' : 'accent'} />

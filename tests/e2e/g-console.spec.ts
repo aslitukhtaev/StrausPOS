@@ -17,7 +17,7 @@ test('Ega: barcha ekranlar va sozlamalar bo\'limlari xatosiz ochiladi', async ({
   await addProduct(pos, add, 'Chips', 1)
   await closeAdd(pos, add)
   await pos.advance(15)
-  for (const s of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']) {
+  for (const s of ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Oshxona', 'Xodimlar', 'Sozlamalar']) {
     await pos.nav(s)
     await page.waitForTimeout(700)
     await expect(page.locator('.shell__main')).not.toContainText(CRASH)

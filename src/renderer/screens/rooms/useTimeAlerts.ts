@@ -1,8 +1,8 @@
 /**
  * Vaqt ogohlantirishlari: mehmon vaqti `warnBeforeMinutes` ga yetganda va olingan vaqt tugaganda (0 dan o'tganda)
  * — bir martalik ekran bildirishnomasi (toast) + qisqa ovozli signal (WebAudio, fayl kerak emas).
- * Bir hodisa qayta chalinmaydi: kalit = sessiya + mehmon + bosqich + olingan daqiqa (uzaytirilsa yana ogohlantiradi)
- * + hisoblangan daqiqa (oshib ketib yana bir soat qo'shilsa — yana bir marta).
+ * Bir hodisa qayta chalinmaydi: kalit = sessiya + mehmon + bosqich + olingan daqiqa (uzaytirilsa yana ogohlantiradi).
+ * Ortiqcha vaqt daqiqalab hisoblanadi — shuning uchun "vaqt tugadi" har mehmon uchun BIR MARTA chiqadi.
  * Xotira modul darajasida — ekranlar orasida o'tilganda ham takrorlanmaydi.
  */
 import { useEffect } from 'react'
@@ -65,16 +65,17 @@ export function useTimeAlerts(): void {
         if (phase !== 'warn' && phase !== 'over') continue
         // Butun olingan vaqt ogohlantirish oynasidan qisqa bo'lsa (masalan 10 daq) — "tugayapti" darhol chiqmasin
         if (phase === 'warn' && g.paidMinutes * 60_000 <= warnMs) continue
-        // Har oshgan blok uchun bitta ogohlantirish (aynan 0 da va keyingi soniyada ikki marta chiqmasin)
-        const overIdx = Math.max(1, Math.ceil((g.billedMinutes - g.paidMinutes) / Math.max(1, opts.blockMinutes)))
-        const key = [c.session.session.id, g.id, phase, g.paidMinutes, phase === 'over' ? overIdx : 0].join(':')
+        const key = [c.session.session.id, g.id, phase, g.paidMinutes].join(':')
         if (fired.has(key)) continue
         fired.add(key)
         const name = `${c.room.name}: ${g.label}`
         if (phase === 'over') {
-          const extra = g.billedMinutes - g.paidMinutes
+          const block = Math.max(1, opts.blockMinutes)
           toast.error(`${name} vaqti tugadi`, {
-            description: extra > 0 ? `Keyingi ${formatHours(extra)} hisoblandi. "+1 soat" bilan uzaytiring yoki tugating.` : 'Olingan vaqt tugadi.',
+            description:
+              `Olingan ${formatHours(g.paidMinutes)} tugadi. ` +
+              (block === 1 ? "Endi o'tirilgan har daqiqa qo'shiladi." : `Endi har boshlangan ${formatHours(block)} qo'shiladi.`) +
+              ' "+1 soat" bilan uzaytiring yoki tugating.',
             duration: 15_000
           })
           sound = 'over'

@@ -10,7 +10,7 @@ import { getNow, toast } from '@/ui'
 import { useApp } from '@/store/app'
 
 export const REFRESH_MS = 10_000
-/** Ko'ruvchi kompyuterda tezroq (faqat ko'radi — har 3 soniya) */
+/** Terminal (ikkinchi kompyuter) — ikkala ekran sinxron bo'lishi uchun tezroq (har 3 soniya) */
 export const VIEWER_REFRESH_MS = 3_000
 
 interface BoardState {
@@ -32,10 +32,10 @@ export const useBoard = create<BoardState>((set, get) => ({
     try {
       const cards = await api.rooms.board()
       set({ cards, at: getNow(), error: null, failStreak: 0 })
-      if (useApp.getState().mode === 'viewer') useApp.getState().setConnected(true)
+      if (useApp.getState().mode !== 'main') useApp.getState().setConnected(true)
     } catch (e) {
-      if (useApp.getState().mode === 'viewer') {
-        // Ko'ruvchida aloqa uzilishi — toast emas, butun eni bo'ylab banner (AppShell)
+      if (useApp.getState().mode !== 'main') {
+        // Terminalda (ikkinchi kompyuter) aloqa uzilishi — toast emas, butun eni bo'ylab banner (AppShell)
         useApp.getState().setConnected(false)
         set({ error: e instanceof Error ? e.message : String(e), failStreak: get().failStreak + 1 })
         return

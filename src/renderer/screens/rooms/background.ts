@@ -10,13 +10,13 @@ import { useApp } from '@/store/app'
 import { useTimeAlerts } from './useTimeAlerts'
 
 export function useRoomsBackground(): void {
-  const readOnly = useApp((s) => s.readOnly)
+  const fast = useApp((s) => s.readOnly || s.mode !== 'main')
   useEffect(() => {
     void useBoard.getState().load()
     const id = setInterval(() => {
       if (!isAnyModalOpen() || useBoard.getState().cards == null) void useBoard.getState().load()
-    }, readOnly ? VIEWER_REFRESH_MS : REFRESH_MS)
+    }, fast ? VIEWER_REFRESH_MS : REFRESH_MS)
     return () => clearInterval(id)
-  }, [readOnly])
+  }, [fast])
   useTimeAlerts()
 }

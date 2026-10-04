@@ -9,11 +9,18 @@ type BillingKeys = 'defaultHours' | 'blockMinutes' | 'graceMinutes' | 'warnBefor
 type Draft = Pick<AppSettings, BillingKeys>
 
 const HOURS = [1, 2, 3, 4]
-const BLOCKS = [30, 60]
+/** Oshib ketganda: har daqiqa (aynan o'tirilgan vaqt, standart) / 30 daqiqa / 1 soat bloklar */
+const BLOCKS = [1, 30, 60]
 const GRACE = [0, 5, 10, 15]
 const WARN = [5, 10, 15]
 const ROUND = [1, 100, 500, 1000, 5000]
 const FALLBACK_RATE = 100_000
+
+function blockLabel(m: number): string {
+  if (m === 1) return 'Har daqiqa'
+  if (m === 60) return '1 soat'
+  return formatHours(m).replace('daq', 'daqiqa')
+}
 
 const pick = (s: AppSettings): Draft => ({
   defaultHours: s.defaultHours,
@@ -68,7 +75,8 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
   const rate = room?.rate ?? FALLBACK_RATE
   const paid = d.defaultHours * 60
   const opts = { roundTo: d.roundTo, blockMinutes: d.blockMinutes, graceMinutes: d.graceMinutes }
-  const examples = [25, paid + 10, paid + d.blockMinutes + 10].map((sat) => {
+  // Misollar: kam o'tirdi · 1 daqiqa oshdi · 25 daqiqa oshdi
+  const examples = [25, paid + 1, paid + 25].map((sat) => {
     const ms = sat * MS_MIN
     const iv: TimeInterval[] = [{ roomId: 0, rate, start: 0, end: ms }]
     const billed = billedMinutes(ms, paid, opts)
@@ -83,7 +91,7 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
 
   return (
     <div className="set-section">
-      <SectionHead icon="percent" title="Hisob-kitob" description="Oldindan olinadigan vaqt, oshib ketganda bloklar va yaxlitlash" />
+      <SectionHead icon="percent" title="Hisob-kitob" description="Oldindan olinadigan vaqt, oshib ketgan vaqt hisobi va yaxlitlash" />
       <div className="set-section__body">
         <div className="set-bill">
           <div className="set-bill__item">
@@ -98,19 +106,25 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
           </div>
           <div className="set-bill__item">
             <div className="set-bill__head">
-              <div className="set-bill__title"><Icon name="plus" size={22} /> Oshib ketganda blok</div>
-              <div className="set-bill__hint">Olingan vaqtdan oshsa, har boshlangan blok to'liq qo'shiladi</div>
+              <div className="set-bill__title"><Icon name="plus" size={22} /> Oshib ketganda</div>
+              <div className="set-bill__hint">
+                {d.blockMinutes <= 1
+                  ? "Olingan vaqtdan oshsa, aynan o'tirilgan daqiqalar qo'shiladi (01:01:00 → 61 daqiqa)"
+                  : `Olingan vaqtdan oshsa, har boshlangan ${longDuration(d.blockMinutes)} to'liq qo'shiladi`}
+              </div>
             </div>
             <Segmented
               block size="lg" value={d.blockMinutes} onChange={(v) => set('blockMinutes', v)}
-              options={withCurrent(BLOCKS, settings.blockMinutes).map((m) => ({ value: m, label: m === 60 ? '1 soat' : m + ' daqiqa' }))}
+              options={withCurrent(BLOCKS, settings.blockMinutes).map((m) => ({ value: m, label: blockLabel(m) }))}
             />
           </div>
           <div className="set-bill__item">
             <div className="set-bill__head">
               <div className="set-bill__title"><Icon name="timer" size={22} /> Imtiyozli daqiqa</div>
               <div className="set-bill__hint">
-                {d.graceMinutes === 0 ? "Qattiq: 1 daqiqa oshsa ham keyingi blok qo'shiladi" : d.graceMinutes + " daqiqagacha oshsa — qo'shimcha to'lov yo'q"}
+                {d.graceMinutes === 0
+                  ? d.blockMinutes <= 1 ? "Yo'q: oshgan birinchi daqiqadan hisoblanadi" : "Qattiq: 1 daqiqa oshsa ham keyingi blok qo'shiladi"
+                  : d.graceMinutes + " daqiqagacha oshsa — qo'shimcha to'lov yo'q"}
               </div>
             </div>
             <Segmented
@@ -160,7 +174,10 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
 
         <Note>
           Mehmon kamroq o'tirsa ham olingan vaqt to'liq to'lanadi. Oshib ketsa{' '}
-          {d.graceMinutes > 0 ? d.graceMinutes + ' daqiqa imtiyozdan keyin ' : ''}har boshlangan {formatHours(d.blockMinutes)} to'liq qo'shiladi.
+          {d.graceMinutes > 0 ? d.graceMinutes + ' daqiqa imtiyozdan keyin ' : ''}
+          {d.blockMinutes <= 1
+            ? "aynan o'tirilgan har daqiqa qo'shiladi (masalan 1 soat olingan, 01:01:00 o'tirdi → 61 daqiqa)."
+            : `har boshlangan ${longDuration(d.blockMinutes)} to'liq qo'shiladi.`}
           Mahsulot va xizmat narxlari yaxlitlanmaydi. Saqlangach ochiq hisoblar yangi qoida bilan ko'rsatiladi; yopilgan (to'langan)
           cheklar o'zgarmaydi.
         </Note>

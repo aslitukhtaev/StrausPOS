@@ -1,75 +1,47 @@
 /**
- * "Xonani ochish" oynasi: mehmonlar soni + olinadigan vaqt (1/2/3/4 soat yoki boshqa) + ofitsiant,
- * oldindan narx ("4 kishi × 2 soat × 70 000 = 560 000"). Ofitsiant tanlanmasa — aniq ogohlantirish.
+ * "Xonani ochish" oynasi: mehmonlar soni + olinadigan vaqt (1/2/3/4 soat yoki boshqa),
+ * oldindan narx ("4 kishi × 2 soat × 70 000 = 560 000"). Ofitsiant xonaga biriktirilmaydi — har bir buyurtma qatori
+ * o'zini olib kelgan ofitsiantga yoziladi (qo'shish oynasida).
  * Klaviatura: raqam tugmasi = mehmonlar soni, Enter = boshlash.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { Id, Room, SessionView } from '@shared/types'
+import type { Room, SessionView } from '@shared/types'
 import { formatHours, guestTimeAmount } from '@shared/billing'
 import { api } from '@/api'
-import { Button, Icon, Modal, Stepper, cx, formatMoney, toast } from '@/ui'
+import { Button, Modal, Stepper, cx, formatMoney, toast } from '@/ui'
 import { useBillingOptions, useDefaultHours } from './live'
 import { TimePicker } from './TimePicker'
-import { WaiterPicker, useWaiters } from './WaiterPicker'
 
 export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClose: () => void; onOpened: (v: SessionView) => void }) {
   const cap = Math.max(1, room.capacity)
   const defaultHours = useDefaultHours()
   const billing = useBillingOptions()
-  const waiters = useWaiters()
   const [count, setCount] = useState(Math.min(2, cap))
   const [minutes, setMinutes] = useState(defaultHours * 60)
-  const [waiterId, setWaiterId] = useState<Id | null>(null)
   const [busy, setBusy] = useState(false)
-  const [askWaiter, setAskWaiter] = useState(false)
-  const [highlight, setHighlight] = useState(false)
   const submitRef = useRef<() => void>(() => undefined)
-  const waiterRef = useRef<HTMLDivElement>(null)
 
   // Oldindan narx: bir kishi uchun olingan vaqt summasi (billing.ts) × kishi
   const perGuest = guestTimeAmount([{ roomId: room.id, rate: room.pricePerHour, start: 0, end: 0 }], minutes, 0, billing)
   const total = perGuest * count
 
-  const start = async () => {
+  const submit = async () => {
     if (busy) return
-    setAskWaiter(false)
     setBusy(true)
     try {
-      const v = await api.sessions.open(room.id, count, minutes, waiterId)
+      const v = await api.sessions.open(room.id, count, minutes)
       onOpened(v)
     } catch (e) {
       toast.error(e)
       setBusy(false)
     }
   }
-
-  const submit = () => {
-    if (busy || askWaiter) return
-    // Ofitsiantlar umuman bo'lmasa — ogohlantirish ma'nosiz
-    if (waiterId == null && waiters.list && waiters.list.length > 0) {
-      setAskWaiter(true)
-      return
-    }
-    void start()
-  }
-  submitRef.current = submit
-
-  const chooseWaiter = () => {
-    setAskWaiter(false)
-    setHighlight(true)
-    const el = waiterRef.current
-    if (el) {
-      el.scrollIntoView({ block: 'nearest' })
-      const first = el.querySelector<HTMLElement>('.rooms-waiter')
-      if (first) setTimeout(() => first.focus(), 50)
-    }
-  }
+  submitRef.current = () => void submit()
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
-      if (document.querySelectorAll('.ui-modal').length > 1) return // ogohlantirish oynasi ochiq
       if (/^[0-9]$/.test(e.key)) {
         const n = e.key === '0' ? 10 : Number(e.key)
         if (n >= 1 && n <= cap) {
@@ -101,7 +73,7 @@ export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClos
             Bekor qilish
           </Button>
           <div className="spacer" />
-          <Button variant="primary" size="lg" icon="play" loading={busy} onClick={submit} data-autofocus>
+          <Button variant="primary" size="lg" icon="play" loading={busy} onClick={() => void submit()} data-autofocus>
             Boshlash · {count} kishi · {formatHours(minutes)}
           </Button>
         </>
@@ -137,18 +109,6 @@ export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClos
           <TimePicker value={minutes} onChange={setMinutes} />
         </section>
 
-        <section className="rooms-open__sec" ref={waiterRef}>
-          <div className="rooms-open__label">
-            Ofitsiant
-            {waiterId == null && waiters.list && waiters.list.length > 0 && (
-              <span className={cx('rooms-open__need', highlight && 'is-strong')}>
-                <Icon name="alert" size={18} /> Tanlanmagan
-              </span>
-            )}
-          </div>
-          <WaiterPicker waiters={waiters} value={waiterId} onChange={setWaiterId} highlight={highlight} />
-        </section>
-
         <div className="rooms-open__price" data-testid="open-price">
           <span className="rooms-open__formula num">
             {count} kishi × {formatHours(minutes)} × {formatMoney(room.pricePerHour)}
@@ -159,31 +119,13 @@ export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClos
           </span>
         </div>
         <div className="rooms-open__hint">
-          Olingan vaqt kamroq o'tirilsa ham to'liq to'lanadi; oshib ketsa keyingi soat qo'shiladi.
+          Olingan vaqt kamroq o'tirilsa ham to'liq to'lanadi;{' '}
+          {billing.blockMinutes <= 1
+            ? "oshib ketsa — o'tirilgan har daqiqa qo'shiladi."
+            : `oshib ketsa — har boshlangan ${formatHours(billing.blockMinutes)} qo'shiladi.`}
         </div>
       </div>
 
-      {askWaiter && (
-        <Modal open onClose={() => setAskWaiter(false)} size="sm" className="rooms-nowaiter">
-          <div className="ui-confirm">
-            <div className="ui-confirm__icon rooms-nowaiter__icon">
-              <Icon name="alert" size={34} />
-            </div>
-            <div className="ui-confirm__title">Ofitsiant biriktirilmadi!</div>
-            <div className="ui-confirm__msg">
-              Ofitsiant biriktiring — aks holda bar savdosidan foiz hech kimga yozilmaydi.
-            </div>
-            <div className="rooms-nowaiter__actions">
-              <Button size="lg" variant="primary" icon="user" onClick={chooseWaiter} data-autofocus block>
-                Ofitsiant tanlash
-              </Button>
-              <Button size="lg" variant="ghost" onClick={() => void start()} block>
-                Ofitsiantsiz boshlash
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </Modal>
   )
 }

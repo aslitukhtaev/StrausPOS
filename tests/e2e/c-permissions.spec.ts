@@ -2,10 +2,10 @@
  * c) Ruxsatlar: kassir / administrator / ega / ofitsiant — UI'da ko'rinmaydi VA server ham rad etadi.
  */
 import { test, expect, T0, MIN } from './fixtures'
-import { addProduct, backToBoard, closeAdd, enterSession, guest, line, openAdd, openRoom, setWaiterUi, wsTotal } from './ui'
+import { addProduct, backToBoard, closeAdd, enterSession, guest, line, openAdd, openRoom, selectProduct, submitAdd, wsTotal } from './ui'
 
 const DENIED = "Bu amal uchun ruxsatingiz yo'q"
-const ALL = ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Xodimlar', 'Sozlamalar']
+const ALL = ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Oshxona', 'Xodimlar', 'Sozlamalar']
 const STAFF = { isProvider: false, isWaiter: false, commissionPct: 0, active: true }
 
 async function navItems(page: import('@playwright/test').Page): Promise<string[]> {
@@ -44,10 +44,13 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
   expect(await b.rpcError('waiters.sessions', pos.ids.waiter1, '2026-10')).toBe(DENIED)
   expect(await b.rpcError('waiters.payouts', pos.ids.waiter1, '2026-10')).toBe(DENIED)
   expect(await b.rpcError('waiters.payout', pos.ids.waiter1, '2026-10', 1000, '')).toBe(DENIED)
-  // Ofitsiant biriktirish (session.manage) — kassirga ruxsat
-  await setWaiterUi(pos, 'Bekzod')
-  const sw = await b.rpc<{ waiterName: string | null; session: { waiterPct: number } }>('sessions.get', 1)
-  expect(sw).toMatchObject({ waiterName: 'Bekzod', session: { waiterPct: 12 } })
+  // "Kim olib bordi" (session.manage) — kassir mahsulotni ofitsiant nomiga yoza oladi
+  const add2 = await openAdd(pos)
+  await addProduct(pos, add2, 'Suv 0.5 L', 1, 'Butun guruh', 'Bekzod')
+  await closeAdd(pos, add2)
+  const sw = await b.rpc<{ lines: { name: string; waiterId: number | null; waiterPct: number }[] }>('sessions.get', 1)
+  expect(sw.lines.find((l) => l.waiterId === pos.ids.waiter2)).toMatchObject({ name: 'Suv 0.5 L', waiterPct: 12 })
+  await expect(line(pos, 'Suv 0.5 L').getByTestId('line-waiter')).toContainText(['Bekzod'])
   expect(await b.rpcError('staff.changePin', pos.ids.owner, '9999')).toBe(DENIED)
   expect(await b.rpcError('rooms.save', { name: 'Yangi', pricePerHour: 1, capacity: 1 })).toBe(DENIED)
   expect(await b.rpcError('catalog.adjustStock', 1, 10, '')).toBe(DENIED)
@@ -73,7 +76,7 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
 test('Administrator: X, chegirma, bar, hisobot bor; xodimlar, sozlamalar, zaxira yo\'q', async ({ pos, page }) => {
   await pos.open()
   await pos.login('admin')
-  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar'])
+  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Ofitsiantlar', 'Oshxona'])
   await openRoom(pos, 'Sauna 1', 1)
   const add = await openAdd(pos)
   await addProduct(pos, add, 'Suv 0.5 L', 1)
@@ -135,14 +138,15 @@ test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar (to\'lov qila olmagan
   await pos.login('waiter1')
   expect(await navItems(page)).toEqual(['Xonalar'])
 
-  // O'zini biriktirib xona ochadi, bar qo'shadi
-  await openRoom(pos, 'Sauna 1', 2, { waiter: 'Sardor' })
-  await expect(page.getByTestId('waiter-strip')).toContainText('Sardor')
-  await expect(page.getByTestId('waiter-strip')).toContainText('10% bardan')
+  // Xona ochadi (ofitsiant tanlovi yo'q), mahsulot qo'shadi — qator avtomatik uning nomiga yoziladi
+  await openRoom(pos, 'Sauna 1', 2)
   const add = await openAdd(pos)
-  await addProduct(pos, add, 'Suv 0.5 L', 2)
-  await closeAdd(pos, add)
+  // Ofitsiantning o'zi kirgan — "Kim olib bordi" ko'rsatilmaydi
+  await expect(add.getByTestId('add-waiter')).toHaveCount(0)
+  await selectProduct(add, 'Suv 0.5 L', 2)
+  await submitAdd(pos, add)
   await expect(line(pos, 'Suv 0.5 L')).toContainText('2 × 5 000')
+  await expect(line(pos, 'Suv 0.5 L').getByTestId('line-waiter')).toHaveText('Sardor')
   // +1 soat (session.manage) bor
   await guest(pos, 'Mehmon 1').getByRole('button', { name: '1 soat' }).click()
   await expect(guest(pos, 'Mehmon 1')).toContainText('2 soat olingan')
@@ -167,7 +171,7 @@ test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar (to\'lov qila olmagan
   expect(await b.rpcError('system.backup')).toBe(DENIED)
   // Ikkinchi xona: xato ochildi → darhol bekor qila oladi; 5 daqiqadan keyin — yo'q (discount.apply yo'q)
   await backToBoard(pos)
-  await openRoom(pos, 'Sauna 2', 1, { waiter: 'Sardor' })
+  await openRoom(pos, 'Sauna 2', 1)
   await expect(page.getByRole('button', { name: 'Sessiyani bekor qilish' })).toBeVisible()
   await pos.advance(5)
   await expect(page.getByRole('button', { name: 'Sessiyani bekor qilish' })).toHaveCount(0)

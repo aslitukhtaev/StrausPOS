@@ -152,3 +152,8 @@
 .sale-hist__paper { min-height: 0; overflow: auto; background: var(--bg); display: flex; flex-direction: column; }
 .sale-hist__paper > .checkout-paper { flex: 1 1 auto; }
 .sale-hist__paper > .ui-empty { margin: auto; }
+.sale-dept { flex: none; }
+/* Bar/Oshxona bo'limi bo'lsa: 1-qator qidiruv + bo'lim, 2-qator kategoriyalar (tor ekranda kesilib qolmasin) */
+.sale-cat__bar.has-dept { flex-wrap: wrap; }
+.sale-cat__bar.has-dept .sale-cat__search { flex: 1 1 200px; max-width: 360px; }
+.sale-cat__bar.has-dept .sale-cat__chips { flex: 1 1 100%; }

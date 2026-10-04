@@ -1,5 +1,6 @@
 /**
- * h) "Qattiq" vaqt (oldindan olinadigan vaqt) — haqiqiy brauzer orqali. roundTo = 1000, blockMinutes = 60, graceMinutes = 0.
+ * h) "Qattiq" vaqt (oldindan olinadigan vaqt) — haqiqiy brauzer orqali. roundTo = 1000, graceMinutes = 0.
+ *    Standart blockMinutes = 1 (aynan o'tirilgan daqiqa); 1-test soatlik bloklar bilan (useHourBlocks).
  *
  *  1) Sauna 1 (50 000/soat), 3 kishi × 2 soat (T0):
  *       ochilishi bilan 3 × 2 × 50 000 = 300 000 (oldindan narx oynada ham shu)
@@ -13,13 +14,14 @@
  *  2) Imtiyoz (grace) 10 daq: 1 soat olingan, 70 daq → 50 000; 71 daq → 100 000.
  *     Keyin blok 30 daq (grace 10): 71 daq → 11 daq oshdi → 1 × 30 daq: 90 daq × 50 000/60 = 75 000.
  *  3) Ogohlantirish (warnBeforeMinutes = 10): 50-daqiqada "10 daqiqa qoldi" toast'i BIR MARTA; vaqt tugaganda
- *     "vaqti tugadi" BIR MARTA (boshqa ekranda ham; qaytib kelganda takrorlanmaydi); keyingi blok boshlanganda yana bir marta.
+ *     "vaqti tugadi" BIR MARTA (boshqa ekranda ham; qaytib kelganda va keyingi daqiqalarda takrorlanmaydi).
+ *     Daqiqalik hisob: 61 daq → 51 000 (50 000 × 61/60 = 50 833 → 1000 ga yaxlitlangan); kartada "+00:01:00 oshdi · 1 daq qo'shildi".
  */
 import type { Page } from '@playwright/test'
 import { test, expect, fm, T0, MIN } from './fixtures'
 import {
   backToBoard, confirm, enterSession, expectGuest, expectWsTotal, finishReceipt, guest, hoursText, openRoom, startCheckout,
-  tile, wsTotal
+  tile, useHourBlocks, wsTotal
 } from './ui'
 
 interface View {
@@ -28,13 +30,16 @@ interface View {
 }
 
 test('2 soat × 3 kishi: 5 daqiqada chiqqan ham to\'liq, +1 soat, hammaga +1 soat, oshganda keyingi soat', async ({ pos, page }) => {
+  await useHourBlocks(pos)
   await pos.open()
   await pos.login('admin')
 
   // Oldindan narx — ochish oynasida
   await tile(pos, 'Sauna 1').click()
   const d = pos.dialog('Sauna 1 — xonani ochish')
-  await expect(d.locator('.rooms-waiter').first()).toBeVisible()
+  // Ofitsiant xonaga biriktirilmaydi — tanlov yo'q
+  await expect(d.locator('.rooms-waiter')).toHaveCount(0)
+  await expect(d).not.toContainText('Ofitsiant')
   await d.locator('.rooms-open__n', { hasText: /^3$/ }).click()
   await d.locator('.rooms-time__btn', { has: page.locator('.rooms-time__n', { hasText: /^2$/ }) }).click()
   await expect(d.getByTestId('open-price')).toContainText('3 kishi × 2 soat × 50 000')
@@ -49,7 +54,7 @@ test('2 soat × 3 kishi: 5 daqiqada chiqqan ham to\'liq, +1 soat, hammaga +1 soa
   await d.getByRole('button', { name: 'Bekor qilish' }).click()
   await expect(d).toHaveCount(0)
 
-  await openRoom(pos, 'Sauna 1', 3, { minutes: 120, waiter: 'Sardor' })
+  await openRoom(pos, 'Sauna 1', 3, { minutes: 120 })
   await expectWsTotal(pos, 300_000)
   for (const g of ['Mehmon 1', 'Mehmon 2', 'Mehmon 3']) {
     await expectGuest(pos, g, 100_000)
@@ -98,7 +103,7 @@ test('2 soat × 3 kishi: 5 daqiqada chiqqan ham to\'liq, +1 soat, hammaga +1 soa
   // ── +181: 1 daqiqa oshdi → keyingi soat to'liq ──
   await pos.setNow(T0 + 181 * MIN)
   await expect(guest(pos, 'Mehmon 3').getByTestId('countdown')).toContainText('+00:01:00')
-  await expect(guest(pos, 'Mehmon 3')).toContainText('Keyingi 1 soat hisoblandi')
+  await expect(guest(pos, 'Mehmon 3').getByTestId('overnote')).toHaveText("+00:01:00 oshdi · 1 soat qo'shildi")
   await expect(guest(pos, 'Mehmon 3')).toHaveClass(/rooms-guest--over/)
   await expectGuest(pos, 'Mehmon 3', 200_000)
   await expectWsTotal(pos, 500_000)
@@ -170,6 +175,12 @@ test('Imtiyozli daqiqa (grace) va blok sozlamasi ochiq hisobga ta\'sir qiladi', 
   await pos.login('owner')
   await pos.nav('Sozlamalar')
   await page.locator('.set-nav').getByText('Hisob-kitob', { exact: true }).click()
+  // Standart: "Har daqiqa"
+  const over = page.locator('.set-bill__item', { hasText: 'Oshib ketganda' })
+  await expect(over.getByRole('radio', { name: 'Har daqiqa' })).toHaveAttribute('aria-checked', 'true')
+  await expect(over).toContainText("aynan o'tirilgan daqiqalar qo'shiladi")
+  await expect(page.getByTestId('billing-example')).toContainText("1 soat 1 daq to'lanadi")
+  await over.getByRole('radio', { name: '1 soat' }).click()
   await page.getByRole('radio', { name: '10 daq', exact: true }).click()
   await expect(page.getByText("10 daqiqagacha oshsa — qo'shimcha to'lov yo'q")).toBeVisible()
   await page.getByRole('button', { name: 'Saqlash' }).click()
@@ -226,7 +237,7 @@ test('Vaqt ogohlantirishi: "10 daqiqa qoldi" va "vaqti tugadi" bir martadan (bos
   await recordToasts(page)
   await pos.open()
   await pos.login('admin')
-  await openRoom(pos, 'Sauna 1', 1, { waiter: 'Sardor' })
+  await openRoom(pos, 'Sauna 1', 1)
   const WARN = /Sauna 1: Mehmon 1 — 10 daqiqa qoldi/
   const OVER = /Sauna 1: Mehmon 1 vaqti tugadi/
 
@@ -251,11 +262,16 @@ test('Vaqt ogohlantirishi: "10 daqiqa qoldi" va "vaqti tugadi" bir martadan (bos
   await pos.nav('Qarzlar')
   await pos.setNow(T0 + 61 * MIN)
   await expect(pos.toast(OVER)).toBeVisible()
-  await expect(pos.toast(OVER)).toContainText('Keyingi 1 soat hisoblandi')
+  await expect(pos.toast(OVER)).toContainText("Endi o'tirilgan har daqiqa qo'shiladi")
   await page.waitForTimeout(2500)
   await pos.nav('Xonalar')
   await enterSession(pos, 'Sauna 1')
-  await expectGuest(pos, 'Mehmon 1', 100_000)
+  // Daqiqalik: 61 daq × 50 000/60 = 50 833 → 51 000
+  await expectGuest(pos, 'Mehmon 1', 51_000)
+  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("+00:01:00 oshdi · 1 daq qo'shildi")
+  await pos.setNow(T0 + 75 * MIN)
+  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("+00:15:00 oshdi · 15 daq qo'shildi")
+  await expectGuest(pos, 'Mehmon 1', 63_000) // 75 × 50 000/60 = 62 500 → 63 000
   await pos.setNow(T0 + 90 * MIN)
   await page.waitForTimeout(2000)
   expect(await toastCount(page, OVER)).toBe(1)
