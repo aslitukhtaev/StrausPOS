@@ -5,18 +5,9 @@
 import { useState } from 'react'
 import type { LicenseStatus } from '@shared/types'
 import { Button, Icon, Spinner, TextArea, cx, errorMessage, formatDateTime, toast, useNow, type IconName } from '../ui'
-import { formatLeft, useLicense } from '../store/license'
+import { formatLeft, licenseDay, useLicense } from '../store/license'
 import './license.css'
 
-function p2(n: number): string {
-  return n < 10 ? '0' + n : String(n)
-}
-
-/** Kalit tugash kuni (UTC kun — kalit formati shunday): "05.11.2026" */
-export function licenseDay(expiresAt: number): string {
-  const d = new Date(expiresAt - 1)
-  return p2(d.getUTCDate()) + '.' + p2(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear()
-}
 
 export function activatedText(s: LicenseStatus): string {
   if (s.permanent) return 'Faollashtirildi — doimiy'

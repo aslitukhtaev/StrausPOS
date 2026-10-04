@@ -55,9 +55,8 @@ function maybeWarn(s: LicenseStatus): void {
   } catch {
     /* localStorage yo'q — baribir ko'rsatamiz */
   }
-  const days = Math.ceil(left / DAY)
-  toast.warning('Litsenziya ' + (days <= 1 ? 'ertaga' : days + ' kundan keyin') + ' tugaydi', {
-    description: 'Yangi kalit uchun ishlab chiquvchiga murojaat qiling: ' + s.contact,
+  toast.warning('Litsenziya tez orada tugaydi: ' + formatLeft(left), {
+    description: licenseDay(s.expiresAt) + ' gacha amal qiladi. Yangi kalit uchun ishlab chiquvchiga murojaat qiling: ' + s.contact,
     duration: 12_000
   })
 }
@@ -106,6 +105,16 @@ let timer: ReturnType<typeof setInterval> | null = null
 export function startLicenseWatch(): void {
   if (timer) return
   timer = setInterval(() => void useLicense.getState().load(), LICENSE_POLL_MS)
+}
+
+function p2(n: number): string {
+  return n < 10 ? '0' + n : String(n)
+}
+
+/** Kalit tugash kuni (UTC kun — kalit formati shunday): "05.11.2026" */
+export function licenseDay(expiresAt: number): string {
+  const d = new Date(expiresAt - 1)
+  return p2(d.getUTCDate()) + '.' + p2(d.getUTCMonth() + 1) + '.' + d.getUTCFullYear()
 }
 
 /** "14 soat qoldi" / "35 daqiqa qoldi" / "3 kun qoldi" */

@@ -25,7 +25,7 @@ function LicenseLink() {
   const blocked = st.state === 'expired' || st.state === 'tampered'
   const trial = st.state === 'trial'
   const text = blocked
-    ? 'Litsenziya muddati tugagan — Aktivatsiya'
+    ? (st.state === 'tampered' ? 'Kompyuter soati noto‘g‘ri' : 'Litsenziya muddati tugagan') + ' — Aktivatsiya'
     : trial && st.trialEndsAt != null ? 'Sinov: ' + formatLeft(st.trialEndsAt - now) + ' — Faollashtirish' : 'Litsenziya'
   return (
     <button

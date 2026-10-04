@@ -100,11 +100,11 @@
 .shell__banner--license .ui-icon { animation: none; }
 .shell__banner--license .ui-btn { flex: none; }
 
-/* Qulf ekranidagi havola */
+/* Qulf ekranidagi havola (o'ng yuqori burchak — pastdagi "ko'rish rejimi" havolasi bilan ustma-ust tushmaydi) */
 .lock-licenselink {
   position: absolute;
-  left: 24px;
-  bottom: 16px;
+  top: 16px;
+  right: 24px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
