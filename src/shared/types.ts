@@ -413,3 +413,24 @@ export interface BarSaleRow {
   total: number
   cashier: string
 }
+
+// ───────────── Litsenziya (oflayn aktivatsiya) ─────────────
+/**
+ * trial — 1 kunlik sinov; active — imzolangan kalit amalda; expired — sinov/kalit muddati tugagan yoki kalit yo'q;
+ * tampered — kompyuter soati orqaga surilgani aniqlandi (expired kabi cheklanadi).
+ * expired/tampered: dastur FAQAT KO'RISH rejimida (ma'lumotlar saqlanadi; hisobot, qarzlar, zaxira ishlaydi).
+ */
+export type LicenseState = 'trial' | 'active' | 'expired' | 'tampered'
+
+export interface LicenseStatus {
+  state: LicenseState
+  /** Mijoz ishlab chiquvchiga yuboradigan kod, masalan "7K3Q9-XPM2A-B4C" */
+  machineCode: string
+  /** Sinov tugash vaqti (trial/expired holatida) */
+  trialEndsAt: number | null
+  /** Kalit tugash vaqti; null — doimiy yoki kalit yo'q */
+  expiresAt: number | null
+  permanent: boolean
+  /** Ishlab chiquvchi bilan bog'lanish (telefon) */
+  contact: string
+}

@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, NetworkStatus, DiscoveredServer, ConnectionInfo
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, NetworkStatus, DiscoveredServer, ConnectionInfo
 } from './types'
 import type { Permission } from './types'
 
@@ -106,6 +106,16 @@ export interface PosApi {
     openList(): Promise<SessionView[]>
     /** Yopilgan bar savdolari oralig'da (chekni qayta ko'rish uchun checkout.receipt). Ruxsat: session.pay */
     history(range: ReportRange): Promise<BarSaleRow[]>
+  }
+
+  /**
+   * Litsenziya (login talab qilmaydi). Muddat tugagan bo'lsa main jarayon barcha YOZISH metodlarini rad etadi
+   * ("Litsenziya muddati tugagan…"), faqat o'qish, auth.*, license.*, system.backup va connection.* ishlaydi.
+   */
+  license: {
+    status(): Promise<LicenseStatus>
+    /** Imzolangan kalitni kiritish. Noto'g'ri/boshqa kompyuterniki/muddati o'tgan bo'lsa tushunarli xato */
+    activate(key: string): Promise<LicenseStatus>
   }
 
   // ── Bar / ombor ──
