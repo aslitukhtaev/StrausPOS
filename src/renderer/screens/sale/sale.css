@@ -15,7 +15,7 @@
 /* ── Katalog ── */
 .sale-cat { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
 .sale-cat__bar { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; flex: none; }
-.sale-cat__search { flex: 0 0 250px; }
+.sale-cat__search { flex: 0 0 220px; }
 .sale-cat__clear {
   display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-right: -8px;
   border: 0; border-radius: var(--r-full); background: transparent; color: var(--text-3); cursor: pointer;
@@ -49,7 +49,8 @@
 .sale-tile.is-added { border-color: var(--accent-line); }
 .sale-tile.is-pending { border-color: var(--accent); }
 .sale-tile.is-out { cursor: not-allowed; opacity: 0.45; background: var(--surface-2); box-shadow: none; }
-.sale-tile__name { font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: 1.2; padding-right: 38px; }
+.sale-tile__name { font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: 1.2; }
+.sale-tile.is-added .sale-tile__name { padding-right: 38px; }
 .sale-tile__foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 8px; }
 .sale-tile__foot .ui-money { color: var(--accent); font-weight: var(--fw-bold); }
 .sale-tile__stock {
@@ -70,12 +71,8 @@
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl); box-shadow: var(--shadow-2);
   overflow: hidden;
 }
-.sale-tabs {
-  flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 12px;
-  background: var(--surface-2); border-bottom: 1px solid var(--line-soft);
-}
 .sale-tabs__scroll { flex: 1 1 auto; min-width: 0; display: flex; gap: 6px; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
-.sale-tabs__new { flex: none; }
+.sale-cart__new { flex: none; }
 .sale-tab {
   flex: none; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
   min-width: 92px; height: 52px; padding: 0 14px; border-radius: var(--r-md);
@@ -90,19 +87,17 @@
 .sale-tab.is-active .sale-tab__sum { color: var(--accent); }
 
 .sale-cart__head {
-  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 12px 16px 10px 20px; border-bottom: 1px solid var(--line-soft);
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 74px;
+  padding: 10px 12px 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line-soft);
 }
-.sale-cart__title { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text); }
+.sale-cart__title { display: flex; align-items: center; gap: 10px; min-width: 0; padding-left: 6px; font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text); }
 .sale-cart__title .ui-icon, .sale-cart__title svg { color: var(--accent); flex: none; }
-.sale-cart__time { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text-3); }
-.sale-cart__cancel { color: var(--danger-text); }
 
 .sale-cart__lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 6px 0; }
 .sale-cart__lines > .ui-empty { padding-top: 28px; padding-bottom: 28px; }
 .sale-line {
   display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 10px;
-  padding: 8px 12px 8px 20px; min-height: 64px; border-bottom: 1px solid var(--line-soft);
+  padding: 6px 12px 6px 20px; min-height: 60px; border-bottom: 1px solid var(--line-soft);
 }
 .sale-line:last-child { border-bottom: 0; }
 .sale-line__main { min-width: 0; }
@@ -115,13 +110,15 @@
 .sale-line__sum { min-width: 86px; text-align: right; font-weight: var(--fw-bold); }
 
 .sale-cart__foot {
-  flex: none; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px;
+  flex: none; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 14px;
   border-top: 1px solid var(--line); background: var(--surface-2);
 }
 .sale-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
 .sale-total__label { font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text-2); letter-spacing: 0.04em; white-space: nowrap; }
 .sale-total__n { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-3); letter-spacing: 0; }
 .sale-total__sum { white-space: nowrap; }
+.sale-cart__actions { display: flex; gap: 10px; }
+.sale-cart__actions > .ui-iconbtn { flex: none; }
 .sale-cart__hint { text-align: center; font-size: var(--fs-sm); color: var(--text-3); }
 
 /* ── Olib tashlash (X, miqdor > 1) ── */

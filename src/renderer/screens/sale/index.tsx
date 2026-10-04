@@ -257,7 +257,6 @@ export default function SaleScreen() {
   }
 
   const noProducts = categories !== null && products.length === 0
-  const saleNo = active && sales ? sales.findIndex((s) => s.session.id === active.session.id) + 1 : 0
   const canX = canReturn
   const canCancel = !!active && (itemCount === 0 || canReturn)
 
@@ -382,9 +381,9 @@ export default function SaleScreen() {
 
         {/* ───── Savat ───── */}
         <section className="sale-cart" aria-label="Savat" data-testid="sale-cart">
-          {sales && sales.length > 0 && (
-            <div className="sale-tabs" role="tablist" aria-label="Ochiq savdolar">
-              <div className="sale-tabs__scroll">
+          <div className="sale-cart__head">
+            {sales && sales.length > 0 ? (
+              <div className="sale-tabs__scroll" role="tablist" aria-label="Ochiq savdolar">
                 {sales.map((s, i) => (
                   <button
                     key={s.session.id}
@@ -405,29 +404,15 @@ export default function SaleScreen() {
                   </span>
                 )}
               </div>
-              <Button size="sm" variant="ghost" icon="plus" onClick={newSale} disabled={activeId === null} className="sale-tabs__new">
+            ) : (
+              <div className="sale-cart__title">
+                <Icon name="receipt" size={24} />
+                <span>Yangi savdo</span>
+              </div>
+            )}
+            {sales && sales.length > 0 && (
+              <Button size="sm" variant="ghost" icon="plus" onClick={newSale} disabled={activeId === null} className="sale-cart__new">
                 Yangi savdo
-              </Button>
-            </div>
-          )}
-
-          <div className="sale-cart__head">
-            <div className="sale-cart__title">
-              <Icon name="receipt" size={24} />
-              <span>{active ? 'Savdo ' + saleNo : 'Yangi savdo'}</span>
-              {active && <span className="sale-cart__time">{formatClock(active.session.openedAt)}</span>}
-            </div>
-            {active && (
-              <Button
-                size="sm"
-                variant="ghost"
-                icon="trash"
-                className="sale-cart__cancel"
-                onClick={() => void cancelSale()}
-                disabled={!canCancel || busy}
-                title={canCancel ? undefined : 'Bekor qilish uchun administrator kerak (mahsulotlarni qaytarish ruxsati)'}
-              >
-                Bekor qilish
               </Button>
             )}
           </div>
@@ -470,17 +455,30 @@ export default function SaleScreen() {
               </span>
               <Money value={total} size="3xl" tone={total > 0 ? 'accent' : 'muted'} className="sale-total__sum" />
             </div>
-            <Button
-              variant="success"
-              size="xl"
-              block
-              icon="check"
-              disabled={!active || total <= 0 || !canPay || busy}
-              onClick={() => active && setPayId(active.session.id)}
-              data-testid="sale-pay"
-            >
-              To'lash
-            </Button>
+            <div className="sale-cart__actions">
+              {active && (
+                <IconButton
+                  icon="trash"
+                  variant="danger"
+                  size="lg"
+                  label={canCancel ? 'Savdoni bekor qilish' : 'Bekor qilish uchun administrator kerak (mahsulotlarni qaytarish ruxsati)'}
+                  onClick={() => void cancelSale()}
+                  disabled={!canCancel || busy}
+                  data-testid="sale-cancel"
+                />
+              )}
+              <Button
+                variant="success"
+                size="lg"
+                block
+                icon="check"
+                disabled={!active || total <= 0 || !canPay || busy}
+                onClick={() => active && setPayId(active.session.id)}
+                data-testid="sale-pay"
+              >
+                To'lash
+              </Button>
+            </div>
             {!canPay && <div className="sale-cart__hint">To'lovni kassir qabul qiladi</div>}
           </div>
         </section>

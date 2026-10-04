@@ -3,7 +3,7 @@
  */
 import { useState } from 'react'
 import type { LineView } from '@shared/types'
-import { Button, Modal, Money, Stepper, formatMoney } from '@/ui'
+import { Button, Modal, Money, Stepper } from '@/ui'
 
 export function RemoveDialog({ line, onClose, onRemove }: { line: LineView; onClose: () => void; onRemove: (qty: number) => Promise<void> }) {
   const [qty, setQty] = useState(1)
@@ -31,7 +31,7 @@ export function RemoveDialog({ line, onClose, onRemove }: { line: LineView; onCl
           </Button>
           <div className="spacer" />
           <Button variant="danger" className="is-solid" icon="x" loading={busy} onClick={() => void run(qty)} data-autofocus data-testid="sale-remove-ok">
-            Olib tashlash · <Money value={qty * line.unitPrice} currency={false} />
+            Olib tashlash
           </Button>
         </>
       }
@@ -44,7 +44,7 @@ export function RemoveDialog({ line, onClose, onRemove }: { line: LineView; onCl
           </Button>
         </div>
         <div className="sale-rm__hint">
-          Narxi {formatMoney(line.unitPrice)} so'm · mahsulot omborga qaytadi
+          Savatdan ayriladi: <Money value={qty * line.unitPrice} size="sm" /> · mahsulot omborga qaytadi
         </div>
       </div>
     </Modal>
