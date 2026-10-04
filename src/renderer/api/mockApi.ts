@@ -333,6 +333,11 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
         return delay(clone(net), 300)
       }
     },
+    license: {
+      status: () =>
+        delay({ state: 'trial' as const, machineCode: '7K3Q9-XPM2A-B4C', trialEndsAt: Date.now() + 14 * 3_600_000, expiresAt: null, permanent: false, contact: '+998 __ ___ __ __' }, 40),
+      activate: () => fail("Kalit noto'g'ri", 400)
+    },
     connection: {
       info: () => delay(conn(), 40),
       discover: () =>

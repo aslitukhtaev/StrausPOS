@@ -1,0 +1,123 @@
+/* Litsenziya: aktivatsiya oynasi, Sozlamalar bo'limi, tepa belgi va banner. Faqat tokenlar. */
+.lic { display: flex; flex-direction: column; gap: 20px; }
+/* Ikki ustun (keng oynada): 1) kompyuter kodi | 2) kalit — 768px balandlikka skrollsiz sig'adi */
+.lic-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; align-items: start; }
+.lic-center { display: flex; justify-content: center; padding: 40px; color: var(--accent); }
+
+.lic-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.lic-status__icon { flex: none; margin-top: 2px; }
+.lic-status__text { min-width: 0; }
+.lic-status__title { font-size: var(--fs-xl); font-weight: var(--fw-bold); line-height: 1.2; }
+.lic-status__desc { margin-top: 6px; font-size: var(--fs-md); color: var(--text-2); }
+.lic-status--trial { border-color: var(--warning-line); background: var(--warning-soft); }
+.lic-status--trial .lic-status__icon { color: var(--warning); }
+.lic-status--active { border-color: var(--free-line); background: var(--free-soft); }
+.lic-status--active .lic-status__icon { color: var(--free); }
+.lic-status--expired { border-color: var(--danger-line); background: var(--danger-soft); }
+.lic-status--expired .lic-status__icon { color: var(--danger); }
+.lic-status--expired .lic-status__title { color: var(--danger-text); }
+
+.lic-step { display: flex; flex-direction: column; gap: 12px; }
+.lic-step__label { display: flex; align-items: center; gap: 10px; font-size: var(--fs-lg); font-weight: var(--fw-bold); }
+.lic-step__no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  font-size: var(--fs-md);
+}
+.lic-code {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border: 2px dashed var(--accent-line);
+  border-radius: var(--r-lg);
+  background: var(--accent-soft);
+}
+.lic-code__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.05em;
+  color: var(--text);
+  user-select: all;
+  word-break: break-all;
+}
+.lic-hint { display: flex; align-items: center; gap: 10px; font-size: var(--fs-md); color: var(--text-2); }
+.lic-hint .ui-icon { flex: none; color: var(--accent); }
+.lic-contact { color: var(--text); font-weight: var(--fw-bold); user-select: all; }
+.lic-key.ui-textarea {
+  min-height: 120px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: var(--fs-lg);
+  letter-spacing: 0.03em;
+  resize: vertical;
+}
+.lic-msg { display: flex; align-items: center; gap: 10px; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.lic-msg .ui-icon { flex: none; }
+.lic-msg--error { color: var(--danger-text); }
+.lic-msg--ok { color: var(--free); }
+.lic-submit { align-self: stretch; }
+
+/* ── Tepa paneldagi sinov belgisi ── */
+.topbar__trial {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--warning-line);
+  border-radius: var(--r-full);
+  background: var(--warning-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.topbar__trial .ui-icon { color: var(--warning); }
+.topbar__trial:hover { border-color: var(--warning); }
+
+/* ── Muddat tugaganda qizil banner ── */
+.shell__banner--license .ui-icon { animation: none; }
+.shell__banner--license .ui-btn { flex: none; }
+
+/* Qulf ekranidagi havola */
+.lock-licenselink {
+  position: absolute;
+  left: 24px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.lock-licenselink:hover { color: var(--text); background: var(--surface); }
+.lock-licenselink.is-danger { color: var(--danger-text); background: var(--danger-soft); }
+.lock-licenselink.is-trial .ui-icon { color: var(--warning); }

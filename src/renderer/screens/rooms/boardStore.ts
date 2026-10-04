@@ -32,9 +32,9 @@ export const useBoard = create<BoardState>((set, get) => ({
     try {
       const cards = await api.rooms.board()
       set({ cards, at: getNow(), error: null, failStreak: 0 })
-      if (useApp.getState().readOnly) useApp.getState().setConnected(true)
+      if (useApp.getState().mode === 'viewer') useApp.getState().setConnected(true)
     } catch (e) {
-      if (useApp.getState().readOnly) {
+      if (useApp.getState().mode === 'viewer') {
         // Ko'ruvchida aloqa uzilishi — toast emas, butun eni bo'ylab banner (AppShell)
         useApp.getState().setConnected(false)
         set({ error: e instanceof Error ? e.message : String(e), failStreak: get().failStreak + 1 })

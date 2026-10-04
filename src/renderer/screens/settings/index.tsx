@@ -17,9 +17,10 @@ import { AppearanceSection } from './AppearanceSection'
 import { BackupSection } from './BackupSection'
 import { NetworkSection } from './NetworkSection'
 import { AboutSection, APP_VERSION } from './AboutSection'
+import { LicenseSection } from './LicenseSection'
 import './settings.css'
 
-type SectionId = 'rooms' | 'receipt' | 'security' | 'billing' | 'appearance' | 'network' | 'backup' | 'about'
+type SectionId = 'rooms' | 'receipt' | 'security' | 'billing' | 'appearance' | 'network' | 'backup' | 'license' | 'about'
 
 const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'rooms', label: 'Xonalar', desc: 'Narx, sig\'im, tartib', icon: 'rooms' },
@@ -29,6 +30,7 @@ const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'appearance', label: "Ko'rinish", desc: 'Kunduzgi / tungi', icon: 'sun' },
   { id: 'network', label: 'Tarmoq', desc: "Boshqa kompyuterdan ko'rish", icon: 'eye' },
   { id: 'backup', label: 'Zaxira', desc: 'Nusxa, tiklash', icon: 'database' },
+  { id: 'license', label: 'Litsenziya', desc: 'Aktivatsiya kaliti', icon: 'key' },
   { id: 'about', label: 'Haqida', desc: 'Versiya ' + APP_VERSION, icon: 'info' }
 ]
 
@@ -116,6 +118,7 @@ export default function SettingsScreen() {
   if (tab === 'rooms') body = <RoomsSection />
   else if (tab === 'network') body = <NetworkSection />
   else if (tab === 'backup') body = <BackupSection />
+  else if (tab === 'license') body = <LicenseSection />
   else if (tab === 'about') body = <AboutSection />
   else if (!settings) {
     body = loadErr ? (

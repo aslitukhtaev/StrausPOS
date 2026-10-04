@@ -18,6 +18,10 @@
  *   const connected = useApp((s) => s.connected)      // ko'ruvchida asosiy kompyuter bilan aloqa
  *   useApp.getState().setConnected(false)             // rpc xatosida (banner + qayta ulanish)
  * Ko'ruvchida login/qulf/Setup yo'q — to'g'ridan-to'g'ri qobiq; ruxsatlar faqat ['reports.view'].
+ *
+ * Litsenziya (store/license): asosiy kompyuterda muddat tugagan/soat buzilgan bo'lsa ham `readOnly = true`
+ * (o'zgartirish tugmalari yashirin), lekin login/qulf odatdagidek. Ko'ruvchiga xos narsalar (login yo'q,
+ * "Faqat ko'rish" belgisi, aloqa banneri) uchun `mode === 'viewer'` ni tekshiring, readOnly'ni emas.
  */
 import { create } from 'zustand'
 import type { AppMode, AppSettings, Permission, Staff } from '@shared/types'
@@ -26,6 +30,7 @@ import { useAuth } from './auth'
 import { useNav } from './nav'
 import { syncClock } from './clock'
 import { errorMessage } from './toast'
+import { setLicenseBlockedHandler, startLicenseWatch, useLicense } from './license'
 
 export type Phase = 'boot' | 'setup' | 'lock' | 'shell' | 'error'
 
@@ -179,6 +184,10 @@ export const useApp = create<AppState>((set, get) => ({
       }
       set({ mode: 'main', readOnly: false, connected: true, host: null })
       void syncClock(() => api.system.now())
+      // Litsenziya: muddat tugagan/soat buzilgan → butun ilova faqat ko'rish (server ham rad etadi)
+      await useLicense.getState().load()
+      set({ readOnly: useLicense.getState().blocked })
+      startLicenseWatch()
       if (await api.auth.needsSetup()) {
         set({ phase: 'setup' })
         return
@@ -238,7 +247,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async lock() {
-    if (get().readOnly) return // ko'ruvchida qulf yo'q
+    if (get().mode === 'viewer') return // ko'ruvchida qulf yo'q
     try {
       await getApi().auth.logout()
     } catch {
@@ -253,6 +262,11 @@ export const useApp = create<AppState>((set, get) => ({
     set({ businessName })
   }
 }))
+
+// Litsenziya holati ish davomida o'zgarsa (sinov tugadi / kalit kiritildi) — asosiy rejimda readOnly'ni moslash
+setLicenseBlockedHandler((blocked) => {
+  if (useApp.getState().mode === 'main') useApp.setState({ readOnly: blocked })
+})
 
 // "auto" rejimda tizim mavzusi o'zgarsa — darhol qo'llash
 if (darkQuery) {

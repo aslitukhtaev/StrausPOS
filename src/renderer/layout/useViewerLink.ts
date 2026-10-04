@@ -12,9 +12,9 @@ import { useBoard } from '../screens/rooms/boardStore'
 export const RETRY_MS = 5000
 
 export function useViewerLink(): void {
-  const readOnly = useApp((s) => s.readOnly)
+  const isViewer = useApp((s) => s.mode === 'viewer')
   useEffect(() => {
-    if (!readOnly) return
+    if (!isViewer) return
     let alive = true
     const tick = async () => {
       const st = useApp.getState()
@@ -43,5 +43,5 @@ export function useViewerLink(): void {
       alive = false
       clearInterval(id)
     }
-  }, [readOnly])
+  }, [isViewer])
 }

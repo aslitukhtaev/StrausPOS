@@ -9,6 +9,7 @@ import LockScreen from './screens/Lock'
 import SetupScreen from './screens/Setup'
 import { Button, ConfirmHost, EmptyState, Logo, Spinner, ToastViewport } from './ui'
 import Gallery from './ui/Gallery'
+import { LicenseDialog } from './layout/LicenseDialog'
 
 const SHOW_GALLERY = new URLSearchParams(location.search).has('gallery')
 
@@ -58,6 +59,7 @@ export default function App() {
       {phase === 'setup' && <SetupScreen />}
       {phase === 'lock' && <LockScreen />}
       {phase === 'shell' && <AppShell />}
+      <LicenseDialog />
       <ToastViewport />
       <ConfirmHost />
     </>

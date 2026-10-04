@@ -6,7 +6,9 @@ import type { Staff } from '@shared/types'
 import { ROLE_LABELS } from '@shared/permissions'
 import { api } from '../../api'
 import { useApp } from '../../store/app'
-import { Avatar, Button, EmptyState, Icon, Numpad, PinDots, Spinner, errorMessage } from '../../ui'
+import { Avatar, Button, EmptyState, Icon, Numpad, PinDots, Spinner, cx, errorMessage, useNow } from '../../ui'
+import { formatLeft, useLicense } from '../../store/license'
+import '../../layout/license.css'
 import { BrandPanel } from './BrandPanel'
 import { ViewerConnect } from '../Setup/ViewerConnect'
 import '../Setup/setup.css'
@@ -14,6 +16,28 @@ import './lock.css'
 
 const PIN_MAX = 6
 const PIN_MIN = 4
+
+/** Litsenziya havolasi (login'siz aktivatsiya oynasi) */
+function LicenseLink() {
+  const st = useLicense((s) => s.status)
+  const now = useNow()
+  if (!st) return null
+  const blocked = st.state === 'expired' || st.state === 'tampered'
+  const trial = st.state === 'trial'
+  const text = blocked
+    ? 'Litsenziya muddati tugagan — Aktivatsiya'
+    : trial && st.trialEndsAt != null ? 'Sinov: ' + formatLeft(st.trialEndsAt - now) + ' — Faollashtirish' : 'Litsenziya'
+  return (
+    <button
+      type="button"
+      className={cx('lock-licenselink', blocked && 'is-danger', trial && 'is-trial')}
+      onClick={() => useLicense.getState().openDialog()}
+      data-testid="lock-license"
+    >
+      <Icon name={blocked ? 'lock' : trial ? 'clock' : 'key'} size={18} /> {text}
+    </button>
+  )
+}
 
 export default function LockScreen() {
   const businessName = useApp((s) => s.businessName)
@@ -175,6 +199,7 @@ export default function LockScreen() {
             <Icon name="eye" size={18} /> Bu kompyuterni ko'rish rejimiga o'tkazish
           </button>
         )}
+        <LicenseLink />
       </section>
     </div>
   )
