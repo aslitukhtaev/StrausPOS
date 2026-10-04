@@ -47,17 +47,16 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
   hisobotda umumiy tushumga kiradi va alohida `barSales` ko'rsatkichi; xonalar panelida ko'rinmaydi.
 - Bekor qilish: biror mehmon ≥1 daqiqa o'tirgan bo'lsa faqat `discount.apply` ruxsati bilan (xato ochilgan xonani kassir darhol bekor qila oladi).
 
-## Tarmoq: ikkinchi kompyuter — FAQAT KO'RISH
+## Tarmoq: ikkinchi kompyuter — TERMINAL (to'liq ishlaydi)
 - Asosiy kompyuter (baza shu yerda) Sozlamalar → Tarmoq'da ruxsat bersa, Electron main LAN'da HTTP server ochadi
-  (standart port 47321) va UDP broadcast orqali o'zini e'lon qiladi. Har so'rov `X-Delfin-Code` (6 raqamli kod) bilan.
-- Server faqat O'QISH metodlarini bajaradi (qat'iy allowlist: rooms.board/list, sessions.get, catalog.* ro'yxatlari,
-  debts.list/payments, reports.*, waiters.monthly/sessions/payouts/list, settings.get, system.now/receiptHtml, staff.list).
-  Ular alohida PosService konteksti (sintetik ko'ruvchi, ruxsat: reports.view) bilan, asosiy kompyuterdagi login
-  holatiga TA'SIR QILMASDAN bajariladi. Har qanday yozish rad etiladi — xavfsizlik serverda, UI'da emas.
-- Ko'ruvchi kompyuter: o'sha ilova, `connection.connectViewer` bilan rejim lokal konfiguratsiyaga (`userData/connection.json`)
-  yoziladi; main jarayon DB ochmaydi, IPC chaqiruvlarini HTTP orqali asosiyga yo'naltiradi (Node 16: `http` moduli).
-  UI `readOnly` rejimida: login yo'q, barcha o'zgartirish tugmalari yashirin, tepada "Faqat ko'rish · <asosiy nomi>" belgisi,
-  aloqa uzilsa aniq banner va avtomatik qayta ulanish.
+  (standart port 47321) va UDP orqali o'zini e'lon qiladi (47322). Har so'rov `X-Delfin-Code` (6 raqam) va
+  `X-Delfin-Terminal` (terminal UUID) bilan.
+- Server har bir terminal uchun ALOHIDA PosService login konteksti saqlaydi (`forTerminal`): terminal xodimi PIN bilan
+  kiradi, ruxsatlar uning roliga qarab; asosiy kompyuterdagi login'ga ta'sir qilmaydi. Litsenziya guard serverda ham.
+  Denylist (faqat asosiyda): network.*, connection.*, system.backup/restore, license.activate, auth.setupOwner.
+- Terminal kompyuter: `userData/connection.json` (mode 'terminal'; eski 'viewer' ham terminal deb o'qiladi), DB ochilmaydi,
+  IPC chaqiruvlari HTTP orqali asosiyga. Kassa cheki terminalning o'z printeriga; oshxona cheki asosiydagi oshxona printeriga.
+- Sinxronlik: ikkala tomonda xonalar paneli va sessiya oynasi ~3 soniyada yangilanadi.
 
 ## 2026-10 o'zgarishlari (mijoz talabi)
 - **Vaqt oshsa** — aynan o'tirilgan daqiqa uchun (blockMinutes standart 1): 1 soat olingan, 01:01:00 → 61 daq.
