@@ -60,6 +60,21 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
   UI `readOnly` rejimida: login yo'q, barcha o'zgartirish tugmalari yashirin, tepada "Faqat ko'rish · <asosiy nomi>" belgisi,
   aloqa uzilsa aniq banner va avtomatik qayta ulanish.
 
+## 2026-10 o'zgarishlari (mijoz talabi)
+- **Vaqt oshsa** — aynan o'tirilgan daqiqa uchun (blockMinutes standart 1): 1 soat olingan, 01:01:00 → 61 daq.
+- **Ofitsiant xonaga biriktirilmaydi.** Har bir ofitsiant o'z PIN'i bilan kirib istalgan xonaga buyurtma qo'shadi;
+  qator `waiterId`/`waiterPct` ni oladi. Haq = (bar + OSHXONA mahsulotlari qatorlari, qaytarish ayirilgan) × foiz; xizmat yo'q.
+  Kassir qo'shganda "kim olib bordi" ixtiyoriy. Xonasiz bar savdosida haq yo'q.
+- **Oshxona bo'limi** barдан alohida (kategoriya `department`). Oshxona mahsuloti qo'shilganda asosiy kompyuterdagi
+  oshxona printeriga avtomatik oshxona cheki (xona, mahsulotlar, miqdor, ofitsiant, vaqt; qaytarishda "BEKOR" cheki).
+  Oshxona kunlik hisobi: savdo × `kitchen.sharePct`% = oshxonaga beriladigan, kunlik pul berish (`kitchen.*`).
+- **To'lov usullari**: Naqd · Karta · Terminal · Qarz; Aralash — to'rttasi ham (qarz ham).
+- **Qarzdorlar** bitta odam = bitta yozuv (telefon bo'yicha). Qarz yozishda qidirib tanlanadi; to'lov FIFO.
+- **Oraliq chek** — sessiya yopilmasdan (`checkout.preBill`), "Qo'shish" tugmasi yonida.
+- **Qo'shish oynasi** — mahsulot −/+ bilan tanlanadi, bitta "Qo'shish" bilan (`lines.addProducts`).
+- **Terminal rejimi** (ko'rish rejimi o'rniga): ikkinchi kompyuter TO'LIQ ishlaydi, o'z login'i bilan; baza bitta (asosiyda).
+  Server har bir terminal uchun alohida login konteksti saqlaydi (token). Eski 'viewer' konfiguratsiyasi terminal deb o'qiladi.
+
 ## Dizayn tamoyillari
 Brend: **Delfin Sauna**, logotip — delfin. Ranglar rasmdagi suvdan: yorqin moviy-feruza (aqua/cyan), oq ko'pik,
 chuqur dengiz ko'ki. **Ikki rejim**: kunduzgi (yorug', oq-moviy) va tungi (chuqur dengiz). `data-theme` = light|dark,

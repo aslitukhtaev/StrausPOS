@@ -49,10 +49,15 @@ export interface Room {
 }
 
 // ───────────── Mahsulot / xizmat ─────────────
+/** Bo'lim: bar (ichimlik/snek) yoki oshxona (ovqat — alohida jamoa yuritadi, oshxona cheki chiqadi) */
+export type Department = 'bar' | 'kitchen'
+
 export interface ProductCategory {
   id: Id
   name: string
   sortOrder: number
+  /** Kategoriya qaysi bo'limga tegishli (mahsulotlar shu bo'limni oladi). Standart 'bar' */
+  department: Department
 }
 
 export interface Product {
@@ -145,6 +150,15 @@ export interface OrderLine {
   providerId: Id | null
   createdAt: number
   createdBy: Id
+  /** Mahsulot bo'limi (kind='product'); xizmatlar uchun null */
+  department: Department | null
+  /**
+   * Shu qatorni olib kelgan OFITSIANT (ofitsiant o'z profili bilan qo'shsa — avtomatik; kassir qo'shganda ixtiyoriy tanlanadi).
+   * Ofitsiant haqi = shu qator summasi (qaytarishlar ayirilgan) × waiterPct%. Faqat bar va oshxona mahsulotlari; xizmatlar — yo'q.
+   */
+  waiterId: Id | null
+  /** Qo'shilgan paytdagi ofitsiant foizi (muzlatilgan) */
+  waiterPct: number
 }
 
 export interface ReturnRecord {
@@ -158,7 +172,10 @@ export interface ReturnRecord {
 }
 
 // ───────────── To'lov va qarz ─────────────
-export type PayMethod = 'cash' | 'card' | 'debt'
+/** Naqd · Karta (o'tkazma) · Terminal (POS) · Qarz. Aralash to'lovda to'rttasi ham (qarz ham) bo'lishi mumkin */
+export type PayMethod = 'cash' | 'card' | 'terminal' | 'debt'
+/** Qarzni to'lash usullari */
+export type DebtPayMethod = 'cash' | 'card' | 'terminal'
 
 export interface PaymentInput {
   method: PayMethod
@@ -166,8 +183,24 @@ export interface PaymentInput {
 }
 
 export interface DebtorInput {
+  /** Mavjud qarzdor tanlangan bo'lsa — uning id si (yangi yozuv yaratilmaydi, qarz shu odamga qo'shiladi) */
+  debtorId?: Id | null
   name: string
   phone: string
+}
+
+/** Qarzdor (bitta odam — bitta yozuv; telefon raqami bo'yicha takrorlanmaydi) */
+export interface Debtor {
+  id: Id
+  name: string
+  phone: string
+  /** Jami olingan qarz */
+  total: number
+  paid: number
+  /** total − paid */
+  balance: number
+  debtsCount: number
+  lastAt: number
 }
 
 export interface Payment {
@@ -181,6 +214,7 @@ export interface Payment {
 
 export interface Debt {
   id: Id
+  debtorId: Id
   sessionId: Id | null
   customerName: string
   phone: string
@@ -193,7 +227,7 @@ export interface Debt {
 export interface DebtPayment {
   id: Id
   debtId: Id
-  method: 'cash' | 'card'
+  method: DebtPayMethod
   amount: number
   at: number
   by: Id
@@ -220,12 +254,14 @@ export interface AppSettings {
   roundTo: number
   /** Xona ochilganda standart tanlanadigan soat (1, 2, ...) */
   defaultHours: number
-  /** Olingan vaqtdan oshib ketsa, shu daqiqalik bloklar bilan qo'shiladi (standart 60 = har boshlangan soat) */
+  /** Olingan vaqtdan oshsa, shu daqiqalik bloklar bilan qo'shiladi. Standart 1 = aynan o'tirilgan daqiqa uchun (01:01 → 61 daq) */
   blockMinutes: number
   /** Oshib ketganda keyingi blok hisoblanishidan oldingi imtiyozli daqiqalar (0 = qattiq) */
   graceMinutes: number
   /** Vaqt tugashiga necha daqiqa qolganda ogohlantirilsin */
   warnBeforeMinutes: number
+  /** Oshxona: ulush foizi (oshxona savdosidan oshxonaga beriladigan qism, standart 100), oshxona printeri, avtomatik chek */
+  kitchen: { sharePct: number; printerName: string; paperWidth: 58 | 80; autoPrint: boolean }
   /** Interfeys rejimi: kunduzgi / tungi / tizimga qarab */
   theme: 'light' | 'dark' | 'auto'
   /** Qulf ekrani yoqilganmi */
@@ -302,6 +338,8 @@ export interface ReceiptData {
   total: number
   payments: { method: PayMethod; amount: number }[]
   debtor: DebtorInput | null
+  /** true — sessiya yopilmagan, oraliq hisob ("To'lanmagan") */
+  provisional: boolean
 }
 
 // ───────────── Hisobotlar ─────────────
@@ -319,9 +357,9 @@ export interface SalesReport {
   serviceRevenue: number
   discounts: number
   total: number
-  byMethod: { cash: number; card: number; debt: number }
+  byMethod: { cash: number; card: number; terminal: number; debt: number }
   /** Shu davrda qarzdan undirilgan to'lovlar (kassadagi naqd = byMethod.cash + debtPayments.cash) */
-  debtPayments: { cash: number; card: number }
+  debtPayments: { cash: number; card: number; terminal: number }
   returnsAmount: number
   byDay: { day: string; total: number }[]
   byRoom: { roomId: Id; roomName: string; sessions: number; total: number }[]
@@ -373,8 +411,12 @@ export interface WaiterSessionRow {
 }
 
 // ───────────── Tarmoq: ikkinchi kompyuter "faqat ko'rish" rejimida ─────────────
-/** Asosiy kompyuter (baza shu yerda) yoki ko'ruvchi (Wi-Fi orqali asosiyga ulangan, faqat o'qiydi) */
-export type AppMode = 'main' | 'viewer'
+/**
+ * main — asosiy kompyuter ("miya", baza shu yerda);
+ * terminal — Wi-Fi orqali asosiyga ulangan TO'LIQ ishlaydigan kompyuter (masalan ofitsiantlar monobloki):
+ *   o'z login'i (xodim PIN), barcha amallar asosiy bazada bajariladi, ikkala ekran sinxron.
+ */
+export type AppMode = 'main' | 'terminal'
 
 export interface NetworkStatus {
   /** Ko'ruvchi kompyuterlarga ruxsat berilganmi */
@@ -384,8 +426,8 @@ export interface NetworkStatus {
   code: string
   /** Shu kompyuterning Wi-Fi/LAN manzillari (masalan 192.168.1.10) */
   addresses: string[]
-  /** Oxirgi 2 daqiqada so'rov yuborgan ko'ruvchilar */
-  viewers: { ip: string; name: string; lastSeen: number }[]
+  /** Oxirgi 2 daqiqada so'rov yuborgan terminallar (kompyuter nomi, IP, kirgan xodim) */
+  terminals: { ip: string; name: string; staffName: string | null; lastSeen: number }[]
 }
 
 export interface DiscoveredServer {
@@ -397,10 +439,10 @@ export interface DiscoveredServer {
 
 export interface ConnectionInfo {
   mode: AppMode
-  /** viewer rejimida: asosiy kompyuter manzili */
+  /** terminal rejimida: asosiy kompyuter manzili */
   host: string | null
   port: number | null
-  /** viewer rejimida: hozir aloqa bormi */
+  /** terminal rejimida: hozir aloqa bormi */
   connected: boolean
 }
 
@@ -433,4 +475,28 @@ export interface LicenseStatus {
   permanent: boolean
   /** Ishlab chiquvchi bilan bog'lanish (telefon) */
   contact: string
+}
+
+// ───────────── Oshxona hisobi ─────────────
+/** Oshxona kunlik hisobi: oshxona mahsulotlari savdosi va oshxonaga beriladigan ulush (AppSettings.kitchen.sharePct) */
+export interface KitchenDayRow {
+  /** 'YYYY-MM-DD' (mahalliy) */
+  day: string
+  /** Oshxona mahsulotlari savdosi (qaytarishlar ayirilgan; yopilgan sessiyalar) */
+  sales: number
+  /** Oshxonaga hisoblangan summa = sales × sharePct% (sessiya yopilgan paytdagi foiz bilan) */
+  due: number
+  /** Shu kun uchun berilgan pul */
+  paid: number
+  balance: number
+  orders: number
+}
+
+export interface KitchenPayout {
+  id: Id
+  day: string
+  amount: number
+  note: string
+  at: number
+  by: Id
 }

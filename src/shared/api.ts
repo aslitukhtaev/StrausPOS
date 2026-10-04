@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, NetworkStatus, DiscoveredServer, ConnectionInfo
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo
 } from './types'
 import type { Permission } from './types'
 
@@ -47,18 +47,17 @@ export interface PosApi {
 
   sessions: {
     /**
-     * Xonani ochish: mehmonlar soni (1..sig'im), har bir mehmon uchun olingan vaqt (daqiqa, masalan 60/120),
-     * ofitsiant (null = keyin biriktiriladi; UI ogohlantiradi).
+     * Xonani ochish: mehmonlar soni (1..sig'im), har bir mehmon uchun olingan vaqt (daqiqa, masalan 60/120).
+     * Ofitsiant xonaga BIRIKTIRILMAYDI — har bir ofitsiant o'z profili bilan istalgan xonaga buyurtma qo'shadi
+     * (OrderLine.waiterId). Eski sessiyalardagi waiterId/waiterPct faqat tarix uchun saqlanadi.
      */
-    open(roomId: Id, guestCount: number, paidMinutes: number, waiterId: Id | null): Promise<SessionView>
+    open(roomId: Id, guestCount: number, paidMinutes: number): Promise<SessionView>
     get(sessionId: Id): Promise<SessionView>
     addGuest(sessionId: Id, paidMinutes: number): Promise<SessionView>
     /** Mehmonga vaqt qo'shish (+1 soat va h.k.). minutes > 0 */
     extendGuest(guestId: Id, minutes: number): Promise<SessionView>
     /** Sessiyadagi barcha tugamagan mehmonlarga vaqt qo'shish */
     extendAll(sessionId: Id, minutes: number): Promise<SessionView>
-    /** Ofitsiant biriktirish/almashtirish (null = olib tashlash). Foiz shu paytda muzlatiladi. */
-    setWaiter(sessionId: Id, waiterId: Id | null): Promise<SessionView>
     /** Mehmon vaqtini boshqarish */
     guestPause(guestId: Id): Promise<SessionView>
     guestResume(guestId: Id): Promise<SessionView>
@@ -76,7 +75,13 @@ export interface PosApi {
 
   // ── Qatorlar (bar/xizmat) ──
   lines: {
-    addProduct(sessionId: Id, productId: Id, qty: number, guestId: Id | null): Promise<SessionView>
+    /**
+     * waiterId: ofitsiant o'zi kirgan bo'lsa e'tiborsiz (u avtomatik yoziladi); kassir/admin qo'shsa ixtiyoriy
+     * "kim olib bordi" (null = ofitsiantsiz, haq yo'q). Oshxona mahsuloti bo'lsa oshxona cheki avtomatik chiqadi.
+     */
+    addProduct(sessionId: Id, productId: Id, qty: number, guestId: Id | null, waiterId?: Id | null): Promise<SessionView>
+    /** Bir nechta mahsulotni bitta amalda qo'shish (qo'shish oynasidagi −/+ savat; oshxona cheki bitta bo'lib chiqadi) */
+    addProducts(sessionId: Id, items: { productId: Id; qty: number }[], guestId: Id | null, waiterId?: Id | null): Promise<SessionView>
     addService(sessionId: Id, serviceId: Id, guestId: Id | null, providerId: Id | null): Promise<SessionView>
     /** X tugmasi: qaytarish. qty <= faol miqdor. Mahsulot omborga qaytadi. */
     returnLine(lineId: Id, qty: number, reason: string): Promise<SessionView>
@@ -90,13 +95,15 @@ export interface PosApi {
      */
     pay(sessionId: Id, payments: PaymentInput[], debtor: DebtorInput | null): Promise<ReceiptData>
     receipt(sessionId: Id): Promise<ReceiptData>
+    /** Sessiya yopilmasdan oraliq hisob cheki (provisional=true, "To'lanmagan"). Ruxsat: session.manage */
+    preBill(sessionId: Id): Promise<ReceiptData>
   }
 
   /**
    * Xonasiz bar savdosi (kassa). Oddiy sessiya kabi: kind='bar', roomId=0, mehmonlar/vaqt/ofitsiant YO'Q.
    * Mahsulot qo'shish — lines.addProduct(sessionId, productId, qty, null); X — lines.returnLine;
    * to'lov — checkout.pay (CheckoutDialog o'zgarishsiz ishlaydi); bo'sh savdo — sessions.cancel.
-   * Xizmat qo'shib bo'lmaydi, setWaiter/extend/moveRoom/addGuest rad etiladi; ofitsiant haqi hisoblanmaydi.
+   * Xizmat qo'shib bo'lmaydi, extend/moveRoom/addGuest rad etiladi; ofitsiant haqi hisoblanmaydi (waiterId e'tiborsiz).
    * Xonalar paneli (rooms.board) bar savdolarini ko'rsatmaydi.
    */
   barSales: {
@@ -135,8 +142,31 @@ export interface PosApi {
   // ── Qarzlar ──
   debts: {
     list(onlyOpen: boolean): Promise<Debt[]>
-    pay(debtId: Id, method: 'cash' | 'card', amount: number): Promise<Debt>
+    pay(debtId: Id, method: DebtPayMethod, amount: number): Promise<Debt>
     payments(debtId: Id): Promise<DebtPayment[]>
+  }
+
+  /** Qarzdorlar (bir odam — bitta yozuv). Qarz yozishda avval qidiriladi, topilsa shu odamga qo'shiladi */
+  debtors: {
+    /** Ism yoki telefon bo'yicha qidiruv (to'lov oynasidagi avtomatik taklif). Ruxsat: debt.manage */
+    search(query: string): Promise<Debtor[]>
+    list(onlyOpen: boolean): Promise<Debtor[]>
+    /** Odamning barcha qarzlari (eng yangisi birinchi) */
+    debts(debtorId: Id): Promise<Debt[]>
+    /** Odamning qarzini to'lash — eng eski qarzdan boshlab yopiladi (FIFO). amount ≤ balance */
+    pay(debtorId: Id, method: DebtPayMethod, amount: number): Promise<Debtor>
+    /** Ism/telefonni tuzatish (telefon boshqa qarzdorniki bo'lsa — rad) */
+    rename(debtorId: Id, name: string, phone: string): Promise<Debtor>
+  }
+
+  /** Oshxona kunlik hisob-kitobi (oshxona jamoasiga har kuni pul berish). Ruxsat: reports.view; payout — staff.manage */
+  kitchen: {
+    /** Oy ichidagi kunlar ('YYYY-MM') */
+    daily(month: string): Promise<KitchenDayRow[]>
+    payout(day: string, amount: number, note: string): Promise<KitchenPayout>
+    payouts(month: string): Promise<KitchenPayout[]>
+    /** Oshxona chekini qayta chop etish (sessiyadagi barcha faol oshxona qatorlari) */
+    reprint(sessionId: Id): Promise<void>
   }
 
   // ── Xodimlar ──
@@ -165,23 +195,24 @@ export interface PosApi {
   network: {
     status(): Promise<NetworkStatus>
     setEnabled(enabled: boolean): Promise<NetworkStatus>
-    /** Yangi ulanish kodi — eski kod bilan ulangan ko'ruvchilar uziladi */
+    /** Yangi ulanish kodi — eski kod bilan ulangan terminallar uziladi */
     regenerateCode(): Promise<NetworkStatus>
   }
 
   /**
-   * Ulanish rejimi (har bir kompyuterning o'zida, login talab qilmaydi; DB'da emas, lokal konfiguratsiyada saqlanadi).
-   * Ko'ruvchi rejimida PosApi'ning faqat O'QISH metodlari ishlaydi (server allowlist), qolganlari
-   * "Bu kompyuter faqat ko'rish rejimida" xatosini beradi. Ko'ruvchida login yo'q: auth.current() sintetik
-   * {name: "Ko'ruvchi"} xodimni va faqat ['reports.view'] ruxsatini qaytaradi.
+   * Ulanish rejimi (har bir kompyuterning o'zida, login talab qilmaydi; lokal konfiguratsiyada saqlanadi).
+   * TERMINAL — ikkinchi kompyuter (ofitsiantlar monobloki): asosiyga Wi-Fi orqali ulanadi, o'z qulf/login ekrani bor
+   * (xodim PIN), barcha PosApi amallari asosiy bazada SHU TERMINALNING login konteksti bilan bajariladi.
+   * Terminalda ishlamaydigan (faqat asosiy kompyuterga tegishli): network.*, system.backup/restore, license.activate,
+   * auth.setupOwner. Kassa cheki terminalning o'z printeriga, oshxona cheki asosiy kompyuterdagi oshxona printeriga.
    */
   connection: {
     info(): Promise<ConnectionInfo>
     /** Wi-Fi'dagi asosiy kompyuterlarni qidirish (UDP broadcast, ~2 soniya) */
     discover(): Promise<DiscoveredServer[]>
-    /** Ko'ruvchi rejimiga o'tish: manzil + kod tekshiriladi, saqlanadi, ilova qayta yuklanadi */
-    connectViewer(host: string, port: number, code: string): Promise<void>
-    /** Ko'ruvchi rejimidan chiqish (asosiy rejimga qaytish) */
+    /** Terminal rejimiga o'tish: manzil + kod tekshiriladi, saqlanadi, ilova qayta yuklanadi */
+    connectTerminal(host: string, port: number, code: string): Promise<void>
+    /** Terminal rejimidan chiqish (asosiy rejimga qaytish) */
     disconnect(): Promise<void>
   }
 
