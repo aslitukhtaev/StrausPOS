@@ -196,7 +196,7 @@ export default function ReportsScreen() {
             <Card title="Xonalar bo'yicha" subtitle="Tushum va sessiyalar" padding="md">
               {s.byRoom.length === 0 ? <Mute>Ma'lumot yo'q</Mute> : (
                 <BarList
-                  rows={s.byRoom.map((r) => ({ key: r.roomId, label: r.roomName, value: r.total, extra: r.sessions + ' ta sessiya' }))}
+                  rows={s.byRoom.map((r) => ({ key: r.roomId, label: r.roomId === 0 ? r.roomName || 'Bar (xonasiz)' : r.roomName, value: r.total, extra: r.sessions + (r.roomId === 0 ? ' ta savdo' : ' ta sessiya') }))}
                 />
               )}
             </Card>
@@ -340,6 +340,7 @@ const Mute = ({ children }: { children: React.ReactNode }) => <div className="re
 
 /* ───────────── KPI ───────────── */
 function Kpis({ s }: { s: SalesReport }) {
+  const bar = s.barSales || { count: 0, total: 0 }
   const tiles: { label: string; icon: IconName; value: number; tone?: 'warning' | 'danger'; sign?: boolean }[] = [
     { label: 'Vaqt', icon: 'clock', value: s.timeRevenue },
     { label: 'Bar', icon: 'bar', value: s.productRevenue },
@@ -353,6 +354,13 @@ function Kpis({ s }: { s: SalesReport }) {
         <div className="rep-kpi__label"><Icon name="cash" size={22} /> Jami tushum</div>
         <Money value={s.total} size="3xl" tone="accent" />
         <div className="rep-kpi__note">Qaytarishlar va chegirmalar hisobga olingan</div>
+        <div className="rep-kpi__bar" data-testid="rep-bar-sales" title="Xonaga bog'lanmagan bar savdolari (jami tushumga kiradi, ofitsiant ulushi yo'q)">
+          <div className="rep-kpi__label"><Icon name="receipt" size={22} /> Bar (xonasiz)</div>
+          <div className="rep-kpi__barval">
+            <span className="rep-kpi__count num">{bar.count}<span className="rep-kpi__unit"> ta</span></span>
+            <Money value={bar.total} size="xl" />
+          </div>
+        </div>
       </Card>
       {tiles.map((t) => (
         <Card key={t.label} padding="md" className="rep-kpi">

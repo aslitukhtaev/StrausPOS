@@ -9,10 +9,11 @@
  *   &offline=1   — ko'ruvchida aloqa uzilgan holat (connection.info().connected=false, board xato)
  *
  * Qo'llab-quvvatlanadi: auth.*, settings.*, system.now, rooms.list/board, staff.list, waiters.list, catalog.categories/products/services,
- * debts.list. Qolganlari "Mock rejimida mavjud emas" xatosini beradi.
+ * debts.list, xonasiz bar savdosi (barSales.*, lines.addProduct/returnLine, sessions.get/cancel, checkout.pay/receipt — faqat bar
+ * savdolari uchun soddalashtirilgan). Qolganlari "Mock rejimida mavjud emas" xatosini beradi.
  */
 import type { PosApi } from '@shared/api'
-import type { AppSettings, ConnectionInfo, NetworkStatus, Permission, SessionView, Product, ProductCategory, Room, RoomCard, ServiceItem, Staff } from '@shared/types'
+import type { AppSettings, BarSaleRow, ConnectionInfo, NetworkStatus, Permission, ReceiptData, SessionView, Product, ProductCategory, Room, RoomCard, ServiceItem, Staff } from '@shared/types'
 import { ROLE_PERMISSIONS } from '@shared/permissions'
 
 const delay = <T>(v: T, ms = 120): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms))
@@ -121,6 +122,35 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
     } as unknown as SessionView
   }
 
+  // ── Xonasiz bar savdolari (soddalashtirilgan, faqat UI ko'rinishi uchun) ──
+  const BAR_ROOM: Room = { id: 0, name: 'Bar', pricePerHour: 0, capacity: 0, active: true, sortOrder: 0 }
+  const bars = new Map<number, SessionView>()
+  const barReceipts = new Map<number, ReceiptData>()
+  let barSeq = 100
+  let lineSeq = 1000
+  let receiptSeq = 1
+  const barFind = (id: number): SessionView => {
+    const v = bars.get(id)
+    if (!v) throw new Error('Savdo topilmadi')
+    return v
+  }
+  const barTotals = (v: SessionView): SessionView => {
+    for (const l of v.lines) {
+      l.activeQty = l.qty - l.returnedQty
+      l.amount = l.activeQty * l.unitPrice
+    }
+    v.linesTotal = v.lines.reduce((a, l) => a + l.amount, 0)
+    v.total = v.linesTotal
+    v.due = v.total - v.paid
+    v.computedAt = Date.now()
+    return v
+  }
+  const barOpen = (id: number): SessionView => {
+    const v = barFind(id)
+    if (v.session.status !== 'open') throw new Error('Savdo allaqachon yopilgan')
+    return v
+  }
+
   const session = () => (current ? { staff: clone(current), permissions: ROLE_PERMISSIONS[current.role].slice() as Permission[] } : null)
   const needAuth = () => {
     if (!current) throw new Error('Avval tizimga kiring')
@@ -167,6 +197,15 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
     },
     system: {
       now: () => delay(Date.now(), 20),
+      printReceipt: () => delay(undefined, 300),
+      receiptHtml: (d) =>
+        delay(
+          '<html><body style="font:13px monospace;margin:8px">' +
+            '<b>' + d.settings.businessName + '</b><br>Chek № ' + d.receiptNo + ' · ' + d.roomName + '<hr>' +
+            d.lines.map((l) => l.name + ' × ' + l.qty + ' = ' + l.amount).join('<br>') +
+            '<hr><b>Jami: ' + d.total + '</b></body></html>',
+          40
+        ),
       listPrinters: () => delay([], 20)
     },
     rooms: {
@@ -185,9 +224,102 @@ export function createMockApi(opts: { empty?: boolean; viewer?: boolean; offline
       }
     },
     sessions: {
-      get: () => {
+      get: (id) => {
         online()
+        if (bars.has(id)) return delay(clone(barTotals(barFind(id))))
         return delay(busyView())
+      },
+      cancel: (id) => {
+        const v = barOpen(id)
+        if (v.lines.some((l) => l.qty - l.returnedQty > 0)) return fail("Sessiyada buyurtmalar bor — bekor qilib bo'lmaydi")
+        bars.delete(id)
+        return delay(undefined)
+      }
+    },
+    barSales: {
+      open: () => {
+        needAuth()
+        const id = ++barSeq
+        const now = Date.now()
+        const v = {
+          session: { id, kind: 'bar', roomId: 0, status: 'open', openedAt: now, closedAt: null, openedBy: current!.id, discount: 0, note: '', waiterId: null, waiterPct: 0 },
+          room: clone(BAR_ROOM), waiterName: null, guests: [], lines: [], computedAt: now,
+          timeTotal: 0, linesTotal: 0, discount: 0, total: 0, paid: 0, due: 0, payments: []
+        } as SessionView
+        bars.set(id, v)
+        return delay(clone(v))
+      },
+      openList: () =>
+        delay(
+          Array.from(bars.values())
+            .filter((v) => v.session.status === 'open')
+            .sort((a, b) => b.session.openedAt - a.session.openedAt)
+            .map((v) => clone(barTotals(v)))
+        ),
+      history: (range) =>
+        delay(
+          Array.from(bars.values())
+            .filter((v) => v.session.status === 'closed' && v.session.closedAt! >= range.from && v.session.closedAt! < range.to)
+            .sort((a, b) => b.session.closedAt! - a.session.closedAt!)
+            .map((v): BarSaleRow => ({
+              sessionId: v.session.id,
+              receiptNo: barReceipts.get(v.session.id)?.receiptNo ?? null,
+              closedAt: v.session.closedAt!,
+              items: v.lines.reduce((a, l) => a + l.qty - l.returnedQty, 0),
+              total: v.total,
+              cashier: current ? current.name : ''
+            }))
+        )
+    },
+    lines: {
+      addProduct: (sessionId, productId, qty) => {
+        const v = barOpen(sessionId)
+        const p = products.find((x) => x.id === productId)
+        if (!p) return fail('Mahsulot topilmadi')
+        if (p.trackStock && p.stock < qty) return fail(`Omborda yetarli emas (qoldi: ${p.stock})`)
+        const ex = v.lines.find((l) => l.refId === p.id && l.unitPrice === p.price)
+        if (ex) ex.qty += qty
+        else
+          v.lines.push({
+            id: ++lineSeq, sessionId, guestId: null, kind: 'product', refId: p.id, name: p.name, unitPrice: p.price, qty, returnedQty: 0,
+            providerId: null, createdAt: Date.now(), createdBy: current ? current.id : 0, activeQty: qty, amount: qty * p.price, providerName: null
+          })
+        if (p.trackStock) p.stock -= qty
+        return delay(clone(barTotals(v)), 60)
+      },
+      returnLine: (lineId, qty) => {
+        const v = Array.from(bars.values()).find((x) => x.lines.some((l) => l.id === lineId))
+        if (!v) return fail('Qator topilmadi')
+        const l = v.lines.find((x) => x.id === lineId)!
+        if (qty < 1 || qty > l.qty - l.returnedQty) return fail("Qaytarish miqdori noto'g'ri")
+        l.returnedQty += qty
+        const p = products.find((x) => x.id === l.refId)
+        if (p && p.trackStock) p.stock += qty
+        return delay(clone(barTotals(v)), 60)
+      }
+    },
+    checkout: {
+      pay: (sessionId, payments, debtor) => {
+        const v = barTotals(barOpen(sessionId))
+        const sum = payments.reduce((a, p) => a + p.amount, 0)
+        if (sum !== v.total) return fail("To'lov summasi jami summaga teng emas")
+        const now = Date.now()
+        v.session.status = 'closed'
+        v.session.closedAt = now
+        v.paid = sum
+        v.due = 0
+        const r: ReceiptData = {
+          settings: clone(settings.receipt), receiptNo: receiptSeq++, roomName: 'Bar', openedAt: v.session.openedAt, closedAt: now,
+          cashier: current ? current.name : '', guests: [],
+          lines: v.lines.filter((l) => l.activeQty > 0).map((l) => ({ name: l.name, qty: l.activeQty, unitPrice: l.unitPrice, amount: l.amount, guestLabel: null, providerName: null })),
+          timeTotal: 0, linesTotal: v.linesTotal, discount: 0, total: v.total, payments: clone(payments), debtor: debtor ? clone(debtor) : null
+        }
+        barReceipts.set(sessionId, r)
+        return delay(clone(r), 200)
+      },
+      receipt: (sessionId) => {
+        const r = barReceipts.get(sessionId)
+        return r ? delay(clone(r)) : fail('Chek topilmadi')
       }
     },
     network: {

@@ -9,7 +9,7 @@ Jonli namuna (barcha komponentlar): `npm run dev:web` → <http://localhost:5173
 
 ## 1. Ekran qanday qo'shiladi
 
-1. Fayl: `src/renderer/screens/<id>/index.tsx` — **kichik harf**, `id` ∈ `rooms | bar | debts | reports | staff | settings`.
+1. Fayl: `src/renderer/screens/<id>/index.tsx` — **kichik harf**, `id` ∈ `rooms | sale | bar | debts | reports | staff | settings`.
 2. `export default function XScreen() { ... }` — props yo'q. Qobiq uni avtomatik topadi (`layout/routes.tsx`, `import.meta.glob`),
    hech qanday ro'yxatga qo'shish shart emas. Fayl bo'lmasa "tayyorlanmoqda" placeholder ko'rinadi.
 3. Ekran `.shell__main` ichida chiziladi: padding (24px / ≥1600px da 32px) va vertikal skroll **qobiqda bor**.
@@ -19,7 +19,7 @@ Jonli namuna (barcha komponentlar): `npm run dev:web` → <http://localhost:5173
    (`.rooms-…`, `.debts-…`) — `ui-*`, `shell*`, `side__*`, `topbar__*`, `lock-*`, `auth*`, `brand*`, `setup*` band.
    Ranglar/o'lchamlar faqat `var(--…)` tokenlar orqali (bo'lim 6).
 5. Ekran sarlavhasi: `<PageHeader title=… icon=… actions=… />` (barcha ekranlarda bir xil).
-6. Ruxsatlar bo'yicha nav (`routes.tsx`): rooms — hamma; bar `stock.manage`; debts `debt.manage`; reports `reports.view`;
+6. Ruxsatlar bo'yicha nav (`routes.tsx`): rooms — hamma; sale (Bar savdo) `session.open`; bar `stock.manage`; debts `debt.manage`; reports `reports.view`;
    staff `staff.manage`; settings `settings.manage`. Ekran ichidagi tugmalarni `useCan(perm)` bilan yashiring/o'chiring.
 
 ## 2. Importlar
