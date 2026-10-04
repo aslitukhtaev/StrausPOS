@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, NetworkStatus, DiscoveredServer, ConnectionInfo
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, NetworkStatus, DiscoveredServer, ConnectionInfo
 } from './types'
 import type { Permission } from './types'
 
@@ -90,6 +90,22 @@ export interface PosApi {
      */
     pay(sessionId: Id, payments: PaymentInput[], debtor: DebtorInput | null): Promise<ReceiptData>
     receipt(sessionId: Id): Promise<ReceiptData>
+  }
+
+  /**
+   * Xonasiz bar savdosi (kassa). Oddiy sessiya kabi: kind='bar', roomId=0, mehmonlar/vaqt/ofitsiant YO'Q.
+   * Mahsulot qo'shish — lines.addProduct(sessionId, productId, qty, null); X — lines.returnLine;
+   * to'lov — checkout.pay (CheckoutDialog o'zgarishsiz ishlaydi); bo'sh savdo — sessions.cancel.
+   * Xizmat qo'shib bo'lmaydi, setWaiter/extend/moveRoom/addGuest rad etiladi; ofitsiant haqi hisoblanmaydi.
+   * Xonalar paneli (rooms.board) bar savdolarini ko'rsatmaydi.
+   */
+  barSales: {
+    /** Yangi bar savdosi. Ruxsat: session.open */
+    open(): Promise<SessionView>
+    /** Ochiq (to'lanmagan) bar savdolari, eng yangisi birinchi */
+    openList(): Promise<SessionView[]>
+    /** Yopilgan bar savdolari oralig'da (chekni qayta ko'rish uchun checkout.receipt). Ruxsat: session.pay */
+    history(range: ReportRange): Promise<BarSaleRow[]>
   }
 
   // ── Bar / ombor ──

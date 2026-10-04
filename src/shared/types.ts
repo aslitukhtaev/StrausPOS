@@ -78,8 +78,13 @@ export interface ServiceItem {
 // ───────────── Sessiya (guruh tashrifi) ─────────────
 export type SessionStatus = 'open' | 'closed'
 
+/** 'room' — xona sessiyasi; 'bar' — xonasiz bar savdosi (vaqt, mehmon, ofitsiant yo'q) */
+export type SessionKind = 'room' | 'bar'
+
 export interface Session {
   id: Id
+  kind: SessionKind
+  /** kind='bar' bo'lsa 0 (SessionView.room — sintetik "Bar" xonasi, id=0) */
   roomId: Id
   status: SessionStatus
   openedAt: number
@@ -324,6 +329,8 @@ export interface SalesReport {
   byStaff: { staffId: Id; name: string; sessions: number; total: number }[]
   /** Ofitsiantlar: bar savdosi va hisoblangan haq */
   byWaiter: { staffId: Id; name: string; sessions: number; productSales: number; commission: number }[]
+  /** Xonasiz bar savdolari (jami summalar yuqoridagi umumiy ko'rsatkichlarga ham kiradi) */
+  barSales: { count: number; total: number }
 }
 
 // ───────────── Ofitsiantlar hisob-kitobi ─────────────
@@ -394,4 +401,14 @@ export interface ConnectionInfo {
   port: number | null
   /** viewer rejimida: hozir aloqa bormi */
   connected: boolean
+}
+
+export interface BarSaleRow {
+  sessionId: Id
+  receiptNo: number | null
+  closedAt: number
+  /** Mahsulotlar soni (qaytarilganlar ayirilgan) */
+  items: number
+  total: number
+  cashier: string
 }

@@ -44,6 +44,8 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
   Foiz biriktirish paytida sessiyada muzlatiladi, to'lov paytida haq sessiyaga yoziladi. Oylik hisob: `waiters.monthly`,
   berilgan pullar `waiters.payout`.
 - Guruh uchun bitta chek.
+- **Xonasiz bar savdosi** (`barSales.*`): kind='bar' sessiya — faqat mahsulotlar, to'lov va chek odatdagidek; ofitsiant haqi YO'Q;
+  hisobotda umumiy tushumga kiradi va alohida `barSales` ko'rsatkichi; xonalar panelida ko'rinmaydi.
 - Bekor qilish: biror mehmon ≥1 daqiqa o'tirgan bo'lsa faqat `discount.apply` ruxsati bilan (xato ochilgan xonani kassir darhol bekor qila oladi).
 
 ## Tarmoq: ikkinchi kompyuter — FAQAT KO'RISH
