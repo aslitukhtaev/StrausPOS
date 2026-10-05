@@ -35,6 +35,7 @@ export type Permission =
   | 'settings.manage' // xonalar, narxlar, mahsulotlar, chek, parol
   | 'staff.manage'
   | 'backup.manage'
+  | 'expense.manage' // xarajat qo'shish/o'zgartirish/o'chirish (ega, administrator)
 
 // ───────────── Xonalar ─────────────
 export interface Room {
@@ -69,6 +70,8 @@ export interface Product {
   trackStock: boolean
   lowStockAt: number
   active: boolean
+  /** Tannarx (bitta dona sotib olish narxi), 0 = kiritilmagan. Sotuv paytida qatorda muzlatiladi; sof foyda hisobida ishlatiladi */
+  costPrice: number
 }
 
 /** Xizmat (massaj va h.k.) — qat'iy narx, ulush yo'q. */
@@ -159,6 +162,8 @@ export interface OrderLine {
   waiterId: Id | null
   /** Qo'shilgan paytdagi ofitsiant foizi (muzlatilgan) */
   waiterPct: number
+  /** Qo'shilgan paytdagi tannarx (muzlatilgan, bitta dona) */
+  costPrice: number
 }
 
 export interface ReturnRecord {
@@ -574,4 +579,50 @@ export interface SessionDetail {
   cashier: string | null
   /** Qaytarishlar (X) — kim, nima, sabab */
   returns: { lineId: Id; name: string; qty: number; reason: string; at: number; byName: string }[]
+}
+
+// ───────────── Xarajatlar va sof foyda ─────────────
+export interface ExpenseCategory {
+  id: Id
+  name: string
+  active: boolean
+}
+
+export interface Expense {
+  id: Id
+  /** 'YYYY-MM-DD' (mahalliy) */
+  day: string
+  categoryId: Id
+  categoryName: string
+  amount: number
+  note: string
+  createdBy: string
+  createdAt: number
+}
+
+/** Sof foyda hisoboti (oraliq bo'yicha). Hisob "hisoblangan" (accrual) asosida: ofitsiant haqi va oshxona ulushi — hisoblangan summa, berilgan pul emas */
+export interface ProfitReport {
+  range: ReportRange
+  /** Jami tushum (yopilgan sessiyalar jami, obslugasi bilan; qarzga yozilganlari ham) */
+  revenue: number
+  /** shundan obsluga */
+  serviceCharge: number
+  /** Sotilgan mahsulotlar tannarxi: Σ (qty − returnedQty) × costPrice */
+  cogs: number
+  /** Tannarxi kiritilmagan mahsulotlar sotuvi (foyda aniqligi uchun ogohlantirish) */
+  noCostSales: number
+  /** Ofitsiantlarga hisoblangan haq */
+  waiterCommission: number
+  /** Oshxonaga hisoblangan ulush */
+  kitchenDue: number
+  /** Xarajatlar jami */
+  expenses: number
+  expensesByCategory: { categoryId: Id; name: string; amount: number }[]
+  /** revenue − cogs − waiterCommission − kitchenDue − expenses */
+  netProfit: number
+  /** netProfit / revenue × 100 (revenue 0 bo'lsa 0) */
+  marginPct: number
+  /** Shu oraliqda qarzga yozilgan (hali tushmagan) summa — ma'lumot uchun */
+  debtIssued: number
+  byDay: { day: string; revenue: number; expenses: number; profit: number }[]
 }

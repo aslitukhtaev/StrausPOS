@@ -3,7 +3,7 @@ import type { Permission, Role } from './types'
 const ALL: Permission[] = [
   'session.open', 'session.manage', 'session.pay', 'line.return', 'price.override',
   'discount.apply', 'debt.manage', 'stock.manage', 'reports.view', 'settings.manage',
-  'staff.manage', 'backup.manage'
+  'staff.manage', 'backup.manage', 'expense.manage'
 ]
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {

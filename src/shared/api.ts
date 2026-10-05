@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, SoldItemRow
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, SoldItemRow, Expense, ExpenseCategory, ProfitReport
 } from './types'
 import type { Permission } from './types'
 
@@ -185,6 +185,22 @@ export interface PosApi {
   }
 
   // ── Ofitsiantlar oylik hisob-kitobi ──
+  /** Xarajatlar. O'qish: reports.view; yozish/o'chirish: expense.manage (ega, administrator) */
+  expenses: {
+    list(range: ReportRange): Promise<Expense[]>
+    /** id yo'q = yangi. day 'YYYY-MM-DD' (kelajak kun mumkin emas), amount > 0 butun so'm */
+    save(e: { id?: Id; day: string; categoryId: Id; amount: number; note: string }): Promise<Expense>
+    remove(id: Id): Promise<void>
+    categories(): Promise<ExpenseCategory[]>
+    /** Standart: Ijara, Kommunal (svet, gaz, suv), Maosh, Mahsulot xaridi, Ta'mirlash, Reklama, Boshqa */
+    saveCategory(c: { id?: Id; name: string; active: boolean }): Promise<ExpenseCategory>
+  }
+
+  /** Sof foyda hisoboti. Ruxsat: reports.view */
+  profit: {
+    report(range: ReportRange): Promise<ProfitReport>
+  }
+
   waiters: {
     /** Faol ofitsiantlar (xonaga biriktirish uchun; session.open ruxsati yetarli) */
     list(): Promise<Staff[]>
