@@ -269,6 +269,8 @@ export interface AppSettings {
   /** Hech narsa bosilmasa necha daqiqada qulflansin (0 = hech qachon) */
   autoLockMinutes: number
   language: 'uz'
+  /** Instagram QR kodi va nomi */
+  instagram: { qrCodeBase64: string; handle: string }
 }
 
 // ───────────── Ko'rinish modellari (UI uchun, hisoblangan) ─────────────
@@ -408,6 +410,24 @@ export interface WaiterSessionRow {
   productSales: number
   pct: number
   commission: number
+}
+
+export interface SessionHistoryRow {
+  sessionId: Id
+  roomName: string
+  roomId: Id
+  openedAt: number
+  closedAt: number
+  openedBy: string
+  guestCount: number
+  timeTotal: number
+  productSales: number
+  serviceRevenue: number
+  discount: number
+  total: number
+  paid: number
+  paymentMethods: string
+  items: { name: string; qty: number; amount: number }[]
 }
 
 // ───────────── Tarmoq: ikkinchi kompyuter "faqat ko'rish" rejimida ─────────────

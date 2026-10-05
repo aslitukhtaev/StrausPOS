@@ -9,8 +9,8 @@ const ALL: Permission[] = [
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: ALL,
   admin: ALL.filter((p) => p !== 'staff.manage' && p !== 'settings.manage' && p !== 'backup.manage'),
-  cashier: ['session.open', 'session.manage', 'session.pay', 'debt.manage'],
-  waiter: ['session.open', 'session.manage']
+  cashier: ['session.open', 'session.manage', 'session.pay', 'line.return', 'discount.apply', 'debt.manage'],
+  waiter: ['session.open', 'session.manage', 'line.return']
 }
 
 export const ROLE_LABELS: Record<Role, string> = { owner: 'Ega', admin: 'Administrator', cashier: 'Kassir', waiter: 'Ofitsiant' }

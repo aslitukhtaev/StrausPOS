@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow
 } from './types'
 import type { Permission } from './types'
 
@@ -224,6 +224,7 @@ export interface PosApi {
   reports: {
     sales(range: ReportRange): Promise<SalesReport>
     returns(range: ReportRange): Promise<{ at: number; productName: string; qty: number; amount: number; reason: string; by: string; roomName: string }[]>
+    sessions(range: ReportRange): Promise<SessionHistoryRow[]>
   }
   system: {
     /** Chekni chop etish (Electron: silent print; brauzer: window.print) */

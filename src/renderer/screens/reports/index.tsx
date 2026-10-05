@@ -3,19 +3,20 @@
  * xizmat ko'rsatuvchilar, kassirlar va qaytarishlar. Tashqi kutubxonasiz.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReportRange, SalesReport } from '@shared/types'
+import type { ReportRange, SalesReport, SessionHistoryRow } from '@shared/types'
 import type { IconName } from '../../ui'
 import { api } from '../../api'
 import { useApp } from '../../store/app'
 import { useNav } from '../../store/nav'
 import {
-  Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Spinner, formatDate, formatDateShort,
+  Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Spinner, Tabs, formatDate, formatDateShort,
   formatDateTime, formatMoney, getNow, toast, cx
 } from '../../ui'
 import './reports.css'
 
 type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
 type ReturnRow = Awaited<ReturnType<typeof api.reports.returns>>[number]
+type ReportTab = 'sales' | 'sessions'
 
 const DAY = 86_400_000
 const startOfDay = (ts: number) => {
@@ -68,11 +69,12 @@ const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 
 export default function ReportsScreen() {
   const businessName = useApp((s) => s.businessName)
   const go = useNav((s) => s.go)
+  const [tab, setTab] = useState<ReportTab>('sales')
   const [preset, setPreset] = useState<Preset>('today')
   const [fromStr, setFromStr] = useState(() => toInput(getNow()))
   const [toStr, setToStr] = useState(() => toInput(getNow()))
   const [range, setRange] = useState<ReportRange>(() => presetRange('today', getNow()))
-  const [data, setData] = useState<{ sales: SalesReport; returns: ReturnRow[] } | null>(null)
+  const [data, setData] = useState<{ sales: SalesReport; returns: ReturnRow[]; sessions: SessionHistoryRow[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const seq = useRef(0)
@@ -81,10 +83,10 @@ export default function ReportsScreen() {
     const my = ++seq.current
     setLoading(true)
     setFailed(false)
-    Promise.all([api.reports.sales(r), api.reports.returns(r)])
-      .then(([sales, returns]) => {
+    Promise.all([api.reports.sales(r), api.reports.returns(r), api.reports.sessions(r)])
+      .then(([sales, returns, sessions]) => {
         if (my !== seq.current) return
-        setData({ sales, returns })
+        setData({ sales, returns, sessions })
         setLoading(false)
       })
       .catch((e) => {
@@ -142,31 +144,41 @@ export default function ReportsScreen() {
         <div>Chop etildi: {formatDateTime(getNow())}</div>
       </div>
 
-      <div className="rep-period">
-        <Segmented
-          size="lg"
-          value={preset}
-          onChange={(v) => pickPreset(v as Preset)}
-          options={[
-            { value: 'today', label: 'Bugun' },
-            { value: 'yesterday', label: 'Kecha' },
-            { value: 'week', label: '7 kun' },
-            { value: 'month', label: 'Bu oy' },
-            { value: 'custom', label: 'Oraliq', icon: 'calendar' }
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Tabs
+          value={tab}
+          onChange={(v) => setTab(v as ReportTab)}
+          items={[
+            { id: 'sales', label: 'Savdo hisoboti', icon: 'receipt' },
+            { id: 'sessions', label: 'Sessiyalar tarixi', icon: 'history' }
           ]}
         />
-        {preset === 'custom' && (
-          <div className="rep-period__custom">
-            <Field label="Dan">
-              <Input type="date" value={fromStr} max={toStr || undefined} onChange={(e) => setFromStr(e.target.value)} />
-            </Field>
-            <Field label="Gacha">
-              <Input type="date" value={toStr} min={fromStr || undefined} onChange={(e) => setToStr(e.target.value)} />
-            </Field>
-            <Button variant="primary" icon="check" onClick={applyCustom}>Ko'rsatish</Button>
-          </div>
-        )}
-        {loading && data && <Spinner size={24} />}
+        <div className="rep-period">
+          <Segmented
+            size="lg"
+            value={preset}
+            onChange={(v) => pickPreset(v as Preset)}
+            options={[
+              { value: 'today', label: 'Bugun' },
+              { value: 'yesterday', label: 'Kecha' },
+              { value: 'week', label: '7 kun' },
+              { value: 'month', label: 'Bu oy' },
+              { value: 'custom', label: 'Oraliq', icon: 'calendar' }
+            ]}
+          />
+          {preset === 'custom' && (
+            <div className="rep-period__custom">
+              <Field label="Dan">
+                <Input type="date" value={fromStr} max={toStr || undefined} onChange={(e) => setFromStr(e.target.value)} />
+              </Field>
+              <Field label="Gacha">
+                <Input type="date" value={toStr} min={fromStr || undefined} onChange={(e) => setToStr(e.target.value)} />
+              </Field>
+              <Button variant="primary" icon="check" onClick={applyCustom}>Ko'rsatish</Button>
+            </div>
+          )}
+          {loading && data && <Spinner size={24} />}
+        </div>
       </div>
 
       {!data && loading && <div className="rep-center"><Spinner size={40} /></div>}
@@ -189,7 +201,7 @@ export default function ReportsScreen() {
         />
       )}
 
-      {s && !empty && (
+      {tab === 'sales' && s && !empty && (
         <div className={cx('rep__content', loading && 'is-loading')}>
           <Kpis s={s} />
 
@@ -319,6 +331,12 @@ export default function ReportsScreen() {
               </table>
             )}
           </TableCard>
+        </div>
+      )}
+
+      {tab === 'sessions' && data && (
+        <div className={cx('rep__content', loading && 'is-loading')}>
+          <SessionsHistoryTable sessions={data.sessions} />
         </div>
       )}
     </div>
@@ -520,6 +538,49 @@ function DayChart({ s, range }: { s: SalesReport; range: ReportRange }) {
         <div className="rep-days__hover num">{formatDate(days[hover].ts) + ' — ' + formatMoney(days[hover].total) + " so'm"}</div>
       )}
     </Card>
+  )
+}
+
+function SessionsHistoryTable({ sessions }: { sessions: SessionHistoryRow[] }) {
+  if (sessions.length === 0) {
+    return <EmptyState size="lg" icon="history" title="Sessiyalar yo'q" description="Bu davrda hech qanday sessiya yopilmagan." />
+  }
+
+  return (
+    <TableCard title="Sessiyalar tarixi" subtitle={sessions.length + ' ta sessiya'}>
+      <table className="ui-table rep-table">
+        <thead>
+          <tr>
+            <th>Xona</th>
+            <th>Ochilish vaqti</th>
+            <th className="r">Mehmonlar</th>
+            <th className="r">Vaqt summa</th>
+            <th className="r">Mahsulot</th>
+            <th className="r">Xizmat</th>
+            <th className="r">Chegirma</th>
+            <th className="r">Jami</th>
+            <th className="r">To'landi</th>
+            <th>To'lov turlari</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sessions.map((sess) => (
+            <tr key={sess.sessionId}>
+              <td>{sess.roomName}</td>
+              <td className="num nowrap">{formatDateTime(sess.openedAt)}</td>
+              <td className="r num">{sess.guestCount}</td>
+              <td className="r"><Money value={sess.timeTotal} size="sm" currency={false} /></td>
+              <td className="r"><Money value={sess.productSales} size="sm" currency={false} /></td>
+              <td className="r"><Money value={sess.serviceRevenue} size="sm" currency={false} /></td>
+              <td className="r"><Money value={sess.discount} size="sm" currency={false} tone={sess.discount > 0 ? 'warning' : 'default'} /></td>
+              <td className="r"><Money value={sess.total} size="sm" currency={false} /></td>
+              <td className="r"><Money value={sess.paid} size="sm" currency={false} /></td>
+              <td className="rep-table__methods" title={sess.paymentMethods}>{sess.paymentMethods}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableCard>
   )
 }
 
