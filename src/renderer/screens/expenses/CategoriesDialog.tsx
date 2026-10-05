@@ -28,7 +28,7 @@ export function CategoriesDialog({ cats, onClose, onChanged }: { cats: ExpenseCa
   }
 
   return (
-    <Modal open onClose={onClose} title="Xarajat kategoriyalari" size="sm" footer={<Button variant="secondary" size="lg" onClick={onClose}>Yopish</Button>}>
+    <Modal open onClose={onClose} title="Xarajat kategoriyalari" size="md" footer={<Button variant="secondary" size="lg" onClick={onClose}>Yopish</Button>}>
       <div className="exp-cats">
         <div className="exp-cats__add">
           <Input size="lg" value={name} placeholder="Yangi kategoriya" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} data-testid="exp-cat-name" />

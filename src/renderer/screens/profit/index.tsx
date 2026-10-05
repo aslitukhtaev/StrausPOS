@@ -91,7 +91,7 @@ export default function ProfitScreen() {
               <div className="pf-hero__label">SOF FOYDA</div>
               <Money value={r.netProfit} size="3xl" tone={positive ? 'success' : 'danger'} className="pf-hero__val" />
               <div className={cx('pf-hero__margin', positive ? 't-success' : 't-danger')} data-testid="pf-margin">
-                Marja: <b className="num">{(Math.round(r.marginPct * 10) / 10).toString().replace('.', ',')}%</b>
+                Marja: <b className="num">{(Math.round(r.marginPct * 10) / 10).toString().replace('.', ',').replace('-', '−')}%</b>
               </div>
             </Card>
 

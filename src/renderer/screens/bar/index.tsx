@@ -241,7 +241,7 @@ export default function BarScreen() {
                         </div>
                         {p.costPrice > 0 && (
                           <div className="bar-row__cost ellipsis" data-testid="bar-cost">
-                            Tannarx {formatMoney(p.costPrice)} · marja {p.price > 0 ? Math.round(((p.price - p.costPrice) / p.price) * 100) : 0}%
+                            Tannarx {formatMoney(p.costPrice)} · {p.price > 0 ? Math.round(((p.price - p.costPrice) / p.price) * 100) : 0}%
                           </div>
                         )}
                       </div>

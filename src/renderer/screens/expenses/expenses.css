@@ -44,3 +44,5 @@
 .exp-cats__row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--line-soft); }
 .exp-cats__name { flex: 1; font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .exp-cats__name.is-off { color: var(--text-3); }
+.exp-cats__add .ui-btn { flex: none; white-space: nowrap; }
+.exp-cats__add .ui-input-wrap, .exp-cats__add > :first-child { flex: 1; min-width: 0; }

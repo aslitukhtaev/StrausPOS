@@ -14,7 +14,7 @@ import { RangePicker, initialRange } from './RangePicker'
 import { CAT_COLORS, dayDMY } from './range'
 import './expenses.css'
 
-const COLS = '130px 200px minmax(0,1fr) 170px 160px 120px'
+const COLS = '120px 190px minmax(0,1fr) 200px 130px 120px'
 
 export default function ExpensesScreen() {
   const readOnly = useApp((s) => s.readOnly)
@@ -104,7 +104,7 @@ export default function ExpensesScreen() {
             <div className="exp-kpis">
               <Card tone="accent" padding="lg" data-testid="exp-total">
                 <div className="exp-kpi__label">Jami xarajat</div>
-                <Money value={total} size="3xl" />
+                <Money value={total} size="2xl" />
                 <div className="exp-kpi__note">{sorted.length} ta yozuv</div>
               </Card>
               <Card padding="lg">
@@ -152,7 +152,7 @@ export default function ExpensesScreen() {
               ) : (
                 <DataTable
                   className="exp-table"
-                  columns={canWrite ? COLS : '130px 200px minmax(0,1fr) 170px 160px'}
+                  columns={canWrite ? COLS : '120px 190px minmax(0,1fr) 200px 130px'}
                   header={['Sana', 'Kategoriya', 'Izoh', <span key="a" className="r">Summa</span>, 'Kim kiritdi', ...(canWrite ? [''] : [])]}
                   data-testid="exp-table"
                 >

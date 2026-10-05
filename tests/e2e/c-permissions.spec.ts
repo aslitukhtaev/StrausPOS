@@ -5,7 +5,7 @@ import { test, expect, T0, MIN } from './fixtures'
 import { addProduct, backToBoard, closeAdd, enterSession, guest, line, openAdd, openRoom, selectProduct, submitAdd, wsTotal } from './ui'
 
 const DENIED = "Bu amal uchun ruxsatingiz yo'q"
-const ALL = ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Tarix', 'Ofitsiantlar', 'Oshxona', 'Xodimlar', 'Sozlamalar']
+const ALL = ['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Xarajatlar', 'Sof foyda', 'Tarix', 'Ofitsiantlar', 'Oshxona', 'Xodimlar', 'Sozlamalar']
 const STAFF = { isProvider: false, isWaiter: false, commissionPct: 0, active: true }
 
 async function navItems(page: import('@playwright/test').Page): Promise<string[]> {
@@ -74,7 +74,7 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
 test('Administrator: X, chegirma, bar, hisobot bor; xodimlar, sozlamalar, zaxira yo\'q', async ({ pos, page }) => {
   await pos.open()
   await pos.login('admin')
-  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Tarix', 'Ofitsiantlar', 'Oshxona'])
+  expect(await navItems(page)).toEqual(['Xonalar', 'Bar savdo', 'Bar', 'Qarzlar', 'Hisobot', 'Xarajatlar', 'Sof foyda', 'Tarix', 'Ofitsiantlar', 'Oshxona'])
   await openRoom(pos, 'Sauna 1', 1)
   const add = await openAdd(pos)
   await addProduct(pos, add, 'Suv 0.5 L', 1)
