@@ -427,6 +427,10 @@ export interface WaiterSessionRow {
 }
 
 export interface SessionHistoryRow {
+  /** Chek raqami (bar savdosi ham); bekor qilinganlar ro'yxatda yo'q */
+  receiptNo: number | null
+  /** Hisobni yopgan (to'lovni qabul qilgan) xodim ismi */
+  cashier: string | null
   /** Obsluga summasi (total ga kiradi) */
   serviceCharge: number
   sessionId: Id
@@ -444,6 +448,31 @@ export interface SessionHistoryRow {
   paid: number
   paymentMethods: string
   items: { name: string; qty: number; amount: number }[]
+}
+
+/** Sotilgan mahsulot/xizmat qatori: AYNAN qaysi xodim sotgani bilan ("Tarix" → Sotuvlar) */
+export interface SoldItemRow {
+  lineId: Id
+  /** Qator qo'shilgan vaqt */
+  at: number
+  sessionId: Id
+  receiptNo: number | null
+  /** Xona nomi yoki "Bar" */
+  roomName: string
+  name: string
+  kind: LineKind
+  department: Department | null
+  qty: number
+  /** Qaytarilgan miqdor */
+  returnedQty: number
+  unitPrice: number
+  /** (qty − returnedQty) × unitPrice */
+  amount: number
+  /** Qatorni qo'shgan (sotgan) xodim */
+  staffId: Id
+  staffName: string
+  /** Ofitsiant (haq oladigan) — bo'lsa ismi */
+  waiterName: string | null
 }
 
 // ───────────── Tarmoq: ikkinchi kompyuter "faqat ko'rish" rejimida ─────────────
