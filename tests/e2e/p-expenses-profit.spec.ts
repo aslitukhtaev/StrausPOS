@@ -56,7 +56,7 @@ test('Xarajat qo\'shish → ro\'yxat; sof foyda; kassirga yo\'q; kelajak kun rad
   await page.getByTestId('exp-add').click()
   const d2 = pos.dialog("Xarajat qo'shish")
   await d2.getByTestId('exp-day').fill('2026-12-31')
-  await pos.typeDigits('5000')
+  for (const k of '5000') await d2.getByRole('button', { name: k, exact: true }).click()
   await d2.getByTestId('exp-save').click()
   await expect(pos.toast(/Kelajak/)).toBeVisible()
   await expect(row).toHaveCount(1)
