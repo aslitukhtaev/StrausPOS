@@ -12,7 +12,8 @@ import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow
+  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow,
+  Expense, ExpenseCategory, ProfitReport
 } from '../../src/shared/types'
 import { ROLE_LABELS, ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
 import {
@@ -119,7 +120,7 @@ interface StaffRow {
 }
 interface RoomRow { id: number; name: string; price_per_hour: number; capacity: number; active: number; sort_order: number; deleted: number }
 interface CategoryRow { id: number; name: string; sort_order: number; department: Department }
-interface ProductRow { id: number; category_id: number; name: string; price: number; stock: number; track_stock: number; low_stock_at: number; active: number; deleted: number }
+interface ProductRow { id: number; category_id: number; name: string; price: number; stock: number; track_stock: number; low_stock_at: number; active: number; deleted: number; cost_price: number }
 interface ServiceRow { id: number; name: string; price: number; duration_min: number | null; active: number; deleted: number }
 interface SessionRow {
   id: number; kind: SessionKind; room_id: number | null; status: 'open' | 'closed'; opened_at: number; closed_at: number | null; opened_by: number
@@ -134,7 +135,7 @@ interface IntervalRow { id: number; guest_id: number; room_id: number; rate: num
 interface LineRow {
   id: number; session_id: number; guest_id: number | null; kind: 'product' | 'service'; ref_id: number; name: string
   unit_price: number; qty: number; returned_qty: number; provider_id: number | null; created_at: number; created_by: number
-  department: Department | null; waiter_id: number | null; waiter_pct: number
+  department: Department | null; waiter_id: number | null; waiter_pct: number; cost_price: number
 }
 interface PaymentRow { id: number; session_id: number; method: PayMethod; amount: number; at: number; by: number }
 interface DebtRow {
@@ -160,7 +161,8 @@ const toCategory = (r: CategoryRow): ProductCategory => ({
   id: r.id, name: r.name, sortOrder: r.sort_order, department: r.department === 'kitchen' ? 'kitchen' : 'bar'
 })
 const toProduct = (r: ProductRow): Product => ({
-  id: r.id, categoryId: r.category_id, name: r.name, price: r.price, stock: r.stock, trackStock: !!r.track_stock, lowStockAt: r.low_stock_at, active: !!r.active
+  id: r.id, categoryId: r.category_id, name: r.name, price: r.price, stock: r.stock, trackStock: !!r.track_stock, lowStockAt: r.low_stock_at, active: !!r.active,
+  costPrice: r.cost_price ?? 0
 })
 const toService = (r: ServiceRow): ServiceItem => ({ id: r.id, name: r.name, price: r.price, durationMin: r.duration_min, active: !!r.active })
 const toSession = (r: SessionRow): Session => ({
@@ -172,8 +174,19 @@ const toLine = (r: LineRow): OrderLine => ({
   id: r.id, sessionId: r.session_id, guestId: r.guest_id, kind: r.kind, refId: r.ref_id, name: r.name, unitPrice: r.unit_price,
   qty: r.qty, returnedQty: r.returned_qty, providerId: r.provider_id, createdAt: r.created_at, createdBy: r.created_by,
   department: r.kind === 'product' ? (r.department === 'kitchen' ? 'kitchen' : 'bar') : null,
-  waiterId: r.waiter_id ?? null, waiterPct: r.waiter_pct ?? 0
+  waiterId: r.waiter_id ?? null, waiterPct: r.waiter_pct ?? 0, costPrice: r.cost_price ?? 0
 })
+interface ExpenseRow {
+  id: number; day: string; category_id: number; amount: number; note: string; created_by: number; created_at: number
+  category_name: string; created_by_name: string | null
+}
+const EXPENSE_SELECT = `SELECT e.*, c.name AS category_name, st.name AS created_by_name FROM expenses e
+  JOIN expense_categories c ON c.id=e.category_id LEFT JOIN staff st ON st.id=e.created_by`
+const toExpense = (r: ExpenseRow): Expense => ({
+  id: r.id, day: r.day, categoryId: r.category_id, categoryName: r.category_name, amount: r.amount, note: r.note,
+  createdBy: r.created_by_name ?? '', createdAt: r.created_at
+})
+const toExpenseCategory = (r: { id: number; name: string; active: number }): ExpenseCategory => ({ id: r.id, name: r.name, active: !!r.active })
 const toPayment = (r: PaymentRow): Payment => ({ id: r.id, sessionId: r.session_id, method: r.method, amount: r.amount, at: r.at, by: r.by })
 const toDebt = (r: DebtRow): Debt => ({
   id: r.id, debtorId: r.debtor_id ?? 0, sessionId: r.session_id, customerName: r.debtor_name ?? r.customer_name, phone: r.debtor_phone ?? r.phone,
@@ -1219,8 +1232,8 @@ export class PosService implements PosApi {
     const now = this.now()
     const ticketId = this.db.tx(() => {
       for (const { p, dep, qty } of items) {
-        const params: (number | string)[] = [s.id, p.id, p.price, dep]
-        let where = 'session_id=? AND kind=\'product\' AND ref_id=? AND unit_price=? AND department=?'
+        const params: (number | string)[] = [s.id, p.id, p.price, dep, p.cost_price ?? 0]
+        let where = 'session_id=? AND kind=\'product\' AND ref_id=? AND unit_price=? AND department=? AND cost_price=?'
         if (guestId == null) where += ' AND guest_id IS NULL'
         else {
           where += ' AND guest_id=?'
@@ -1239,9 +1252,9 @@ export class PosService implements PosApi {
         } else {
           lineId = this.db.insert(
             `INSERT INTO order_lines(session_id, guest_id, kind, ref_id, name, unit_price, qty, returned_qty, provider_id, created_at, created_by,
-               department, waiter_id, waiter_pct)
-             VALUES(?,?,'product',?,?,?,?,0,NULL,?,?,?,?,?)`,
-            [s.id, guestId ?? null, p.id, p.name, p.price, qty, now, me.id, dep, waiter ? waiter.id : null, waiter ? waiter.pct : 0]
+               department, waiter_id, waiter_pct, cost_price)
+             VALUES(?,?,'product',?,?,?,?,0,NULL,?,?,?,?,?,?)`,
+            [s.id, guestId ?? null, p.id, p.name, p.price, qty, now, me.id, dep, waiter ? waiter.id : null, waiter ? waiter.pct : 0, p.cost_price ?? 0]
           )
         }
         if (p.track_stock) {
@@ -1540,6 +1553,8 @@ export class PosService implements PosApi {
       const me = this.need('settings.manage')
       const name = reqText(p.name, 'Mahsulot nomini kiriting', 80)
       const price = reqInt(p.price, "Narx 0 yoki musbat butun son bo'lishi kerak", 0, 100_000_000)
+      const costMsg = "Tannarx 0 yoki musbat butun son bo'lishi kerak"
+      const cost = p.costPrice === undefined ? undefined : reqInt(p.costPrice, costMsg, 0, 100_000_000)
       const cat = this.db.get<CategoryRow>('SELECT * FROM categories WHERE id=? AND deleted=0', [p.categoryId])
       if (!cat) fail('Kategoriya topilmadi')
       if (p.id != null) {
@@ -1551,8 +1566,8 @@ export class PosService implements PosApi {
         const active = bool(p.active, !!cur.active)
         this.db.tx(() => {
           this.db.run(
-            'UPDATE products SET category_id=?, name=?, price=?, stock=?, track_stock=?, low_stock_at=?, active=? WHERE id=?',
-            [cat.id, name, price, stock, b2i(track), low, b2i(active), cur.id]
+            'UPDATE products SET category_id=?, name=?, price=?, stock=?, track_stock=?, low_stock_at=?, active=?, cost_price=? WHERE id=?',
+            [cat.id, name, price, stock, b2i(track), low, b2i(active), cost ?? cur.cost_price ?? 0, cur.id]
           )
           if (stock !== cur.stock) this.addStockMove(cur.id, stock - cur.stock, 'Tahrirlash', null, me.id)
         })
@@ -1562,8 +1577,8 @@ export class PosService implements PosApi {
       const low = p.lowStockAt === undefined ? 5 : reqInt(p.lowStockAt, "Kam qoldiq chegarasi noto'g'ri", 0)
       const id = this.db.tx(() => {
         const nid = this.db.insert(
-          'INSERT INTO products(category_id, name, price, stock, track_stock, low_stock_at, active) VALUES(?,?,?,?,?,?,?)',
-          [cat.id, name, price, stock, b2i(bool(p.trackStock, true)), low, b2i(bool(p.active, true))]
+          'INSERT INTO products(category_id, name, price, stock, track_stock, low_stock_at, active, cost_price) VALUES(?,?,?,?,?,?,?,?)',
+          [cat.id, name, price, stock, b2i(bool(p.trackStock, true)), low, b2i(bool(p.active, true)), cost ?? 0]
         )
         if (stock > 0) this.addStockMove(nid, stock, 'Boshlang‘ich qoldiq', null, me.id)
         return nid
@@ -1913,6 +1928,163 @@ export class PosService implements PosApi {
       x.commission += lineCommission(l)
     }
     return m
+  }
+
+  // ═════════════ EXPENSES / PROFIT ═════════════
+  private expenseCategoryRow(id: unknown): { id: number; name: string; active: number } {
+    const c = isInt(id) ? this.db.get<{ id: number; name: string; active: number }>('SELECT * FROM expense_categories WHERE id=?', [id]) : undefined
+    if (!c) fail('Xarajat turi topilmadi')
+    return c
+  }
+
+  private expenseById(id: Id): Expense {
+    const r = this.db.get<ExpenseRow>(`${EXPENSE_SELECT} WHERE e.id=?`, [id])
+    if (!r) fail('Xarajat topilmadi')
+    return toExpense(r)
+  }
+
+  /** Oraliqdagi (ms, [from, to)) mahalliy kunlar xarajatlari; bo'sh oraliq — hech narsa */
+  private expenseRows(from: number, to: number): ExpenseRow[] {
+    if (to <= from) return []
+    return this.db.all<ExpenseRow>(`${EXPENSE_SELECT} WHERE e.day>=? AND e.day<=? ORDER BY e.day, e.id`, [localDay(from), localDay(to - 1)])
+  }
+
+  expenses: PosApi['expenses'] = {
+    list: async (range) => {
+      this.needRead('reports.view')
+      const { from, to } = this.checkRange(range)
+      return this.expenseRows(from, to).map(toExpense)
+    },
+
+    save: async (e) => {
+      const me = this.need('expense.manage')
+      if (!e || typeof e !== 'object') fail("Xarajat ma'lumotlari noto'g'ri")
+      const d = dayStart(e.day)
+      if (d.day > localDay(this.now())) fail("Kelajak kun uchun xarajat yozib bo'lmaydi")
+      const amount = reqInt(e.amount, "Summa musbat butun son bo'lishi kerak", 1, 1_000_000_000_000)
+      const note = typeof e.note === 'string' ? e.note.trim() : ''
+      if (note.length > 200) fail("Izoh juda uzun (ko'pi bilan 200 belgi)")
+      const cat = this.expenseCategoryRow(e.categoryId)
+      if (e.id != null) {
+        const cur = isInt(e.id) ? this.db.get<{ id: number; category_id: number }>('SELECT id, category_id FROM expenses WHERE id=?', [e.id]) : undefined
+        if (!cur) fail('Xarajat topilmadi')
+        if (!cat.active && cat.id !== cur.category_id) fail('Xarajat turi faol emas')
+        this.db.tx(() =>
+          this.db.run('UPDATE expenses SET day=?, category_id=?, amount=?, note=? WHERE id=?', [d.day, cat.id, amount, note, cur.id])
+        )
+        return this.expenseById(cur.id)
+      }
+      if (!cat.active) fail('Xarajat turi faol emas')
+      const id = this.db.tx(() =>
+        this.db.insert('INSERT INTO expenses(day, category_id, amount, note, created_by, created_at) VALUES(?,?,?,?,?,?)', [
+          d.day, cat.id, amount, note, me.id, this.now()
+        ])
+      )
+      return this.expenseById(id)
+    },
+
+    remove: async (id) => {
+      this.need('expense.manage')
+      if (!isInt(id) || !this.db.get('SELECT id FROM expenses WHERE id=?', [id])) fail('Xarajat topilmadi')
+      this.db.tx(() => this.db.run('DELETE FROM expenses WHERE id=?', [id]))
+    },
+
+    categories: async () => {
+      this.needRead('reports.view')
+      return this.db.all<{ id: number; name: string; active: number }>('SELECT * FROM expense_categories ORDER BY id').map(toExpenseCategory)
+    },
+
+    saveCategory: async (c) => {
+      this.need('expense.manage')
+      if (!c || typeof c !== 'object') fail("Xarajat turi ma'lumotlari noto'g'ri")
+      const name = reqText(c.name, 'Xarajat turi nomini kiriting', 60)
+      const dup = this.db.get<{ id: number }>('SELECT id FROM expense_categories WHERE name=? COLLATE NOCASE', [name])
+      if (dup && dup.id !== c.id) fail('Bunday xarajat turi allaqachon bor')
+      const active = bool(c.active, true)
+      const id = this.db.tx(() => {
+        if (c.id != null) {
+          const cur = this.expenseCategoryRow(c.id)
+          this.db.run('UPDATE expense_categories SET name=?, active=? WHERE id=?', [name, b2i(active), cur.id])
+          return cur.id
+        }
+        return this.db.insert('INSERT INTO expense_categories(name, active) VALUES(?,?)', [name, b2i(active)])
+      })
+      return toExpenseCategory(this.expenseCategoryRow(id))
+    }
+  }
+
+  profit: PosApi['profit'] = {
+    report: async (range) => {
+      this.needRead('reports.view')
+      const { from, to } = this.checkRange(range)
+      const days = new Map<string, { revenue: number; expenses: number; cost: number }>()
+      const day = (k: string) => {
+        let x = days.get(k)
+        if (!x) {
+          x = { revenue: 0, expenses: 0, cost: 0 }
+          days.set(k, x)
+        }
+        return x
+      }
+      const r: ProfitReport = {
+        range: { from, to }, revenue: 0, serviceCharge: 0, cogs: 0, noCostSales: 0, waiterCommission: 0, kitchenDue: 0,
+        expenses: 0, expensesByCategory: [], netProfit: 0, marginPct: 0, debtIssued: 0, byDay: []
+      }
+      const sessions = this.db.all<SessionRow>(
+        "SELECT * FROM sessions WHERE status='closed' AND cancelled=0 AND closed_at>=? AND closed_at<?",
+        [from, to]
+      )
+      const byId = new Map<number, { s: SessionRow; day: string }>()
+      for (const s of sessions) {
+        const k = localDay(s.closed_at ?? s.opened_at)
+        byId.set(s.id, { s, day: k })
+        const x = day(k)
+        const total = s.total ?? 0
+        // Oshxona ulushi va eski (sessiyadagi) ofitsiant haqi — reports/kitchen bilan bir xil muzlatilgan manba
+        const kitchen = s.kitchen_sales && s.kitchen_sales > 0 ? waiterCommission(s.kitchen_sales, s.kitchen_share_pct ?? 100) : 0
+        const legacy = s.kind === 'room' && s.waiter_id != null ? s.waiter_commission ?? 0 : 0
+        r.revenue += total
+        r.serviceCharge += s.service_charge ?? 0
+        r.kitchenDue += kitchen
+        r.waiterCommission += legacy
+        x.revenue += total
+        x.cost += kitchen + legacy
+      }
+      if (sessions.length) {
+        const inList = sessions.map((s) => s.id).join(',')
+        for (const l of this.db.all<LineRow>(`SELECT * FROM order_lines WHERE kind='product' AND session_id IN (${inList})`)) {
+          const q = l.qty - l.returned_qty
+          if (q <= 0) continue
+          const { s, day: k } = byId.get(l.session_id)!
+          const x = day(k)
+          const cogs = q * (l.cost_price ?? 0)
+          r.cogs += cogs
+          x.cost += cogs
+          if (!l.cost_price) r.noCostSales += q * l.unit_price
+          if (l.waiter_id != null && s.kind === 'room' && s.waiter_id == null) {
+            const c = lineCommission(l)
+            r.waiterCommission += c
+            x.cost += c
+          }
+        }
+      }
+      const byCat = new Map<Id, { categoryId: Id; name: string; amount: number }>()
+      for (const e of this.expenseRows(from, to)) {
+        r.expenses += e.amount
+        day(e.day).expenses += e.amount
+        const c = byCat.get(e.category_id) ?? { categoryId: e.category_id, name: e.category_name, amount: 0 }
+        c.amount += e.amount
+        byCat.set(e.category_id, c)
+      }
+      r.expensesByCategory = Array.from(byCat.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
+      r.netProfit = r.revenue - r.cogs - r.waiterCommission - r.kitchenDue - r.expenses
+      r.marginPct = r.revenue > 0 ? Math.round((r.netProfit / r.revenue) * 1000) / 10 : 0
+      r.debtIssued = this.db.get<{ a: number | null }>('SELECT SUM(amount) AS a FROM debts WHERE created_at>=? AND created_at<?', [from, to])?.a ?? 0
+      r.byDay = Array.from(days, ([k, x]) => ({ day: k, revenue: x.revenue, expenses: x.expenses, profit: x.revenue - x.cost - x.expenses }))
+        .filter((x) => x.revenue !== 0 || x.expenses !== 0)
+        .sort((a, b) => a.day.localeCompare(b.day))
+      return r
+    }
   }
 
   // ═════════════ WAITERS ═════════════

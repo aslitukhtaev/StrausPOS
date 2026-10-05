@@ -241,6 +241,11 @@ async function seedDemo(ids: Record<string, number>): Promise<void> {
     if (!p) throw new Error('Demo mahsulot topilmadi: ' + name)
     return p.id
   }
+  // Tannarx (sotuvdan oldin — qatorda muzlatiladi); ba'zi mahsulotlarda ataylab 0 (foyda ogohlantirishi uchun)
+  for (const p of products) {
+    if (['Chips', 'Pista', 'Salat'].includes(p.name) || p.name.startsWith('Yong')) continue
+    await service.catalog.saveProduct({ ...p, costPrice: Math.round((p.price * 0.6) / 500) * 500 })
+  }
   const room = (await service.rooms.list())[0]
   // 1) Xona: 2 mehmon × 1 soat, Pivo 2 + Lag'mon 2 + Shashlik 1 (Sardor olib bordi) → terminal + naqd
   const s1 = await service.sessions.open(room.id, 2, 60)
@@ -263,6 +268,18 @@ async function seedDemo(ids: Record<string, number>): Promise<void> {
     name: 'Jasur',
     phone: '+998 90 123 45 67'
   })
+  // Xarajatlar (bugun va kecha)
+  const cats = await service.expenses.categories()
+  const cid = (n: string): number => cats.find((c) => c.name.startsWith(n))!.id
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const dayOf = (back: number): string => {
+    const d = new Date(clock() - back * 86_400_000)
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  }
+  await service.expenses.save({ day: dayOf(0), categoryId: cid('Ijara'), amount: 3_000_000, note: 'Oylik ijara' })
+  await service.expenses.save({ day: dayOf(0), categoryId: cid('Kommunal'), amount: 450_000, note: 'Svet, gaz' })
+  await service.expenses.save({ day: dayOf(1), categoryId: cid('Mahsulot xaridi'), amount: 600_000, note: 'Ichimliklar' })
+  await service.expenses.save({ day: dayOf(1), categoryId: cid('Reklama'), amount: 150_000, note: '' })
   await service.auth.logout()
 }
 

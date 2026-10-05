@@ -345,6 +345,31 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE sessions ADD COLUMN service_charge_pct REAL NOT NULL DEFAULT 0;
   ALTER TABLE sessions ADD COLUMN service_charge INTEGER NOT NULL DEFAULT 0;
+  `,
+  // v6 — tannarx (mahsulotda; qatorda sotuv paytida muzlatiladi, eski qatorlar 0), xarajat kategoriyalari va xarajatlar.
+  `
+  ALTER TABLE products ADD COLUMN cost_price INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE order_lines ADD COLUMN cost_price INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE expense_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    active INTEGER NOT NULL DEFAULT 1
+  );
+  INSERT INTO expense_categories(name, active) VALUES
+    ('Ijara', 1), ('Kommunal (svet, gaz, suv)', 1), ('Maosh', 1), ('Mahsulot xaridi', 1),
+    ('Ta''mirlash', 1), ('Reklama', 1), ('Boshqa', 1);
+
+  CREATE TABLE expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day TEXT NOT NULL,
+    category_id INTEGER NOT NULL REFERENCES expense_categories(id),
+    amount INTEGER NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    created_by INTEGER NOT NULL REFERENCES staff(id),
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_expenses_day ON expenses(day);
   `
 ]
 

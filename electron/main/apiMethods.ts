@@ -28,6 +28,8 @@ const MAP: MethodMap = {
   kitchen: { daily: true, payout: true, payouts: true, reprint: true },
   staff: { list: true, save: true, changePin: true },
   waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
+  expenses: { list: true, save: true, remove: true, categories: true, saveCategory: true },
+  profit: { report: true },
   settings: { get: true, save: true },
   reports: { sales: true, returns: true, sessions: true },
   network: { status: true, setEnabled: true, regenerateCode: true },

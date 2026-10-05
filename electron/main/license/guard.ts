@@ -24,6 +24,7 @@ export const READ_METHODS: ReadonlySet<string> = new Set([
   'debtors.search', 'debtors.list', 'debtors.debts',
   'kitchen.daily', 'kitchen.payouts',
   'reports.sales', 'reports.returns', 'reports.sessions',
+  'expenses.list', 'expenses.categories', 'profit.report',
   'waiters.monthly', 'waiters.sessions', 'waiters.payouts', 'waiters.list',
   'settings.get',
   'system.now', 'system.receiptHtml', 'system.listPrinters',
