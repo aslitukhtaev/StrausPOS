@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Permission, Role } from '@shared/types'
 import { ALL_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, EDITABLE_ROLES, PERMISSION_CATALOG, ROLE_LABELS, effectivePermissions } from '@shared/permissions'
 import { Button, Switch, confirmDialog } from '@/ui'
-import { Note, SaveBar, SectionHead, useReportDirty, type SectionProps } from './common'
+import { SaveBar, SectionHead, useReportDirty, type SectionProps } from './common'
 
 type ERole = (typeof EDITABLE_ROLES)[number]
 type Draft = Record<ERole, Permission[]>
@@ -92,9 +92,8 @@ export function RolesSection({ settings, save, onDirty }: SectionProps) {
 
   return (
     <div className="set-section">
-      <SectionHead icon="shield" title="Rollar va ruxsatlar" description="Har bir rol nima qila olishini o'zingiz belgilang" />
+      <SectionHead icon="shield" title="Rollar va ruxsatlar" description="Ega doim hamma narsaga ega. O'zgarishlar kirgan xodimlarda bir necha soniyada kuchga kiradi" />
       <div className="set-section__body">
-        <Note>Ega doim hamma narsaga ega. O'zgarishlar kirgan xodimlarda bir necha soniyada kuchga kiradi.</Note>
         <div className="roles-grid" data-testid="roles-matrix">
           <div className="roles-grid__head">
             <div className="roles-grid__perm roles-grid__title">Ruxsat</div>
@@ -109,8 +108,8 @@ export function RolesSection({ settings, save, onDirty }: SectionProps) {
                 <div key={r} className="roles-grid__col">
                   <div className="roles-grid__role">{ROLE_LABELS[r]}</div>
                   <div className="roles-grid__acts">
-                    <Button size="sm" variant="ghost" disabled={isDef} onClick={() => setCol(r, DEFAULT_ROLE_PERMISSIONS[r])} data-testid={'roles-default-' + r}>
-                      Standartga qaytarish
+                    <Button size="sm" variant="ghost" title="Standartga qaytarish" disabled={isDef} onClick={() => setCol(r, DEFAULT_ROLE_PERMISSIONS[r])} data-testid={'roles-default-' + r}>
+                      Standart
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setCol(r, all ? [] : ALL_PERMISSIONS)} data-testid={'roles-all-' + r}>
                       {all ? "Hammasini o'chirish" : 'Hammasini yoqish'}
