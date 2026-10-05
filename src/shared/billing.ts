@@ -147,6 +147,12 @@ export function formatCountdown(remaining: number): string {
   return '+' + formatDuration(-remaining)
 }
 
+/** Tugamaguncha qolgan vaqt; oshganda — jami o'tirilgan vaqt (1 soat olingan, 1 daq oshgan → "01:01:00") */
+export function formatTimeShown(remaining: number, paidMinutes: number): string {
+  if (remaining >= 0) return formatCountdown(remaining)
+  return formatDuration(paidMinutes * MS_MIN - remaining)
+}
+
 export function formatHours(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60

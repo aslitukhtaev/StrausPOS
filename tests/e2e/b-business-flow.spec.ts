@@ -101,7 +101,7 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   await pos.setNow(T0 + 70 * MIN)
   // M1: 10 daq oshdi → keyingi soat: 50 000 + 10 000 + 50 000 = 110 000
   await expectGuest(pos, 'Mehmon 1', 110_000)
-  await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('+00:10:00')
+  await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('01:10:00')
   await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("+00:10:00 oshdi · 1 soat qo'shildi")
   await expect(guest(pos, 'Mehmon 1')).toHaveClass(/rooms-guest--over/)
   await guest(pos, 'Mehmon 2').getByRole('button', { name: /Davom/ }).click()

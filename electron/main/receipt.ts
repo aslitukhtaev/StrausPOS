@@ -99,6 +99,12 @@ export function renderReceiptHtml(data: ReceiptData): string {
     parts.push('<div class="sep"></div>')
     parts.push(`<div class="center footer">${e(s.footer)}</div>`)
   }
+  const ig = data.instagram
+  if (ig && /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(ig.qrCodeBase64)) {
+    parts.push('<div class="sep"></div>')
+    parts.push(`<div class="center"><img class="qr" src="${ig.qrCodeBase64}" alt=""></div>`)
+    parts.push(`<div class="center footer">Bizning Instagram${ig.handle ? ': ' + e(ig.handle) : ''}</div>`)
+  }
 
   return `<!doctype html>
 <html lang="uz"><head><meta charset="utf-8"><title>${data.provisional ? 'Oraliq hisob' : `Chek ${data.receiptNo || ''}`}</title>
@@ -119,6 +125,7 @@ body { width: ${width}mm; padding: 2mm ${(width - contentMm) / 2}mm 6mm; font-fa
 .muted { color: #333; }
 .sep { border-top: 1px dashed #000; margin: 1.5mm 0; }
 .footer { margin-top: 1mm; }
+.qr { width: 32mm; height: 32mm; image-rendering: pixelated; }
 .provisional { font-weight: 700; font-size: ${fontPx + 6}px; border: 2px solid #000; padding: 1mm; margin: 1mm 0; }
 </style></head>
 <body>

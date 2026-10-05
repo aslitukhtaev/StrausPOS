@@ -22,9 +22,9 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
   await addProduct(pos, add, 'Suv 0.5 L', 2)
   await closeAdd(pos, add)
   await expect(line(pos, 'Suv 0.5 L')).toBeVisible()
-  // X (qaytarish) va chegirma tugmalari yo'q
-  await expect(line(pos, 'Suv 0.5 L').getByRole('button', { name: 'Qaytarish' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Chegirma' })).toHaveCount(0)
+  // X (qaytarish) va chegirma tugmalari bor (line.return, discount.apply)
+  await expect(line(pos, 'Suv 0.5 L').getByRole('button', { name: 'Qaytarish' })).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Chegirma' })).toHaveCount(1)
   // Buyurtma bor → bekor qilish tugmasi yo'q
   await expect(page.getByRole('button', { name: 'Sessiyani bekor qilish' })).toHaveCount(0)
   // To'lov tugmasi bor (session.pay)
@@ -33,8 +33,6 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
   // Server ham rad etadi (UI'ni chetlab o'tishga urinish)
   const v = await pos.backend.rpc<{ session: { id: number }; lines: { id: number }[] }>('sessions.get', 1)
   const b = pos.backend
-  expect(await b.rpcError('lines.returnLine', v.lines[0].id, 1, '')).toBe(DENIED)
-  expect(await b.rpcError('sessions.setDiscount', 1, 1000)).toBe(DENIED)
   expect(await b.rpcError('reports.sales', { from: 0, to: T0 * 2 })).toBe(DENIED)
   expect(await b.rpcError('reports.returns', { from: 0, to: T0 * 2 })).toBe(DENIED)
   expect(await b.rpcError('settings.save', await b.rpc('settings.get'))).toBe(DENIED)
@@ -69,8 +67,8 @@ test('Kassir (3333): X, chegirma, sozlamalar, hisobot, xodimlar, bar yo\'q; serv
   await pos.setNow(pos.now + 50_000)
   await expect(page.getByRole('button', { name: 'Sessiyani bekor qilish' })).toBeVisible()
   await pos.advance(30)
-  await expect(page.getByRole('button', { name: 'Sessiyani bekor qilish' })).toHaveCount(0)
-  expect(await b.rpcError('sessions.cancel', 2)).toContain('administrator ruxsati kerak')
+  // Kassirda chegirma ruxsati bor — 1 daqiqadan keyin ham buyurtmasiz sessiyani bekor qila oladi
+  await expect(page.getByRole('button', { name: 'Sessiyani bekor qilish' })).toBeVisible()
 })
 
 test('Administrator: X, chegirma, bar, hisobot bor; xodimlar, sozlamalar, zaxira yo\'q', async ({ pos, page }) => {
@@ -150,16 +148,15 @@ test('(k) Ofitsiant roli (Sardor, PIN 5555): faqat Xonalar (to\'lov qila olmagan
   // +1 soat (session.manage) bor
   await guest(pos, 'Mehmon 1').getByRole('button', { name: '1 soat' }).click()
   await expect(guest(pos, 'Mehmon 1')).toContainText('2 soat olingan')
-  // To'lov, X, chegirma tugmalari yo'q
+  // To'lov va chegirma tugmalari yo'q; X (qaytarish) bor
   await expect(page.locator('.rooms-bill__pay')).toHaveCount(0)
-  await expect(line(pos, 'Suv 0.5 L').getByRole('button', { name: 'Qaytarish' })).toHaveCount(0)
+  await expect(line(pos, 'Suv 0.5 L').getByRole('button', { name: 'Qaytarish' })).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Chegirma' })).toHaveCount(0)
 
   const b = pos.backend
   const v = await b.rpc<{ total: number; lines: { id: number }[] }>('sessions.get', 1)
   expect(v.total).toBe(3 * 50_000 + 10_000) // M1 2 soat + M2 1 soat + suv
   expect(await b.rpcError('checkout.pay', 1, [{ method: 'cash', amount: v.total }], null)).toBe(DENIED)
-  expect(await b.rpcError('lines.returnLine', v.lines[0].id, 1, '')).toBe(DENIED)
   expect(await b.rpcError('sessions.setDiscount', 1, 1000)).toBe(DENIED)
   expect(await b.rpcError('reports.sales', { from: 0, to: T0 * 2 })).toBe(DENIED)
   expect(await b.rpcError('waiters.monthly', '2026-10')).toBe(DENIED)

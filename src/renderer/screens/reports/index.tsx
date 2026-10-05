@@ -2,7 +2,7 @@
  * Hisobot ekrani: davr tanlash, KPI, to'lov ulushi, kunlar grafigi (SVG), xonalar, mahsulotlar,
  * xizmat ko'rsatuvchilar, kassirlar va qaytarishlar. Tashqi kutubxonasiz.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReportRange, SalesReport, SessionHistoryRow } from '@shared/types'
 import type { IconName } from '../../ui'
 import { api } from '../../api'
@@ -542,42 +542,72 @@ function DayChart({ s, range }: { s: SalesReport; range: ReportRange }) {
 }
 
 function SessionsHistoryTable({ sessions }: { sessions: SessionHistoryRow[] }) {
+  const [open, setOpen] = useState<number | null>(null)
   if (sessions.length === 0) {
     return <EmptyState size="lg" icon="inbox" title="Sessiyalar yo'q" description="Bu davrda hech qanday sessiya yopilmagan." />
   }
 
   return (
-    <TableCard title="Sessiyalar tarixi" subtitle={sessions.length + ' ta sessiya'}>
-      <table className="ui-table rep-table">
+    <TableCard title="Sessiyalar tarixi" subtitle={sessions.length + " ta sessiya · tafsilot uchun qatorni bosing"}>
+      <table className="ui-table rep-table" data-testid="rep-sessions">
         <thead>
           <tr>
             <th>Xona</th>
-            <th>Ochilish vaqti</th>
+            <th>Ochilgan</th>
+            <th>Yopilgan</th>
+            <th>Xodim</th>
             <th className="r">Mehmonlar</th>
-            <th className="r">Vaqt summa</th>
+            <th className="r">Vaqt</th>
             <th className="r">Mahsulot</th>
             <th className="r">Xizmat</th>
             <th className="r">Chegirma</th>
             <th className="r">Jami</th>
-            <th className="r">To'landi</th>
-            <th>To'lov turlari</th>
+            <th>To'lov</th>
           </tr>
         </thead>
         <tbody>
-          {sessions.map((sess) => (
-            <tr key={sess.sessionId}>
-              <td>{sess.roomName}</td>
-              <td className="num nowrap">{formatDateTime(sess.openedAt)}</td>
-              <td className="r num">{sess.guestCount}</td>
-              <td className="r"><Money value={sess.timeTotal} size="sm" currency={false} /></td>
-              <td className="r"><Money value={sess.productSales} size="sm" currency={false} /></td>
-              <td className="r"><Money value={sess.serviceRevenue} size="sm" currency={false} /></td>
-              <td className="r"><Money value={sess.discount} size="sm" currency={false} tone={sess.discount > 0 ? 'warning' : 'default'} /></td>
-              <td className="r"><Money value={sess.total} size="sm" currency={false} /></td>
-              <td className="r"><Money value={sess.paid} size="sm" currency={false} /></td>
-              <td className="rep-table__methods" title={sess.paymentMethods}>{sess.paymentMethods}</td>
-            </tr>
-          ))}
+          {sessions.map((sess) => {
+            const isOpen = open === sess.sessionId
+            return (
+              <Fragment key={sess.sessionId}>
+                <tr onClick={() => setOpen(isOpen ? null : sess.sessionId)} style={{ cursor: 'pointer' }} data-testid="rep-session-row">
+                  <td>{sess.roomName}</td>
+                  <td className="num nowrap">{formatDateTime(sess.openedAt)}</td>
+                  <td className="num nowrap">{formatDateTime(sess.closedAt)}</td>
+                  <td>{sess.openedBy || '—'}</td>
+                  <td className="r num">{sess.guestCount}</td>
+                  <td className="r"><Money value={sess.timeTotal} size="sm" currency={false} /></td>
+                  <td className="r"><Money value={sess.productSales} size="sm" currency={false} /></td>
+                  <td className="r"><Money value={sess.serviceRevenue} size="sm" currency={false} /></td>
+                  <td className="r"><Money value={sess.discount} size="sm" currency={false} tone={sess.discount > 0 ? 'warning' : 'default'} /></td>
+                  <td className="r"><Money value={sess.total} size="sm" currency={false} /></td>
+                  <td>{sess.paymentMethods}</td>
+                </tr>
+                {isOpen && (
+                  <tr data-testid="rep-session-items">
+                    <td colSpan={11}>
+                      {sess.items.length === 0 ? (
+                        <Mute>Mahsulot yoki xizmat qo'shilmagan</Mute>
+                      ) : (
+                        <table className="ui-table rep-table">
+                          <thead><tr><th>Nima sotildi</th><th className="r">Soni</th><th className="r">Summa</th></tr></thead>
+                          <tbody>
+                            {sess.items.map((it, i) => (
+                              <tr key={it.name + i}>
+                                <td>{it.name}</td>
+                                <td className="r num">{it.qty}</td>
+                                <td className="r"><Money value={it.amount} size="sm" currency={false} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
         </tbody>
       </table>
     </TableCard>

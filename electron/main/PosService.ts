@@ -291,6 +291,10 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   if (typeof sharePct !== 'number' || !Number.isFinite(sharePct) || sharePct < 0 || sharePct > 100) fail("Oshxona ulushi 0 dan 100 foizgacha bo'lishi kerak")
   const ig = (s.instagram && typeof s.instagram === 'object' ? s.instagram : {}) as Partial<AppSettings['instagram']>
   const big = base.instagram ?? DEFAULT_SETTINGS.instagram
+  const qr = ig.qrCodeBase64 === undefined ? big.qrCodeBase64 : ig.qrCodeBase64
+  if (typeof qr !== 'string' || (qr !== '' && (qr.length > 600_000 || !/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(qr)))) {
+    fail("QR kod rasmi noto'g'ri yoki juda katta (PNG/JPG/WEBP, 400 KB gacha)")
+  }
   return {
     receipt: {
       businessName: str(r.businessName, b.businessName, 100),
@@ -320,7 +324,7 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
     autoLockMinutes: autoLock,
     language: 'uz',
     instagram: {
-      qrCodeBase64: str(ig.qrCodeBase64, big.qrCodeBase64, 50000),
+      qrCodeBase64: qr,
       handle: str(ig.handle, big.handle, 100)
     }
   }
@@ -605,6 +609,7 @@ export class PosService implements PosApi {
     for (const p of v.payments) byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amount)
     return {
       settings: settings.receipt,
+      instagram: settings.instagram,
       // Oraliq chekda raqam YO'Q (chek raqami faqat to'lovda beriladi)
       receiptNo: provisional ? 0 : sr.receipt_no ?? 0,
       roomName: v.room.name,

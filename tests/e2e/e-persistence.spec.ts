@@ -22,7 +22,7 @@ test('Sahifa yangilanishi: ochiq sessiya va jonli vaqt davom etadi', async ({ po
   // M2: 30 daq (pauza) — olingan 1 soat baribir: 50 000; taymer 30 daqiqa qolganda to'xtagan
   await expectGuest(pos, 'Mehmon 1', 51_000)
   await expectGuest(pos, 'Mehmon 2', 50_000)
-  await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('+00:01:00')
+  await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('01:01:00')
   await expect(guest(pos, 'Mehmon 2').getByTestId('countdown')).toHaveText('00:30:00')
   await expect(guest(pos, 'Mehmon 2')).toHaveClass(/rooms-guest--paused/)
   await expectWsTotal(pos, 101_000)

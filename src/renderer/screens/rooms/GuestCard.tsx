@@ -5,7 +5,7 @@
  * Oshganda aniq yozuv: "+00:01:00 oshdi · 1 daq qo'shildi" (billedMinutes − paidMinutes, formatHours).
  */
 import type { GuestView } from '@shared/types'
-import { MS_MIN, formatCountdown, formatHours } from '@shared/billing'
+import { MS_MIN, formatCountdown, formatHours, formatTimeShown } from '@shared/billing'
 import { Avatar, Button, Icon, Money, cx, formatMoney } from '@/ui'
 import { guestPhase } from './live'
 
@@ -53,8 +53,7 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
       <div className="rooms-guest__timerrow">
         <span className="rooms-guest__state">{stateText}</span>
         <span className="rooms-guest__countdown num" data-testid="countdown">
-          {formatCountdown(g.remainingMs)}
-          {over && g.state !== 'finished' && <small> oshdi</small>}
+          {formatTimeShown(g.remainingMs, g.paidMinutes)}
         </span>
       </div>
       <div className="rooms-guest__progress" aria-hidden>

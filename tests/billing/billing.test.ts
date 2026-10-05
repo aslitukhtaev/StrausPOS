@@ -26,6 +26,7 @@ import {
   formatMoney,
   formatDuration,
   formatCountdown,
+  formatTimeShown,
   formatHours
 } from '../../src/shared/billing'
 import type { BillingOptions } from '../../src/shared/billing'
@@ -583,5 +584,13 @@ describe('2026-10: daqiqalik ortiqcha vaqt (blockMinutes=1 — ilova standarti)'
     ].map((g) => buildGuestView(g, [], NOW, PER_MIN))
     expect(gs.map((g) => g.billedMinutes)).toEqual([60, 117, 127, 180])
     expect(gs.map((g) => g.timeAmount)).toEqual([60000, 117000, 127000, 180000])
+  })
+})
+
+describe('formatTimeShown', () => {
+  it('qolgan vaqt va oshganda jami o‘tirilgan vaqt', () => {
+    expect(formatTimeShown(m(59), 60)).toBe('00:59:00')
+    expect(formatTimeShown(-m(1), 60)).toBe('01:01:00')
+    expect(formatTimeShown(-m(2), 60)).toBe('01:02:00')
   })
 })

@@ -102,7 +102,7 @@ test('2 soat × 3 kishi: 5 daqiqada chiqqan ham to\'liq, +1 soat, hammaga +1 soa
   await expectGuest(pos, 'Mehmon 3', 150_000)
   // ── +181: 1 daqiqa oshdi → keyingi soat to'liq ──
   await pos.setNow(T0 + 181 * MIN)
-  await expect(guest(pos, 'Mehmon 3').getByTestId('countdown')).toContainText('+00:01:00')
+  await expect(guest(pos, 'Mehmon 3').getByTestId('countdown')).toContainText('03:01:00')
   await expect(guest(pos, 'Mehmon 3').getByTestId('overnote')).toHaveText("+00:01:00 oshdi · 1 soat qo'shildi")
   await expect(guest(pos, 'Mehmon 3')).toHaveClass(/rooms-guest--over/)
   await expectGuest(pos, 'Mehmon 3', 200_000)

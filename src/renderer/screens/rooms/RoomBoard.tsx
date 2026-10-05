@@ -4,7 +4,7 @@
  */
 import { useMemo, useState } from 'react'
 import type { RoomCard } from '@shared/types'
-import { formatCountdown, formatHours } from '@shared/billing'
+import { formatHours, formatTimeShown } from '@shared/billing'
 import { useCan } from '@/store/auth'
 import { useApp } from '@/store/app'
 import {
@@ -212,7 +212,7 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
                   {left == null ? 'Vaqt' : left <= 0 ? 'Oshib ketdi' : live.anyRunning ? 'Qolgan vaqt' : 'Pauzada qolgan'}
                 </span>
                 <span className={cx('rooms-tile__countdown', 'num', !live.anyRunning && 'is-paused')} data-testid="tile-countdown">
-                  {left == null ? '—' : formatCountdown(left)}
+                  {left == null ? '—' : formatTimeShown(left, live.minGuest ? live.minGuest.paidMinutes : 0)}
                 </span>
               </div>
             </div>

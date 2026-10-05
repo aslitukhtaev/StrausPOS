@@ -342,6 +342,8 @@ export interface ReceiptData {
   debtor: DebtorInput | null
   /** true — sessiya yopilmagan, oraliq hisob ("To'lanmagan") */
   provisional: boolean
+  /** Chek pastida: Instagram QR (data:image/...) va nomi; bo'sh = chiqmaydi */
+  instagram?: { qrCodeBase64: string; handle: string }
 }
 
 // ───────────── Hisobotlar ─────────────

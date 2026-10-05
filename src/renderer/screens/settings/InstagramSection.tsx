@@ -19,6 +19,11 @@ export function InstagramSection({ settings, save, onDirty }: SectionProps) {
       return
     }
 
+    if (file.size > 400_000) {
+      toast.error('Rasm juda katta (400 KB gacha)')
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (event) => {
       const base64 = event.target?.result as string
