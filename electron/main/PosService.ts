@@ -12,7 +12,7 @@ import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout
+  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow
 } from '../../src/shared/types'
 import { ROLE_LABELS, ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
 import {
@@ -2088,6 +2088,83 @@ export class PosService implements PosApi {
           by: r.by_name ?? '',
           roomName: r.room_name
         }))
+    },
+
+    sessions: async (range) => {
+      this.need('reports.view')
+      const { from, to } = this.checkRange(range)
+      const sessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
+        `SELECT s.*, r.name AS room_name, st.name AS staff_name FROM sessions s
+         LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.opened_by
+         WHERE s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<? ORDER BY s.closed_at DESC`,
+        [from, to]
+      )
+      const ids = sessions.map((s) => s.id)
+      const inList = ids.length ? ids.join(',') : '-1'
+      const lines = this.db.all<LineRow>(
+        `SELECT * FROM order_lines WHERE session_id IN (${inList})`
+      )
+      const guests = this.db.all<GuestRow>(
+        `SELECT * FROM guests WHERE session_id IN (${inList})`
+      )
+      const pays = this.db.all<PaymentRow>(
+        `SELECT * FROM payments WHERE session_id IN (${inList})`
+      )
+
+      return sessions.map((s) => {
+        const sessionLines = lines.filter((l) => l.session_id === s.id)
+        const sessionGuests = guests.filter((g) => g.session_id === s.id)
+        const sessionPays = pays.filter((p) => p.session_id === s.id)
+
+        let productSales = 0
+        let serviceRevenue = 0
+        const items: { name: string; qty: number; amount: number }[] = []
+
+        for (const l of sessionLines) {
+          const q = l.qty - l.returned_qty
+          if (q <= 0) continue
+          const amount = q * l.unit_price
+          if (l.kind === 'product') {
+            productSales += amount
+          } else {
+            serviceRevenue += amount
+          }
+          items.push({ name: l.name, qty: q, amount })
+        }
+
+        const paymentMethods = sessionPays.length > 0
+          ? sessionPays.map((p) => {
+            const methods: Record<string, string> = {
+              cash: 'Naqd',
+              card: 'Karta',
+              terminal: 'Terminal',
+              debt: 'Qarz'
+            }
+            return methods[p.method] || p.method
+          }).join(', ')
+          : '—'
+
+        const total = s.total ?? 0
+        const paid = sessionPays.reduce((sum, p) => sum + (p.amount ?? 0), 0)
+
+        return {
+          sessionId: s.id,
+          roomName: s.kind === 'bar' ? BAR_ROOM.name : s.room_name ?? '',
+          roomId: s.kind === 'bar' ? BAR_ROOM.id : s.room_id ?? 0,
+          openedAt: s.opened_at,
+          closedAt: s.closed_at ?? 0,
+          openedBy: s.staff_name ?? '',
+          guestCount: sessionGuests.length,
+          timeTotal: s.time_total ?? 0,
+          productSales,
+          serviceRevenue,
+          discount: s.discount_applied ?? 0,
+          total,
+          paid,
+          paymentMethods,
+          items
+        }
+      })
     }
   }
 

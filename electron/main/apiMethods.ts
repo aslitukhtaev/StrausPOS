@@ -29,7 +29,7 @@ const MAP: MethodMap = {
   staff: { list: true, save: true, changePin: true },
   waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
   settings: { get: true, save: true },
-  reports: { sales: true, returns: true },
+  reports: { sales: true, returns: true, sessions: true },
   network: { status: true, setEnabled: true, regenerateCode: true },
   connection: { info: true, discover: true, connectTerminal: true, disconnect: true },
   system: { printReceipt: true, receiptHtml: true, backup: true, restore: true, now: true, listPrinters: true }
