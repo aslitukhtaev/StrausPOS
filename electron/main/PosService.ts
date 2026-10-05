@@ -92,7 +92,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'auto',
   lockEnabled: true,
   autoLockMinutes: 0,
-  language: 'uz'
+  language: 'uz',
+  instagram: { qrCodeBase64: '', handle: '' }
 }
 
 const PERMISSION_DENIED = "Bu amal uchun ruxsatingiz yo'q"
@@ -288,6 +289,8 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   if (kitchenPaper !== 58 && kitchenPaper !== 80) fail("Oshxona cheki qog'ozi kengligi 58 yoki 80 mm bo'lishi kerak")
   const sharePct = k.sharePct === undefined ? bk.sharePct : k.sharePct
   if (typeof sharePct !== 'number' || !Number.isFinite(sharePct) || sharePct < 0 || sharePct > 100) fail("Oshxona ulushi 0 dan 100 foizgacha bo'lishi kerak")
+  const ig = (s.instagram && typeof s.instagram === 'object' ? s.instagram : {}) as Partial<AppSettings['instagram']>
+  const big = base.instagram ?? DEFAULT_SETTINGS.instagram
   return {
     receipt: {
       businessName: str(r.businessName, b.businessName, 100),
@@ -315,7 +318,11 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
     theme,
     lockEnabled: bool(s.lockEnabled, base.lockEnabled),
     autoLockMinutes: autoLock,
-    language: 'uz'
+    language: 'uz',
+    instagram: {
+      qrCodeBase64: str(ig.qrCodeBase64, big.qrCodeBase64, 50000),
+      handle: str(ig.handle, big.handle, 100)
+    }
   }
 }
 
