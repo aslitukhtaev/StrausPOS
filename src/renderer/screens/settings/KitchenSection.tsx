@@ -78,6 +78,7 @@ export function KitchenSection({ settings, save, onDirty }: SectionProps) {
       timeTotal: 0,
       linesTotal: 0,
       discount: 0,
+      serviceCharge: { pct: 0, amount: 0 },
       total: 0,
       payments: [],
       debtor: null,

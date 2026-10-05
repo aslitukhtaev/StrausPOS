@@ -272,6 +272,11 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
         <div className="rooms-ws__total">
           <span className="rooms-ws__totallabel">{view.paid > 0 ? "Qolgan to'lov" : 'Jami summa'}</span>
           <Money value={view.paid > 0 ? live.due : live.total} size="3xl" tone="accent" className="rooms-ws__totalnum" />
+          {live.serviceCharge > 0 && (
+            <span className="rooms-ws__svc num" data-testid="ws-service">
+              Obsluga {live.serviceChargePct}%: {formatMoney(live.serviceCharge)} so'm
+            </span>
+          )}
         </div>
       </header>
 
@@ -378,8 +383,14 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
           </div>
 
           <div className="rooms-bill__foot">
-            {(live.discount > 0 || view.paid > 0) && (
+            {(live.discount > 0 || view.paid > 0 || live.serviceCharge > 0) && (
               <div className="rooms-bill__sums">
+                {live.serviceCharge > 0 && (
+                  <>
+                    <span>Obsluga {live.serviceChargePct}%</span>
+                    <Money value={live.serviceCharge} />
+                  </>
+                )}
                 {live.discount > 0 && (
                   <>
                     <span>Chegirma</span>
@@ -503,6 +514,11 @@ function LineRow({
           {l.providerName && (
             <span className="rooms-line__prov">
               <Icon name="user" size={15} /> {l.providerName}
+            </span>
+          )}
+          {l.createdByName && (
+            <span className="rooms-line__by" title="Kim va qachon qo'shgan" data-testid="line-by">
+              {l.createdByName} · {formatClock(l.createdAt)}
             </span>
           )}
           {l.returnedQty > 0 && <span className="rooms-line__ret">qaytarildi: {l.returnedQty} dona</span>}

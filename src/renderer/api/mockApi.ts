@@ -35,6 +35,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   roundTo: 1000,
   defaultHours: 2,
+  serviceChargePct: 10,
   blockMinutes: 1,
   graceMinutes: 0,
   warnBeforeMinutes: 10,
@@ -241,7 +242,7 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
         const v = {
           session: { id, kind: 'bar', roomId: 0, status: 'open', openedAt: now, closedAt: null, openedBy: current!.id, discount: 0, note: '', waiterId: null, waiterPct: 0 },
           room: clone(BAR_ROOM), waiterName: null, guests: [], lines: [], computedAt: now,
-          timeTotal: 0, linesTotal: 0, discount: 0, total: 0, paid: 0, due: 0, payments: []
+          timeTotal: 0, linesTotal: 0, discount: 0, serviceChargePct: 0, serviceCharge: 0, total: 0, paid: 0, due: 0, payments: []
         } as SessionView
         bars.set(id, v)
         return delay(clone(v))
@@ -280,7 +281,7 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
           v.lines.push({
             id: ++lineSeq, sessionId, guestId: null, kind: 'product', refId: p.id, name: p.name, unitPrice: p.price, qty, returnedQty: 0,
             providerId: null, createdAt: Date.now(), createdBy: current ? current.id : 0, activeQty: qty, amount: qty * p.price, providerName: null,
-            department: 'bar', waiterId: null, waiterPct: 0
+            department: 'bar', waiterId: null, waiterPct: 0, createdByName: current ? current.name : ''
           })
         if (p.trackStock) p.stock -= qty
         return delay(clone(barTotals(v)), 60)
@@ -310,7 +311,7 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
           settings: clone(settings.receipt), receiptNo: receiptSeq++, roomName: 'Bar', openedAt: v.session.openedAt, closedAt: now,
           cashier: current ? current.name : '', guests: [],
           lines: v.lines.filter((l) => l.activeQty > 0).map((l) => ({ name: l.name, qty: l.activeQty, unitPrice: l.unitPrice, amount: l.amount, guestLabel: null, providerName: null })),
-          timeTotal: 0, linesTotal: v.linesTotal, discount: 0, total: v.total, payments: clone(payments), debtor: debtor ? clone(debtor) : null, provisional: false
+          timeTotal: 0, linesTotal: v.linesTotal, discount: 0, serviceCharge: { pct: 0, amount: 0 }, total: v.total, payments: clone(payments), debtor: debtor ? clone(debtor) : null, provisional: false
         }
         barReceipts.set(sessionId, r)
         return delay(clone(r), 200)

@@ -39,10 +39,11 @@ function ownSample(settings: ReceiptSettings, cashier: string): ReceiptData {
     timeTotal: 185_000,
     linesTotal: 192_000,
     discount: 7_000,
-    total: 370_000,
+    serviceCharge: { pct: 10, amount: 37_000 },
+    total: 407_000,
     payments: [
       { method: 'cash', amount: 200_000 },
-      { method: 'card', amount: 170_000 }
+      { method: 'card', amount: 207_000 }
     ],
     debtor: null,
     provisional: false

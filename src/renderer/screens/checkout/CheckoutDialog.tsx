@@ -106,7 +106,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
   const live = useMemo(() => {
     if (!view) return null
     if (!running || roundTo == null) {
-      return { guests: view.guests, timeTotal: view.timeTotal, linesTotal: view.linesTotal, discount: view.discount, total: view.total }
+      return { guests: view.guests, timeTotal: view.timeTotal, linesTotal: view.linesTotal, discount: view.discount, serviceChargePct: view.serviceChargePct || 0, serviceCharge: view.serviceCharge || 0, total: view.total }
     }
     const t = Math.max(tick, view.computedAt)
     const guests = view.guests.map((g) => ({
@@ -114,7 +114,8 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
       elapsedMs: guestElapsedMs(g.intervals, t),
       timeAmount: guestTimeAmount(g.intervals, g.paidMinutes, t, { roundTo, blockMinutes, graceMinutes })
     }))
-    return { guests, ...computeTotals(guests, view.lines, view.session.discount) }
+    const pct = view.serviceChargePct || 0
+    return { guests, ...computeTotals(guests, view.lines, view.session.discount, pct), serviceChargePct: pct }
   }, [view, running, tick, roundTo, blockMinutes, graceMinutes])
 
   const total = live ? live.total : 0
@@ -400,6 +401,12 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
               <div className="checkout-sum__line is-discount">
                 <span>Chegirma</span>
                 <Money value={-(live ? live.discount : view.discount)} tone="success" />
+              </div>
+            )}
+            {(live ? live.serviceCharge : view.serviceCharge) > 0 && (
+              <div className="checkout-sum__line" data-testid="checkout-service">
+                <span>Obsluga {live ? live.serviceChargePct : view.serviceChargePct}%</span>
+                <Money value={live ? live.serviceCharge : view.serviceCharge} />
               </div>
             )}
             <div className="checkout-sum__total">

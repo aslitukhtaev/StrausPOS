@@ -339,6 +339,12 @@ export const MIGRATIONS: string[] = [
     error TEXT
   );
   CREATE INDEX idx_kitchen_tickets_session ON kitchen_tickets(session_id);
+  `,
+  // v5 — obsluga (xizmat haqi): sessiya yopilganda foiz va summa muzlatiladi. Eski yopilgan sessiyalar uchun 0.
+  // Sozlamaga serviceChargePct = 10 qo'shiladi — MIGRATION_DATA[5].
+  `
+  ALTER TABLE sessions ADD COLUMN service_charge_pct REAL NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN service_charge INTEGER NOT NULL DEFAULT 0;
   `
 ]
 
@@ -404,9 +410,25 @@ function migrateV4Data(db: MigrationDb): void {
   }
 }
 
+/** v5 ma'lumot qismi: mavjud sozlamaga serviceChargePct = 10 (yo'q bo'lsa). */
+function migrateV5Data(db: MigrationDb): void {
+  const row = db.all("SELECT value FROM kv WHERE key='settings'")[0]
+  if (!row) return
+  try {
+    const s = JSON.parse(String(row.value)) as Record<string, unknown>
+    if (s && typeof s === 'object' && s.serviceChargePct === undefined) {
+      s.serviceChargePct = 10
+      db.run("UPDATE kv SET value=? WHERE key='settings'", [JSON.stringify(s)])
+    }
+  } catch {
+    /* buzilgan sozlama — PosService standartga qaytaradi */
+  }
+}
+
 /** Versiya → ma'lumot migratsiyasi (shu versiyaning SQL qismidan keyin bajariladi). */
 export const MIGRATION_DATA: Record<number, (db: MigrationDb) => void> = {
-  4: migrateV4Data
+  4: migrateV4Data,
+  5: migrateV5Data
 }
 
 export const SCHEMA_VERSION = MIGRATIONS.length

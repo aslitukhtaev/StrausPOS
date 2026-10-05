@@ -1,0 +1,37 @@
+.hist { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 100%; }
+.hist-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.hist-filters .ui-select, .hist-filters select { min-width: 200px; }
+.hist-search { flex: 1 1 260px; min-width: 240px; }
+.hist-custom { display: flex; align-items: center; gap: var(--sp-2); }
+.hist-sum { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: baseline; color: var(--text-2); font-size: var(--fs-md); }
+.hist-sum b { color: var(--text); }
+.hist-center { display: flex; justify-content: center; padding: var(--sp-10); }
+
+.hist-table { width: 100%; border-collapse: collapse; }
+.hist-table th { text-align: left; padding: 12px 14px; font-size: var(--fs-sm); color: var(--text-3); font-weight: var(--fw-semibold); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hist-table td { padding: 12px 14px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-md); vertical-align: middle; }
+.hist-table .r { text-align: right; }
+.hist-table .nowrap { white-space: nowrap; }
+.hist-row { cursor: pointer; }
+.hist-row:hover { background: var(--surface-2); }
+.hist-row:focus-visible { outline: none; box-shadow: inset var(--focus-ring); }
+.hist-room { font-weight: var(--fw-semibold); }
+.hist-sub { font-size: var(--fs-xs); color: var(--text-3); }
+.hist-pm { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.hist-det { display: flex; flex-direction: column; gap: var(--sp-5); }
+.hist-det__head { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6); color: var(--text-2); font-size: var(--fs-md); }
+.hist-det__head span { display: inline-flex; align-items: center; gap: 6px; }
+.hist-h { font-size: var(--fs-lg); font-weight: var(--fw-bold); margin: 0 0 var(--sp-2); }
+.hist-tbl { width: 100%; border-collapse: collapse; }
+.hist-tbl th { text-align: left; padding: 6px 10px; font-size: var(--fs-xs); color: var(--text-3); font-weight: var(--fw-semibold); border-bottom: 1px solid var(--line); }
+.hist-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); font-size: var(--fs-sm); vertical-align: top; }
+.hist-tbl .r { text-align: right; white-space: nowrap; }
+.hist-tbl tr.is-gone td { color: var(--text-3); }
+.hist-tbl tr.is-gone .hist-nm { text-decoration: line-through; }
+.hist-nm { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.hist-ret { color: var(--danger-text); font-weight: var(--fw-semibold); }
+.hist-totals { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; max-width: 460px; margin-left: auto; font-size: var(--fs-md); }
+.hist-totals .is-total { font-size: var(--fs-xl); font-weight: var(--fw-bold); padding-top: 8px; border-top: 1px solid var(--line); }
+.hist-totals > span:nth-child(odd) { color: var(--text-2); }
+.hist-debt { color: var(--danger-text); font-weight: var(--fw-semibold); }

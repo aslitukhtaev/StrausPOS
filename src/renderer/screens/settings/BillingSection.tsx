@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AppSettings, TimeInterval } from '@shared/types'
 import { MS_MIN, billedMinutes, formatHours, guestTimeAmount } from '@shared/billing'
 import { api } from '@/api'
-import { Icon, Money, Segmented, formatMoney } from '@/ui'
+import { Icon, Input, Money, Segmented, formatMoney } from '@/ui'
 import { Note, SaveBar, SectionHead, useReportDirty, type SectionProps } from './common'
 
-type BillingKeys = 'defaultHours' | 'blockMinutes' | 'graceMinutes' | 'warnBeforeMinutes' | 'roundTo'
+type BillingKeys = 'defaultHours' | 'blockMinutes' | 'graceMinutes' | 'warnBeforeMinutes' | 'roundTo' | 'serviceChargePct'
 type Draft = Pick<AppSettings, BillingKeys>
 
 const HOURS = [1, 2, 3, 4]
@@ -13,6 +13,7 @@ const HOURS = [1, 2, 3, 4]
 const BLOCKS = [1, 30, 60]
 const GRACE = [0, 5, 10, 15]
 const WARN = [5, 10, 15]
+const SERVICE = [0, 5, 10, 15]
 const ROUND = [1, 100, 500, 1000, 5000]
 const FALLBACK_RATE = 100_000
 
@@ -27,7 +28,8 @@ const pick = (s: AppSettings): Draft => ({
   blockMinutes: s.blockMinutes,
   graceMinutes: s.graceMinutes,
   warnBeforeMinutes: s.warnBeforeMinutes,
-  roundTo: s.roundTo
+  roundTo: s.roundTo,
+  serviceChargePct: s.serviceChargePct ?? 10
 })
 const same = (a: Draft, b: Draft) => (Object.keys(a) as BillingKeys[]).every((k) => a[k] === b[k])
 
@@ -82,6 +84,9 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
     const billed = billedMinutes(ms, paid, opts)
     return { sat, billed, extra: billed > paid, amount: guestTimeAmount(iv, paid, ms, opts) }
   })
+
+  const svcBase = rate * d.defaultHours
+  const svc = Math.round((svcBase * d.serviceChargePct) / 100)
 
   const onSave = async () => {
     setSaving(true)
@@ -152,6 +157,33 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
               options={withCurrent(ROUND, settings.roundTo).map((r) => ({ value: r, label: r === 1 ? "Yo'q" : formatMoney(r) }))}
             />
           </div>
+          <div className="set-bill__item is-wide" data-testid="service-setting">
+            <div className="set-bill__head">
+              <div className="set-bill__title"><Icon name="percent" size={22} /> Obsluga foizi</div>
+              <div className="set-bill__hint">
+                {d.serviceChargePct === 0
+                  ? "O'chiq: obsluga hisoblanmaydi"
+                  : "Vaqt + buyurtmalar − chegirma summasidan hisoblanib, jami hisobga qo'shiladi. Bar savdosida yo'q"}
+              </div>
+            </div>
+            <div className="row" style={{ gap: 12 }}>
+              <Segmented
+                block size="lg" value={d.serviceChargePct} onChange={(v) => set('serviceChargePct', v)}
+                options={SERVICE.map((v) => ({ value: v, label: v === 0 ? "Yo'q" : v + '%' }))}
+                className="grow"
+              />
+              <div style={{ width: 150 }}>
+                <Input
+                  size="lg" type="number" inputMode="numeric" min={0} max={100} suffix="%"
+                  value={String(d.serviceChargePct)} aria-label="Obsluga foizi (qo'lda)" data-testid="service-pct-input"
+                  onChange={(e) => {
+                    const n = Math.round(Number(e.target.value))
+                    set('serviceChargePct', Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0)
+                  }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="set-example" data-testid="billing-example">
@@ -169,6 +201,16 @@ export function BillingSection({ settings, save, onDirty }: SectionProps) {
                 <Money value={e.amount} size="xl" tone={e.extra ? 'default' : 'accent'} />
               </div>
             ))}
+            <div className="set-example__step set-bill__ex" data-testid="service-example">
+              <span className="set-bill__ex-text">
+                Hisob <b>{formatMoney(svcBase)}</b>
+                <span className="set-example__op"> + </span>
+                obsluga <b>{d.serviceChargePct}%</b> ({formatMoney(svc)})
+                <span className="set-example__op"> → </span>
+                <b>jami</b>
+              </span>
+              <Money value={svcBase + svc} size="xl" tone="accent" />
+            </div>
           </div>
         </div>
 

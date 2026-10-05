@@ -17,7 +17,7 @@ const ALWAYS_METHODS: ReadonlySet<string> = new Set(['system.backup', 'system.no
 /** Ma'lumotni faqat o'qiydigan metodlar — litsenziya tugaganda ham ishlaydi (ko'rish rejimi) */
 export const READ_METHODS: ReadonlySet<string> = new Set([
   'rooms.board', 'rooms.list',
-  'sessions.get',
+  'sessions.get', 'sessions.detail',
   'barSales.openList', 'barSales.history',
   'catalog.categories', 'catalog.products', 'catalog.services',
   'debts.list', 'debts.payments',

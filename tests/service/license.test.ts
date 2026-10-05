@@ -189,7 +189,7 @@ describe('sinov (24 soat)', () => {
   })
 
   it('allowlist: faqat o\'qish / auth / license / connection / backup', () => {
-    for (const m of ['rooms.board', 'reports.sales', 'auth.login', 'auth.setupOwner', 'license.activate', 'connection.connectTerminal', 'system.backup', 'system.now', 'settings.get', 'sessions.get'])
+    for (const m of ['rooms.board', 'reports.sales', 'auth.login', 'auth.setupOwner', 'license.activate', 'connection.connectTerminal', 'system.backup', 'system.now', 'settings.get', 'sessions.get', 'sessions.detail'])
       expect(allowedWhenBlocked(m)).toBe(true)
     for (const m of ['rooms.save', 'sessions.open', 'checkout.pay', 'checkout.receipt', 'settings.save', 'system.restore', 'system.printReceipt', 'network.setEnabled', 'debts.pay', 'waiters.payout', 'barSales.open'])
       expect(allowedWhenBlocked(m)).toBe(false)

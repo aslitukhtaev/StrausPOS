@@ -107,23 +107,32 @@ export function waiterCommission(productSales: number, pct: number): number {
   return Math.round((productSales * p) / 100)
 }
 
-export function buildLineView(l: OrderLine, providerName: string | null): LineView {
-  return { ...l, activeQty: lineActiveQty(l), amount: lineAmount(l), providerName }
+export function buildLineView(l: OrderLine, providerName: string | null, createdByName = ''): LineView {
+  return { ...l, createdByName, activeQty: lineActiveQty(l), amount: lineAmount(l), providerName }
 }
 
 export interface Totals {
   timeTotal: number
   linesTotal: number
   discount: number
+  /** Obsluga: round((vaqt + buyurtmalar − chegirma) × pct/100), butun so'm */
+  serviceCharge: number
   total: number
 }
 
-export function computeTotals(guests: GuestView[], lines: LineView[], discount: number): Totals {
+/** Obsluga summasi (chegirmadan KEYINGI summadan, butun so'mga yaxlitlanadi). */
+export function serviceChargeAmount(net: number, pct: number): number {
+  const p = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0
+  return Math.round((Math.max(0, net) * p) / 100)
+}
+
+export function computeTotals(guests: GuestView[], lines: LineView[], discount: number, serviceChargePct = 0): Totals {
   const timeTotal = guests.reduce((s, g) => s + g.timeAmount, 0)
   const linesTotal = lines.reduce((s, l) => s + Math.max(0, l.amount), 0)
   const gross = timeTotal + linesTotal
   const d = Number.isFinite(discount) ? Math.min(Math.max(0, discount), gross) : 0
-  return { timeTotal, linesTotal, discount: d, total: timeTotal + linesTotal - d }
+  const serviceCharge = serviceChargeAmount(gross - d, serviceChargePct)
+  return { timeTotal, linesTotal, discount: d, serviceCharge, total: timeTotal + linesTotal - d + serviceCharge }
 }
 
 // ───────────── Format yordamchilari (UI va chek uchun) ─────────────

@@ -84,6 +84,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   roundTo: 1000,
   defaultHours: 1,
+  serviceChargePct: 10,
   // 2026-10: aynan o'tirilgan daqiqa uchun (1 soat olingan, 01:01:00 → 61 daq)
   blockMinutes: 1,
   graceMinutes: 0,
@@ -126,6 +127,7 @@ interface SessionRow {
   time_total: number | null; lines_total: number | null; discount_applied: number | null; total: number | null
   waiter_id: number | null; waiter_pct: number; product_sales: number | null; waiter_commission: number | null
   kitchen_sales: number | null; kitchen_share_pct: number | null
+  service_charge_pct: number; service_charge: number
 }
 interface GuestRow { id: number; session_id: number; label: string; state: GuestState; paid_minutes: number }
 interface IntervalRow { id: number; guest_id: number; room_id: number; rate: number; start: number; end: number | null }
@@ -277,6 +279,8 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   reqInt(autoLock, "Avto-qulf daqiqasi 0 yoki musbat butun son bo'lishi kerak", 0, 24 * 60)
   const pick = <K extends keyof AppSettings>(k: K): AppSettings[K] => (s[k] === undefined ? base[k] : (s[k] as AppSettings[K]))
   const defaultHours = reqInt(pick('defaultHours'), "Standart soat 1 dan 24 gacha butun son bo'lishi kerak", 1, 24)
+  const scp = pick('serviceChargePct')
+  if (typeof scp !== 'number' || !Number.isFinite(scp) || scp < 0 || scp > 100) fail("Obsluga foizi 0 dan 100 gacha bo'lishi kerak")
   const blockMinutes = reqInt(pick('blockMinutes'), "Blok daqiqasi 1 dan 1440 gacha butun son bo'lishi kerak", 1, 24 * 60)
   const graceMinutes = reqInt(pick('graceMinutes'), "Imtiyozli daqiqalar 0 dan 1440 gacha butun son bo'lishi kerak", 0, 24 * 60)
   const warnBeforeMinutes = reqInt(pick('warnBeforeMinutes'), "Ogohlantirish daqiqasi 0 dan 1440 gacha butun son bo'lishi kerak", 0, 24 * 60)
@@ -310,6 +314,7 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
     },
     roundTo,
     defaultHours,
+    serviceChargePct: Math.round(scp * 100) / 100,
     blockMinutes,
     graceMinutes,
     warnBeforeMinutes,
@@ -576,8 +581,15 @@ export class PosService implements PosApi {
     const names = this.staffNames()
     const opts = this.billingOpts(settings)
     const guestViews = guests.map((g) => buildGuestView(g, lines, now, opts))
-    const lineViews = lines.map((l) => buildLineView(l, l.providerId != null ? names.get(l.providerId) ?? null : null))
-    const totals = computeTotals(guestViews, lineViews, sr.discount)
+    const lineViews = lines.map((l) =>
+      buildLineView(l, l.providerId != null ? names.get(l.providerId) ?? null : null, names.get(l.createdBy) ?? '')
+    )
+    // Obsluga: bar savdosida yo'q; yopilgan sessiyada muzlatilgan foiz/summa
+    const closed = sr.status === 'closed'
+    const pct = sr.kind === 'bar' ? 0 : closed ? sr.service_charge_pct ?? 0 : settings.serviceChargePct
+    const totals = computeTotals(guestViews, lineViews, sr.discount, pct)
+    const serviceCharge = closed ? sr.service_charge ?? 0 : totals.serviceCharge
+    const grandTotal = totals.timeTotal + totals.linesTotal - totals.discount + serviceCharge
     const payments = this.db.all<PaymentRow>('SELECT * FROM payments WHERE session_id=? ORDER BY id', [sessionId]).map(toPayment)
     const paid = payments.reduce((s, p) => s + p.amount, 0)
     return {
@@ -590,9 +602,11 @@ export class PosService implements PosApi {
       timeTotal: totals.timeTotal,
       linesTotal: totals.linesTotal,
       discount: totals.discount,
-      total: totals.total,
+      serviceChargePct: pct,
+      serviceCharge,
+      total: grandTotal,
       paid,
-      due: Math.max(0, totals.total - paid),
+      due: Math.max(0, grandTotal - paid),
       payments
     }
   }
@@ -630,6 +644,7 @@ export class PosService implements PosApi {
       timeTotal: v.timeTotal,
       linesTotal: v.linesTotal,
       discount: v.discount,
+      serviceCharge: { pct: v.serviceChargePct, amount: v.serviceCharge },
       total: v.total,
       payments: Array.from(byMethod, ([method, amount]) => ({ method, amount })),
       debtor: debtRow
@@ -930,6 +945,27 @@ export class PosService implements PosApi {
     get: async (sessionId) => {
       this.requireLogin()
       return this.view(sessionId)
+    },
+
+    detail: async (sessionId) => {
+      this.needRead('reports.view')
+      const sr = this.sessionRow(sessionId)
+      const view = this.view(sr.id)
+      const names = this.staffNames()
+      const returns = this.db
+        .all<{ line_id: number; name: string; qty: number; reason: string; at: number; by: number }>(
+          `SELECT r.line_id, l.name, r.qty, r.reason, r.at, r.by FROM returns r JOIN order_lines l ON l.id=r.line_id
+           WHERE r.session_id=? ORDER BY r.at, r.id`,
+          [sr.id]
+        )
+        .map((r) => ({ lineId: r.line_id, name: r.name, qty: r.qty, reason: r.reason, at: r.at, byName: names.get(r.by) ?? '' }))
+      return {
+        view,
+        receiptNo: sr.receipt_no ?? null,
+        openedBy: names.get(sr.opened_by) ?? '',
+        cashier: sr.closed_by != null ? names.get(sr.closed_by) ?? null : null,
+        returns
+      }
     },
 
     addGuest: async (sessionId, paidMinutes) => {
@@ -1348,8 +1384,9 @@ export class PosService implements PosApi {
         this.db.run(
           `UPDATE sessions SET status='closed', closed_at=?, closed_by=?, receipt_no=?, discount=?,
              time_total=?, lines_total=?, discount_applied=?, total=?, product_sales=?, waiter_commission=?,
-             kitchen_sales=?, kitchen_share_pct=? WHERE id=?`,
-          [now, me.id, next, v.discount, v.timeTotal, v.linesTotal, v.discount, v.total, productSales, commission, kitchenSales, kitchenPct, s.id]
+             kitchen_sales=?, kitchen_share_pct=?, service_charge_pct=?, service_charge=? WHERE id=?`,
+          [now, me.id, next, v.discount, v.timeTotal, v.linesTotal, v.discount, v.total, productSales, commission, kitchenSales, kitchenPct,
+            v.serviceChargePct, v.serviceCharge, s.id]
         )
       })
       return this.buildReceipt(s.id)
@@ -1994,6 +2031,7 @@ export class PosService implements PosApi {
         productRevenue: 0,
         serviceRevenue: 0,
         discounts: 0,
+        serviceCharge: 0,
         total: 0,
         byMethod: { cash: 0, card: 0, terminal: 0, debt: 0 },
         debtPayments: { cash: 0, card: 0, terminal: 0 },
@@ -2019,6 +2057,7 @@ export class PosService implements PosApi {
         const total = s.total ?? 0
         report.timeRevenue += s.time_total ?? 0
         report.discounts += s.discount_applied ?? 0
+        report.serviceCharge += s.service_charge ?? 0
         report.total += total
         const day = localDay(s.closed_at ?? s.opened_at)
         byDay.set(day, (byDay.get(day) ?? 0) + total)
@@ -2171,6 +2210,7 @@ export class PosService implements PosApi {
           productSales,
           serviceRevenue,
           discount: s.discount_applied ?? 0,
+          serviceCharge: s.service_charge ?? 0,
           total,
           paid,
           paymentMethods,

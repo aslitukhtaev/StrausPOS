@@ -81,6 +81,9 @@ export function renderReceiptHtml(data: ReceiptData): string {
 
   parts.push('<div class="sep"></div>')
   if (data.discount > 0) parts.push(row('Chegirma:', '−' + e(money(data.discount))))
+  if (data.serviceCharge && data.serviceCharge.pct > 0) {
+    parts.push(row(`Obsluga ${e(data.serviceCharge.pct)}%:`, e(money(data.serviceCharge.amount))))
+  }
   parts.push(row('JAMI:', e(money(data.total)), 'total'))
 
   if (data.payments.length > 0) {

@@ -19,6 +19,9 @@ export interface LiveTotals {
   timeTotal: number
   linesTotal: number
   discount: number
+  /** Obsluga foizi va summasi (bar savdosida 0) */
+  serviceChargePct: number
+  serviceCharge: number
   total: number
   paid: number
   due: number
@@ -64,7 +67,9 @@ export function liveTotals(view: SessionView, anchor: number, now: number, opts:
   // Yopilgan sessiya — server qiymatlari muzlagan
   const t = view.session.status === 'closed' ? view.computedAt : view.computedAt + Math.max(0, now - anchor)
   const guests = view.guests.map((g) => buildGuestView(g, view.lines, t, opts))
-  const totals = computeTotals(guests, view.lines, view.session.discount)
+  // Obsluga: yopilgan sessiyada muzlatilgan foiz (view.serviceChargePct), ochiqda joriy
+  const pct = view.serviceChargePct || 0
+  const totals = { ...computeTotals(guests, view.lines, view.session.discount, pct), serviceChargePct: pct }
   let running = 0
   let paused = 0
   let finished = 0

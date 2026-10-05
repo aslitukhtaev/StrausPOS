@@ -348,6 +348,22 @@ describe('ofitsiant haqi', () => {
   })
 })
 
+describe('obsluga (serviceChargeAmount / computeTotals pct)', () => {
+  const gv = (timeAmount: number) => ({ ...buildGuestView(guest(1, []), [], 0, DEFAULT_BILLING), timeAmount })
+  const lv = (amount: number) => ({ ...buildLineView(line(), null), amount })
+  it('chegirmadan KEYIN: (100000+20000-30000)=90000 × 10% = 9000', () => {
+    const t = computeTotals([gv(100000)], [lv(20000)], 30000, 10)
+    expect(t).toEqual({ timeTotal: 100000, linesTotal: 20000, discount: 30000, serviceCharge: 9000, total: 99000 })
+  })
+  it('yaxlitlash butun so\'m: 12345 × 10% = 1234.5 → 1235', () => {
+    expect(computeTotals([gv(12345)], [], 0, 10).serviceCharge).toBe(1235)
+  })
+  it('pct=0 yoki noto\'g\'ri → 0', () => {
+    expect(computeTotals([gv(50000)], [], 0, 0).serviceCharge).toBe(0)
+    expect(computeTotals([gv(50000)], [], 0, NaN).serviceCharge).toBe(0)
+  })
+})
+
 describe('computeTotals', () => {
   const gv = (timeAmount: number) => ({ ...buildGuestView(guest(1, []), [], 0, OPT), timeAmount })
   const lv = (amount: number) => ({ ...buildLineView(line(), null), amount })
@@ -357,6 +373,7 @@ describe('computeTotals', () => {
       timeTotal: 150000,
       linesTotal: 20000,
       discount: 0,
+      serviceCharge: 0,
       total: 170000
     })
   })
@@ -377,7 +394,7 @@ describe('computeTotals', () => {
     expect(t.total).toBe(10000)
   })
   it('bo\'sh hisob', () => {
-    expect(computeTotals([], [], 5000)).toEqual({ timeTotal: 0, linesTotal: 0, discount: 0, total: 0 })
+    expect(computeTotals([], [], 5000)).toEqual({ timeTotal: 0, linesTotal: 0, discount: 0, serviceCharge: 0, total: 0 })
   })
   it('BILLING XATO (tuzatildi): NaN chegirma total ni NaN qiladi', () => {
     // Reproduksiya: computeTotals([gv(10000)], [], NaN).total -> NaN (kutilgan: 10000 yoki xato)
@@ -511,7 +528,7 @@ describe('Real senariylar (qo‘lda hisoblangan)', () => {
       line({ id: 2, kind: 'service', qty: 1, unitPrice: 150000, providerId: 5 })
     ]
     const t = computeTotals(gvs, lines.map((l) => buildLineView(l, null)), 20000)
-    expect(t).toEqual({ timeTotal: 540000, linesTotal: 160000, discount: 20000, total: 680000 })
+    expect(t).toEqual({ timeTotal: 540000, linesTotal: 160000, discount: 20000, serviceCharge: 0, total: 680000 })
     expect(waiterCommission(waiterProductSales(lines), 10)).toBe(1000)
   })
 

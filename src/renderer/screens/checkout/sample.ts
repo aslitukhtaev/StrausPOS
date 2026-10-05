@@ -27,10 +27,11 @@ export function sampleReceiptData(settings: AppSettings | ReceiptSettings): Rece
     timeTotal: 235_000,
     linesTotal: 210_000,
     discount: 15_000,
-    total: 430_000,
+    serviceCharge: { pct: 10, amount: 43_000 },
+    total: 473_000,
     payments: [
       { method: 'cash', amount: 300_000 },
-      { method: 'terminal', amount: 130_000 }
+      { method: 'terminal', amount: 173_000 }
     ],
     debtor: null,
     provisional: false

@@ -62,7 +62,7 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     fs.writeFileSync(file, await buildV1())
     const svc = await PosService.create({ file, clock: new FakeClock().now })
     expect(svc.db.version).toBe(SCHEMA_VERSION)
-    expect(SCHEMA_VERSION).toBe(4)
+    expect(SCHEMA_VERSION).toBe(5)
     // FK yoqilgan va buzilmagan
     expect(svc.db.get<{ foreign_keys: number }>('PRAGMA foreign_keys')!.foreign_keys).toBe(1)
     expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])
@@ -75,7 +75,7 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     // Sozlamalar: eski qiymatlar + yangi standartlar
     const s = await svc.settings.get()
     // blockMinutes yo'q edi → yangi standart 1 (daqiqalik)
-    expect(s).toMatchObject({ roundTo: 500, blockMinutes: 1, graceMinutes: 0, defaultHours: 1, warnBeforeMinutes: 10, theme: 'auto' })
+    expect(s).toMatchObject({ roundTo: 500, blockMinutes: 1, graceMinutes: 0, defaultHours: 1, warnBeforeMinutes: 10, theme: 'auto', serviceChargePct: 10 })
     expect(s.receipt).toMatchObject({ businessName: 'Eski Sauna', paperWidth: 58 })
 
     // Yopilgan sessiya: muzlatilgan hisobot summalari o'zgarmaydi; ofitsiant yo'q
@@ -84,6 +84,9 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     const closed = await svc.sessions.get(1)
     expect(closed.session).toMatchObject({ status: 'closed', waiterId: null, waiterPct: 0 })
     expect(closed.guests[0].paidMinutes).toBe(0)
+    // Eski yopilgan sessiya: obsluga muzlatilgan 0 (sozlama 10% bo'lsa ham eski chek o'zgarmaydi)
+    expect(closed).toMatchObject({ serviceChargePct: 0, serviceCharge: 0, total: 130_000 })
+    expect((await svc.reports.sales({ from: 0, to: T0 + HOUR })).serviceCharge).toBe(0)
     expect(closed.payments.map((p) => p.amount)).toEqual([130_000])
 
     // Ochiq sessiya: paidMinutes=0 → aynan o'tirilgan daqiqa (30 daq × 30 000/60 = 15 000), ishni davom ettirish mumkin
@@ -97,8 +100,13 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     expect(w.id).toBe(3)
     open = await svc.lines.addProduct(2, 1, 1, null, w.id)
     expect(open.lines[0]).toMatchObject({ waiterId: w.id, waiterPct: 10, department: 'bar' })
+    // Ochiq sessiyaga yangi sozlama (10%) qo'llanadi: 15 000 vaqt + 60 000 (soat) ... jami = (vaqt+mahsulot) × 1.1
+    expect(open.serviceChargePct).toBe(10)
+    expect(open.serviceCharge).toBe(Math.round((open.timeTotal + open.linesTotal - open.discount) * 0.1))
+    expect(open.total).toBe(open.timeTotal + open.linesTotal - open.discount + open.serviceCharge)
     const r = await svc.checkout.pay(2, [{ method: 'card', amount: open.total }], null)
     expect(r.receiptNo).toBe(2)
+    expect(r.serviceCharge).toEqual({ pct: 10, amount: open.serviceCharge })
     svc.db.close()
 
     // Qayta ochish: migratsiya qayta ishlamaydi, ma'lumot joyida
@@ -315,7 +323,7 @@ describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant
     fs.writeFileSync(file, await buildV3())
     const clock = new FakeClock()
     const svc = await PosService.create({ file, clock: clock.now })
-    expect(svc.db.version).toBe(4)
+    expect(svc.db.version).toBe(5)
     expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])
     expect(svc.db.all("SELECT name FROM sqlite_master WHERE name LIKE '%_v4'")).toEqual([])
     for (const t of ['payments', 'debt_payments'])
@@ -358,26 +366,28 @@ describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant
     const openV = await svc.sessions.get(3)
     expect(openV.session).toMatchObject({ waiterId: null, waiterPct: 0 })
     expect(openV.lines[0]).toMatchObject({ department: 'bar', waiterId: 2, waiterPct: 10 })
-    expect(openV.total).toBe(60_000 + 40_000)
+    // obsluga 10%: (60 000 + 40 000) × 10% = 10 000
+    expect(openV).toMatchObject({ serviceChargePct: 10, serviceCharge: 10_000, total: 110_000 })
 
     // Terminal bilan to'lov; payments hisoblagichi saqlangan (21 dan davom)
-    const r = await svc.checkout.pay(3, [{ method: 'terminal', amount: 100_000 }], null)
+    const r = await svc.checkout.pay(3, [{ method: 'terminal', amount: 110_000 }], null)
     expect(r.receiptNo).toBe(2)
     expect((await svc.sessions.get(3)).payments[0]).toMatchObject({ id: 21, method: 'terminal' })
     // Ofitsiant: eski sessiya (muzlatilgan 4 000) + yangi qatorlar (40 000 × 10% = 4 000)
     expect((await svc.waiters.monthly('2026-01')).find((w) => w.staffId === 2)).toMatchObject({ sessions: 2, productSales: 80_000, commission: 8_000 })
     const rep = await svc.reports.sales({ from: 0, to: T0 + HOUR })
-    expect(rep.byMethod).toEqual({ cash: 0, card: 50_000, terminal: 100_000, debt: 40_000 })
+    expect(rep.byMethod).toEqual({ cash: 0, card: 50_000, terminal: 110_000, debt: 40_000 })
+    expect(rep.serviceCharge).toBe(10_000)
     expect(rep.debtPayments).toEqual({ cash: 10_000, card: 0, terminal: 0 })
     expect(rep.byWaiter).toEqual([{ staffId: 2, name: 'Sardor', sessions: 2, productSales: 80_000, commission: 8_000 }])
 
     // Yangi qarz o'sha telefon bilan (boshqa ism) → Ali ga qo'shiladi, ism o'zgarmaydi
     const n = await svc.sessions.open(1, 1, 60)
-    const rn = await svc.checkout.pay(n.session.id, [{ method: 'debt', amount: 50_000 }], { name: 'Alisher', phone: '901112233' })
+    const rn = await svc.checkout.pay(n.session.id, [{ method: 'debt', amount: 55_000 }], { name: 'Alisher', phone: '901112233' })
     expect(rn.debtor).toEqual({ debtorId: ali.id, name: 'Ali', phone: '+998 90 111 22 33' })
     // FIFO: eng eski (30 000 qoldiqli 1-qarz) dan
     const after = await svc.debtors.pay(ali.id, 'terminal', 40_000)
-    expect(after).toMatchObject({ total: 120_000, paid: 50_000, balance: 70_000, debtsCount: 3 })
+    expect(after).toMatchObject({ total: 125_000, paid: 50_000, balance: 75_000, debtsCount: 3 })
     expect((await svc.debtors.debts(ali.id)).map((d) => [d.id, d.paid, d.closedAt !== null])).toEqual([
       [5, 0, false],
       [2, 10_000, false],
@@ -387,7 +397,7 @@ describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant
 
     // Qayta ochish: migratsiya qayta ishlamaydi
     const again = await PosService.create({ file, clock: clock.now })
-    expect(again.db.version).toBe(4)
+    expect(again.db.version).toBe(5)
     await again.auth.login(1, '1234')
     expect((await again.debtors.list(false))).toHaveLength(2)
     expect((await again.settings.get()).blockMinutes).toBe(1)
@@ -398,7 +408,7 @@ describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant
     const svc = await PosService.create({ file: path.join(dir, 'delfin.db'), clock: new FakeClock().now })
     await svc.auth.setupOwner('Yangi', '9999', 'Delfin Sauna')
     await svc.restoreBytes(await buildV3({ receipt: {}, blockMinutes: 30 }))
-    expect(svc.db.version).toBe(4)
+    expect(svc.db.version).toBe(5)
     await svc.auth.login(1, '1234')
     expect((await svc.settings.get()).blockMinutes).toBe(30)
     expect(await svc.debtors.list(false)).toHaveLength(2)
@@ -416,7 +426,7 @@ describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant
     const file = path.join(dir, 'empty.db')
     fs.writeFileSync(file, bytes)
     const svc = await PosService.create({ file, clock: new FakeClock().now })
-    expect(svc.db.version).toBe(4)
+    expect(svc.db.version).toBe(5)
     expect(svc.db.all('SELECT * FROM debtors')).toEqual([])
     expect(await svc.auth.needsSetup()).toBe(true)
     svc.db.close()

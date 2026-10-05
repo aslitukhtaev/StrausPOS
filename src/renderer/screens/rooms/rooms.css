@@ -159,6 +159,8 @@
   padding-left: 22px; border-left: 1px solid var(--line);
 }
 .rooms-ws__totallabel { font-size: var(--fs-sm); color: var(--text-2); font-weight: var(--fw-semibold); }
+.rooms-ws__svc { font-size: var(--fs-sm); color: var(--text-2); font-weight: var(--fw-semibold); white-space: nowrap; }
+.rooms-line__by { color: var(--text-3); }
 .rooms-ws__totalnum.ui-money--3xl { font-size: 48px; line-height: 1; white-space: nowrap; }
 
 .rooms-ws__body { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; }

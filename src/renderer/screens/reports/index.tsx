@@ -369,6 +369,7 @@ function Kpis({ s }: { s: SalesReport }) {
     { label: 'Vaqt', icon: 'clock', value: s.timeRevenue },
     { label: 'Bar + oshxona', icon: 'bar', value: s.productRevenue },
     { label: 'Xizmat', icon: 'sparkles', value: s.serviceRevenue },
+    { label: 'Obsluga', icon: 'tag', value: s.serviceCharge || 0 },
     { label: 'Chegirma', icon: 'percent', value: s.discounts, tone: 'warning' },
     { label: 'Qaytarilgan', icon: 'undo', value: s.returnsAmount, tone: 'danger' }
   ]

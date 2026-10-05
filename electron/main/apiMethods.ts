@@ -11,7 +11,7 @@ const MAP: MethodMap = {
   auth: { listLoginStaff: true, login: true, logout: true, current: true, needsSetup: true, setupOwner: true },
   rooms: { board: true, list: true, save: true, remove: true },
   sessions: {
-    open: true, get: true, addGuest: true, extendGuest: true, extendAll: true,
+    open: true, get: true, detail: true, addGuest: true, extendGuest: true, extendAll: true,
     guestPause: true, guestResume: true, guestFinish: true,
     renameGuest: true, moveRoom: true, setDiscount: true, stopAll: true, cancel: true
   },

@@ -37,11 +37,13 @@ export interface Ctx {
  * Xotiradagi baza + sozlangan ega + admin/kassir/massajchi + ofitsiantlar
  * (Sardor: 'waiter' roli, 10%; Bekzod: kassir + isWaiter, 12%). Ega sifatida kirilgan holatda qaytadi.
  */
-export async function setup(opts: { file?: string | null; host?: PosHost } = {}): Promise<Ctx> {
+export async function setup(opts: { file?: string | null; host?: PosHost; serviceChargePct?: number } = {}): Promise<Ctx> {
   const clock = new FakeClock()
   const svc = await PosService.create({ file: opts.file ?? null, clock: clock.now, host: opts.host })
   await svc.auth.setupOwner('Ega', '1234', 'Delfin Sauna')
   const owner = (await svc.auth.current())!.staff
+  // Mavjud testlar obslugasiz summalar bilan yozilgan; obsluga testlari serviceChargePct beradi (service-charge.test.ts)
+  await svc.settings.save({ ...(await svc.settings.get()), serviceChargePct: opts.serviceChargePct ?? 0 })
   const mk = (name: string, role: Role, pin: string, isProvider = false, isWaiter = false, commissionPct = 0) =>
     svc.staff.save({ name, role, pin, isProvider, isWaiter, commissionPct, active: true })
   const admin = await mk('Admin', 'admin', '2222')
