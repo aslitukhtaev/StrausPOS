@@ -91,13 +91,14 @@ describe('qaytarish (X tugmasi)', () => {
     await expect(svc.lines.returnLine(lineId, 1, '')).rejects.toThrow('to‘liq qaytarilgan')
   })
 
-  it('kassir qaytara olmaydi', async () => {
+  it('kassir va ofitsiant qaytara oladi', async () => {
     const { svc, rooms, loginAs } = await setup()
     const cola = await productByName(svc, 'Coca-Cola 1 L')
     const v0 = await svc.sessions.open(rooms.s1, 1, 60)
     const v = await svc.lines.addProduct(v0.session.id, cola.id, 1, null)
     await loginAs('cashier')
-    await expect(svc.lines.returnLine(v.lines[0].id, 1, '')).rejects.toThrow("ruxsatingiz yo'q")
+    const r = await svc.lines.returnLine(v.lines[0].id, 1, '')
+    expect(r.lines[0].activeQty).toBe(0)
   })
 
   it('xizmatni qaytarish omborga ta’sir qilmaydi; qaytarishdan keyin chegirma moslashadi', async () => {

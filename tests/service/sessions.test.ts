@@ -236,7 +236,7 @@ describe('chegirma va bekor qilish', () => {
     await svc.lines.addProduct(b.session.id, p.id, 1, null)
     await expect(svc.sessions.cancel(b.session.id)).rejects.toThrow('buyurtmalar bor')
 
-    await loginAs('cashier')
+    await loginAs('waiter')
     const c = await svc.sessions.open(rooms.s2, 1, 60)
     clock.advanceMin(30)
     await expect(svc.sessions.cancel(c.session.id)).rejects.toThrow('administrator')

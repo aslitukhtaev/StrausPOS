@@ -119,7 +119,7 @@ describe('bar savdosi: to‘liq oqim', () => {
     await svc.lines.addProduct(id, pista.id, 2, null)
     const v = await svc.sessions.setDiscount(id, 5_000)
     expect(v.total).toBe(45_000)
-    await ctx.loginAs('cashier')
+    await ctx.loginAs('waiter')
     await expect(svc.sessions.setDiscount(id, 1_000)).rejects.toThrow(DENIED)
   })
 })

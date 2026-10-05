@@ -284,10 +284,10 @@ describe('xodimlar: ofitsiant maydonlari', () => {
 })
 
 describe('ruxsatlar: ofitsiant roli', () => {
-  it('ofitsiant: xona ochadi, mahsulot qo‘shadi, vaqt qo‘shadi; to‘lov/qaytarish/chegirma/hisobot — yo‘q', async () => {
+  it('ofitsiant: xona ochadi, mahsulot qo‘shadi, vaqt qo‘shadi; to‘lov/chegirma/hisobot — yo‘q (qaytarish mumkin)', async () => {
     const { svc, rooms, staff, clock, loginAs } = await setup()
     const login = await svc.auth.login(staff.waiter.id, '5555')
-    expect(login.permissions).toEqual(['session.open', 'session.manage'])
+    expect(login.permissions).toEqual(['session.open', 'session.manage', 'line.return'])
     await loginAs('waiter')
     expect((await svc.waiters.list()).length).toBe(2)
     const v0 = await svc.sessions.open(rooms.s1, 2, 60)
@@ -299,7 +299,6 @@ describe('ruxsatlar: ofitsiant roli', () => {
     await svc.checkout.preBill(v0.session.id)
     clock.advanceMin(10)
     await expect(svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: 1 }], null)).rejects.toThrow(DENIED)
-    await expect(svc.lines.returnLine(v.lines[0].id, 1, '')).rejects.toThrow(DENIED)
     await expect(svc.sessions.setDiscount(v0.session.id, 1000)).rejects.toThrow(DENIED)
     await expect(svc.reports.sales({ from: 0, to: 1 })).rejects.toThrow(DENIED)
     await expect(svc.waiters.monthly('2026-01')).rejects.toThrow(DENIED)

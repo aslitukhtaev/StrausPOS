@@ -66,7 +66,7 @@ describe('kirish / chiqish', () => {
     await expect(svc.auth.login(staff.cashier.id, '0000')).rejects.toThrow("PIN noto'g'ri")
     const r = await svc.auth.login(staff.cashier.id, '3333')
     expect(r.staff.id).toBe(staff.cashier.id)
-    expect(r.permissions).toEqual(['session.open', 'session.manage', 'session.pay', 'debt.manage'])
+    expect(r.permissions).toEqual(['session.open', 'session.manage', 'session.pay', 'line.return', 'discount.apply', 'debt.manage'])
     expect((await svc.auth.current())?.staff.id).toBe(staff.cashier.id)
   })
 
@@ -102,7 +102,7 @@ describe('kirish / chiqish', () => {
 })
 
 describe('ruxsatlar', () => {
-  it('kassir: sozlama, xona, qaytarish, hisobot, zaxira, xodim — rad etiladi', async () => {
+  it('kassir: sozlama, xona, hisobot, zaxira, xodim — rad etiladi', async () => {
     const { svc, loginAs, rooms, staff } = await setup()
     await loginAs('cashier')
     const denied = "Bu amal uchun ruxsatingiz yo'q"
@@ -118,7 +118,7 @@ describe('ruxsatlar', () => {
     await expect(svc.catalog.saveProduct({ name: 'Z', categoryId: 1, price: 1 })).rejects.toThrow(denied)
     await expect(svc.staff.changePin(staff.owner.id, '9999')).rejects.toThrow(denied)
     const v = await svc.sessions.open(rooms.s1, 1, 60)
-    await expect(svc.sessions.setDiscount(v.session.id, 1000)).rejects.toThrow(denied)
+    await expect(svc.sessions.setDiscount(v.session.id, 1000)).resolves.toBeTruthy()
     // o'z PINini o'zgartira oladi
     await svc.staff.changePin(staff.cashier.id, '7777')
     await svc.auth.logout()

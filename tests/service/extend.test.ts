@@ -115,9 +115,9 @@ describe('sozlamalar: blok va imtiyozli daqiqalar', () => {
 })
 
 describe('bekor qilish (oldindan olingan vaqt bilan)', () => {
-  it('kassir birinchi daqiqa ichida bekor qila oladi, keyin — administrator kerak', async () => {
+  it('ofitsiant birinchi daqiqa ichida bekor qila oladi, keyin — administrator kerak', async () => {
     const { svc, rooms, clock, loginAs } = await setup()
-    await loginAs('cashier')
+    await loginAs('waiter')
     const a = await svc.sessions.open(rooms.s1, 1, 60)
     expect(a.timeTotal).toBe(50_000)
     clock.advance(30_000)

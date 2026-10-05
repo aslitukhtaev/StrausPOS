@@ -253,7 +253,7 @@ describe('Terminal kontekstlari: alohida login, ruxsatlar, sinxronlik', () => {
 
     const w = await t1.auth.login(ctx.staff.waiter.id, '5555')
     expect(w.staff.name).toBe('Sardor')
-    expect(w.permissions).toEqual(['session.open', 'session.manage'])
+    expect(w.permissions).toEqual(['session.open', 'session.manage', 'line.return'])
     await t2.auth.login(ctx.staff.cashier.id, '3333')
     await ctx.loginAs('admin')
 
