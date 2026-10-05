@@ -12,7 +12,7 @@ import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow
+  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow
 } from '../../src/shared/types'
 import { ROLE_LABELS, ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
 import {
@@ -916,6 +916,42 @@ export class PosService implements PosApi {
 
   // ═════════════ SESSIONS ═════════════
   sessions: PosApi['sessions'] = {
+    soldItems: async (range, staffId) => {
+      this.need('reports.view')
+      const { from, to } = this.checkRange(range)
+      if (staffId !== null && !isInt(staffId)) fail('Xodim noto\'g\'ri')
+      const rows = this.db.all<
+        LineRow & { receipt_no: number | null; kind_s: string; room_name: string | null; staff_name: string | null; waiter_name: string | null }
+      >(
+        `SELECT l.*, s.receipt_no, s.kind AS kind_s, rm.name AS room_name, cb.name AS staff_name, w.name AS waiter_name
+         FROM order_lines l JOIN sessions s ON s.id=l.session_id
+         LEFT JOIN rooms rm ON rm.id=s.room_id LEFT JOIN staff cb ON cb.id=l.created_by LEFT JOIN staff w ON w.id=l.waiter_id
+         WHERE s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<?
+           ${staffId === null ? '' : 'AND l.created_by=?'}
+         ORDER BY l.created_at DESC, l.id DESC`,
+        staffId === null ? [from, to] : [from, to, staffId]
+      )
+      return rows.map(
+        (l): SoldItemRow => ({
+          lineId: l.id,
+          at: l.created_at,
+          sessionId: l.session_id,
+          receiptNo: l.receipt_no ?? null,
+          roomName: l.kind_s === 'bar' ? BAR_ROOM.name : l.room_name ?? '',
+          name: l.name,
+          kind: l.kind,
+          department: l.kind === 'product' ? (l.department === 'kitchen' ? 'kitchen' : 'bar') : null,
+          qty: l.qty,
+          returnedQty: l.returned_qty,
+          unitPrice: l.unit_price,
+          amount: (l.qty - l.returned_qty) * l.unit_price,
+          staffId: l.created_by,
+          staffName: l.staff_name ?? '',
+          waiterName: l.waiter_id == null ? null : l.waiter_name ?? ''
+        })
+      )
+    },
+
     open: async (roomId, guestCount, paidMinutes) => {
       const me = this.need('session.open')
       const room = this.roomRow(roomId)
@@ -2144,9 +2180,9 @@ export class PosService implements PosApi {
     sessions: async (range) => {
       this.need('reports.view')
       const { from, to } = this.checkRange(range)
-      const sessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
-        `SELECT s.*, r.name AS room_name, st.name AS staff_name FROM sessions s
-         LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.opened_by
+      const sessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null; cashier_name: string | null }>(
+        `SELECT s.*, r.name AS room_name, st.name AS staff_name, cs.name AS cashier_name FROM sessions s
+         LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.opened_by LEFT JOIN staff cs ON cs.id=s.closed_by
          WHERE s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<? ORDER BY s.closed_at DESC`,
         [from, to]
       )
@@ -2205,6 +2241,8 @@ export class PosService implements PosApi {
           openedAt: s.opened_at,
           closedAt: s.closed_at ?? 0,
           openedBy: s.staff_name ?? '',
+          receiptNo: s.receipt_no ?? null,
+          cashier: s.cashier_name ?? null,
           guestCount: sessionGuests.length,
           timeTotal: s.time_total ?? 0,
           productSales,

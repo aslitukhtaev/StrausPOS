@@ -17,13 +17,13 @@ const ALWAYS_METHODS: ReadonlySet<string> = new Set(['system.backup', 'system.no
 /** Ma'lumotni faqat o'qiydigan metodlar — litsenziya tugaganda ham ishlaydi (ko'rish rejimi) */
 export const READ_METHODS: ReadonlySet<string> = new Set([
   'rooms.board', 'rooms.list',
-  'sessions.get', 'sessions.detail',
+  'sessions.get', 'sessions.detail', 'sessions.soldItems',
   'barSales.openList', 'barSales.history',
   'catalog.categories', 'catalog.products', 'catalog.services',
   'debts.list', 'debts.payments',
   'debtors.search', 'debtors.list', 'debtors.debts',
   'kitchen.daily', 'kitchen.payouts',
-  'reports.sales', 'reports.returns',
+  'reports.sales', 'reports.returns', 'reports.sessions',
   'waiters.monthly', 'waiters.sessions', 'waiters.payouts', 'waiters.list',
   'settings.get',
   'system.now', 'system.receiptHtml', 'system.listPrinters',

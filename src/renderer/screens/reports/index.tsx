@@ -2,21 +2,20 @@
  * Hisobot ekrani: davr tanlash, KPI, to'lov ulushi, kunlar grafigi (SVG), xonalar, mahsulotlar,
  * xizmat ko'rsatuvchilar, kassirlar va qaytarishlar. Tashqi kutubxonasiz.
  */
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReportRange, SalesReport, SessionHistoryRow } from '@shared/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReportRange, SalesReport } from '@shared/types'
 import type { IconName } from '../../ui'
 import { api } from '../../api'
 import { useApp } from '../../store/app'
 import { useNav } from '../../store/nav'
 import {
-  Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Spinner, Tabs, formatDate, formatDateShort,
+  Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Spinner, formatDate, formatDateShort,
   formatDateTime, formatMoney, getNow, toast, cx
 } from '../../ui'
 import './reports.css'
 
 type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
 type ReturnRow = Awaited<ReturnType<typeof api.reports.returns>>[number]
-type ReportTab = 'sales' | 'sessions'
 
 const DAY = 86_400_000
 const startOfDay = (ts: number) => {
@@ -69,12 +68,11 @@ const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 
 export default function ReportsScreen() {
   const businessName = useApp((s) => s.businessName)
   const go = useNav((s) => s.go)
-  const [tab, setTab] = useState<ReportTab>('sales')
   const [preset, setPreset] = useState<Preset>('today')
   const [fromStr, setFromStr] = useState(() => toInput(getNow()))
   const [toStr, setToStr] = useState(() => toInput(getNow()))
   const [range, setRange] = useState<ReportRange>(() => presetRange('today', getNow()))
-  const [data, setData] = useState<{ sales: SalesReport; returns: ReturnRow[]; sessions: SessionHistoryRow[] } | null>(null)
+  const [data, setData] = useState<{ sales: SalesReport; returns: ReturnRow[]} | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const seq = useRef(0)
@@ -83,10 +81,10 @@ export default function ReportsScreen() {
     const my = ++seq.current
     setLoading(true)
     setFailed(false)
-    Promise.all([api.reports.sales(r), api.reports.returns(r), api.reports.sessions(r)])
-      .then(([sales, returns, sessions]) => {
+    Promise.all([api.reports.sales(r), api.reports.returns(r)])
+      .then(([sales, returns]) => {
         if (my !== seq.current) return
-        setData({ sales, returns, sessions })
+        setData({ sales, returns })
         setLoading(false)
       })
       .catch((e) => {
@@ -145,14 +143,6 @@ export default function ReportsScreen() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <Tabs
-          value={tab}
-          onChange={(v) => setTab(v as ReportTab)}
-          items={[
-            { id: 'sales', label: 'Savdo hisoboti', icon: 'receipt' },
-            { id: 'sessions', label: 'Sessiyalar tarixi', icon: 'inbox' }
-          ]}
-        />
         <div className="rep-period">
           <Segmented
             size="lg"
@@ -201,7 +191,7 @@ export default function ReportsScreen() {
         />
       )}
 
-      {tab === 'sales' && s && !empty && (
+      {s && !empty && (
         <div className={cx('rep__content', loading && 'is-loading')}>
           <Kpis s={s} />
 
@@ -334,11 +324,6 @@ export default function ReportsScreen() {
         </div>
       )}
 
-      {tab === 'sessions' && data && (
-        <div className={cx('rep__content', loading && 'is-loading')}>
-          <SessionsHistoryTable sessions={data.sessions} />
-        </div>
-      )}
     </div>
   )
 }
@@ -539,79 +524,6 @@ function DayChart({ s, range }: { s: SalesReport; range: ReportRange }) {
         <div className="rep-days__hover num">{formatDate(days[hover].ts) + ' — ' + formatMoney(days[hover].total) + " so'm"}</div>
       )}
     </Card>
-  )
-}
-
-function SessionsHistoryTable({ sessions }: { sessions: SessionHistoryRow[] }) {
-  const [open, setOpen] = useState<number | null>(null)
-  if (sessions.length === 0) {
-    return <EmptyState size="lg" icon="inbox" title="Sessiyalar yo'q" description="Bu davrda hech qanday sessiya yopilmagan." />
-  }
-
-  return (
-    <TableCard title="Sessiyalar tarixi" subtitle={sessions.length + " ta sessiya · tafsilot uchun qatorni bosing"}>
-      <table className="ui-table rep-table" data-testid="rep-sessions">
-        <thead>
-          <tr>
-            <th>Xona</th>
-            <th>Ochilgan</th>
-            <th>Yopilgan</th>
-            <th>Xodim</th>
-            <th className="r">Mehmonlar</th>
-            <th className="r">Vaqt</th>
-            <th className="r">Mahsulot</th>
-            <th className="r">Xizmat</th>
-            <th className="r">Chegirma</th>
-            <th className="r">Jami</th>
-            <th>To'lov</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((sess) => {
-            const isOpen = open === sess.sessionId
-            return (
-              <Fragment key={sess.sessionId}>
-                <tr onClick={() => setOpen(isOpen ? null : sess.sessionId)} style={{ cursor: 'pointer' }} data-testid="rep-session-row">
-                  <td>{sess.roomName}</td>
-                  <td className="num nowrap">{formatDateTime(sess.openedAt)}</td>
-                  <td className="num nowrap">{formatDateTime(sess.closedAt)}</td>
-                  <td>{sess.openedBy || '—'}</td>
-                  <td className="r num">{sess.guestCount}</td>
-                  <td className="r"><Money value={sess.timeTotal} size="sm" currency={false} /></td>
-                  <td className="r"><Money value={sess.productSales} size="sm" currency={false} /></td>
-                  <td className="r"><Money value={sess.serviceRevenue} size="sm" currency={false} /></td>
-                  <td className="r"><Money value={sess.discount} size="sm" currency={false} tone={sess.discount > 0 ? 'warning' : 'default'} /></td>
-                  <td className="r"><Money value={sess.total} size="sm" currency={false} /></td>
-                  <td>{sess.paymentMethods}</td>
-                </tr>
-                {isOpen && (
-                  <tr data-testid="rep-session-items">
-                    <td colSpan={11}>
-                      {sess.items.length === 0 ? (
-                        <Mute>Mahsulot yoki xizmat qo'shilmagan</Mute>
-                      ) : (
-                        <table className="ui-table rep-table">
-                          <thead><tr><th>Nima sotildi</th><th className="r">Soni</th><th className="r">Summa</th></tr></thead>
-                          <tbody>
-                            {sess.items.map((it, i) => (
-                              <tr key={it.name + i}>
-                                <td>{it.name}</td>
-                                <td className="r num">{it.qty}</td>
-                                <td className="r"><Money value={it.amount} size="sm" currency={false} /></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            )
-          })}
-        </tbody>
-      </table>
-    </TableCard>
   )
 }
 

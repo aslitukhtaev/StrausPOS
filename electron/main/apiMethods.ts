@@ -13,7 +13,7 @@ const MAP: MethodMap = {
   sessions: {
     open: true, get: true, detail: true, addGuest: true, extendGuest: true, extendAll: true,
     guestPause: true, guestResume: true, guestFinish: true,
-    renameGuest: true, moveRoom: true, setDiscount: true, stopAll: true, cancel: true
+    renameGuest: true, soldItems: true, moveRoom: true, setDiscount: true, stopAll: true, cancel: true
   },
   lines: { addProduct: true, addProducts: true, addService: true, returnLine: true },
   checkout: { pay: true, receipt: true, preBill: true },
