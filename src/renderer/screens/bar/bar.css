@@ -54,3 +54,4 @@ div.bar-cat { padding: 0 var(--sp-2) 0 0; cursor: default; }
 .bar-cat__dept { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: none; border-radius: var(--r-sm); background: var(--busy-soft); color: var(--busy); }
 .bar-cat__dept.is-kitchen { background: var(--warning-soft); color: var(--warning); }
 .bar-row__kicon { color: var(--warning); flex: none; }
+.bar-row__cost { color: var(--text-3); font-size: var(--fs-xs); margin-top: 2px; }

@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import type { Product, ProductCategory } from '@shared/types'
 import { api } from '@/api'
-import { Button, Field, Input, Modal, MoneyInput, Segmented, Select, toast } from '@/ui'
+import { Button, Field, Input, Modal, MoneyInput, Segmented, Select, formatMoney, toast } from '@/ui'
 
 export function ProductDialog({ product, cats, onClose, onSaved }: { product: Partial<Product>; cats: ProductCategory[]; onClose: () => void; onSaved: () => void | Promise<void> }) {
   const isNew = !product.id
   const [name, setName] = useState(product.name || '')
   const [categoryId, setCategoryId] = useState<number>(product.categoryId ?? cats[0]?.id ?? 0)
   const [price, setPrice] = useState(product.price ?? 0)
+  const [costPrice, setCostPrice] = useState(product.costPrice ?? 0)
   const [trackStock, setTrackStock] = useState(product.trackStock ?? true)
   const [stock, setStock] = useState(product.stock ?? 0)
   const [lowStockAt, setLowStockAt] = useState(product.lowStockAt ?? 5)
@@ -24,6 +25,7 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
         name: name.trim(),
         categoryId,
         price,
+        costPrice,
         trackStock,
         stock: trackStock ? stock : 0,
         lowStockAt: trackStock ? lowStockAt : 0,
@@ -65,6 +67,9 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
             <MoneyInput value={price} onChange={setPrice} />
           </Field>
         </div>
+        <Field label="Tannarx (so'm)" hint={costPrice > 0 && price > 0 ? 'Marja: ' + Math.round(((price - costPrice) / price) * 100) + '% · dona boshiga ' + formatMoney(price - costPrice) + " so'm" : "Ixtiyoriy: sotib olish narxi. 0 = kiritilmagan (sof foyda aniq chiqmaydi)"}>
+          <MoneyInput value={costPrice} onChange={setCostPrice} />
+        </Field>
         <Field as="div" label="Ombor qoldig'ini kuzatish">
           <Segmented size="lg" block value={trackStock ? 'y' : 'n'} onChange={(v) => setTrackStock(v === 'y')} options={[{ value: 'y', label: 'Ha, kuzatish', icon: 'box' }, { value: 'n', label: "Yo'q", icon: 'x' }]} />
         </Field>

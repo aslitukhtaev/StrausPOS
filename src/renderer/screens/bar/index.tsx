@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Department, Product, ProductCategory, ServiceItem } from '@shared/types'
 import { api } from '@/api'
 import { useCan } from '@/store/auth'
-import { Badge, Button, DataRow, DataTable, EmptyState, Icon, IconButton, Input, Money, PageHeader, Segmented, Spinner, Tabs, cx, confirmDialog, toast } from '@/ui'
+import { Badge, Button, DataRow, DataTable, EmptyState, Icon, IconButton, Input, Money, PageHeader, Segmented, Spinner, Tabs, cx, confirmDialog, formatMoney, toast } from '@/ui'
 import { ProductDialog } from './ProductDialog'
 import { StockDialog } from './StockDialog'
 import { CategoryDialog, DEPT_LABEL } from './CategoryDialog'
@@ -239,6 +239,11 @@ export default function BarScreen() {
                           {catName[p.categoryId] || '—'}
                           {!p.active && <Badge tone="neutral" size="sm">Nofaol</Badge>}
                         </div>
+                        {p.costPrice > 0 && (
+                          <div className="bar-row__cost ellipsis" data-testid="bar-cost">
+                            Tannarx {formatMoney(p.costPrice)} · marja {p.price > 0 ? Math.round(((p.price - p.costPrice) / p.price) * 100) : 0}%
+                          </div>
+                        )}
                       </div>
                       <Money value={p.price} size="lg" className="r" />
                       <div className="bar-stock">
