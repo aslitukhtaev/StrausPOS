@@ -144,17 +144,19 @@ export default function HistoryScreen() {
             <Button size="md" variant="primary" onClick={applyCustom}>Ko'rsatish</Button>
           </div>
         )}
-        <Select size="lg" value={roomId} onChange={(e) => setRoomId(e.target.value)} aria-label="Xona" data-testid="hist-room">
+        <div className="hist-room-sel"><Select size="lg" value={roomId} onChange={(e) => setRoomId(e.target.value)} aria-label="Xona" data-testid="hist-room">
           <option value="all">Barcha xonalar</option>
           <option value="0">Bar (xonasiz)</option>
           {rooms.map((r) => (
             <option key={r.id} value={r.id}>{r.name}</option>
           ))}
-        </Select>
-        <Input
-          size="lg" className="hist-search" icon="search" placeholder="Qidirish: xona, mahsulot, xodim..."
-          value={q} onChange={(e) => setQ(e.target.value)} data-testid="hist-search"
-        />
+        </Select></div>
+        <div className="hist-search">
+          <Input
+            size="lg" icon="search" placeholder="Qidirish..."
+            value={q} onChange={(e) => setQ(e.target.value)} data-testid="hist-search"
+          />
+        </div>
       </div>
 
       {failed ? (
@@ -382,7 +384,7 @@ function DetailDialog({ sessionId, onClose }: { sessionId: number; onClose: () =
                 <span>Buyurtmalar</span><Money value={v.linesTotal} />
                 {v.discount > 0 && (<><span>Chegirma</span><Money value={-v.discount} tone="success" /></>)}
                 {v.serviceCharge > 0 && (<><span>Obsluga {v.serviceChargePct}%</span><Money value={v.serviceCharge} /></>)}
-                <span className="is-total">JAMI</span><Money value={v.total} size="xl" tone="accent" className="is-total" />
+                <span className="is-total">JAMI</span><span className="is-total"><Money value={v.total} size="xl" tone="accent" /></span>
                 {v.payments.map((p) => (
                   <PayRow key={p.id} label={(METHOD_LABEL[p.method] || p.method) + ' · ' + formatClock(p.at)} amount={p.amount} debt={p.method === 'debt'} />
                 ))}

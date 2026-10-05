@@ -64,6 +64,11 @@ export const test = base.extend<{ pos: Pos }, { backend: Backend }>({
     if (!backend.proc) await backend.start(true)
     await backend.setClock(T0)
     const ids = (await backend.reset(true))!
+    // Mavjud testlarning qo'lda hisoblangan summalari obslugasiz (2026-10 dan standart 10%): bu yerda 0 ga qo'yiladi.
+    // Obsluga o'z spec'ida (o-history-service) 10% bilan tekshiriladi.
+    await backend.loginAs('owner', ids)
+    await backend.rpc('settings.save', { ...(await backend.rpc<Record<string, unknown>>('settings.get')), serviceChargePct: 0 })
+    await backend.rpc('auth.logout')
     await page.context().addCookies([{ name: 'e2e-backend', value: String(backend.port), url: baseURL! }])
     await page.clock.setFixedTime(T0)
 

@@ -1,7 +1,7 @@
 .hist { display: flex; flex-direction: column; gap: var(--sp-4); min-height: 100%; }
 .hist-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
-.hist-filters .ui-select, .hist-filters select { min-width: 200px; }
-.hist-search { flex: 1 1 260px; min-width: 240px; }
+.hist-room-sel { flex: none; width: 240px; }
+.hist-search { flex: 1 1 240px; min-width: 220px; }
 .hist-custom { display: flex; align-items: center; gap: var(--sp-2); }
 .hist-sum { display: flex; flex-wrap: wrap; gap: var(--sp-6); align-items: baseline; color: var(--text-2); font-size: var(--fs-md); }
 .hist-sum b { color: var(--text); }
@@ -32,6 +32,7 @@
 .hist-nm { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
 .hist-ret { color: var(--danger-text); font-weight: var(--fw-semibold); }
 .hist-totals { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; max-width: 460px; margin-left: auto; font-size: var(--fs-md); }
-.hist-totals .is-total { font-size: var(--fs-xl); font-weight: var(--fw-bold); padding-top: 8px; border-top: 1px solid var(--line); }
+.hist-totals .is-total { font-size: var(--fs-xl); font-weight: var(--fw-bold); padding-top: 8px; border-top: 1px solid var(--line); text-align: right; }
+.hist-totals > .is-total:nth-child(odd) { text-align: left; color: var(--text); }
 .hist-totals > span:nth-child(odd) { color: var(--text-2); }
 .hist-debt { color: var(--danger-text); font-weight: var(--fw-semibold); }
