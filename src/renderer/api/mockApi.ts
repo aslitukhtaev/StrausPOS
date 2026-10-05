@@ -78,10 +78,10 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
     { id: 3, name: 'Gazaklar', sortOrder: 3, department: 'bar' }
   ]
   const products: Product[] = [
-    { id: 1, categoryId: 1, name: 'Coca-Cola 0.5', price: 8000, stock: 48, trackStock: true, lowStockAt: 10, active: true },
-    { id: 2, categoryId: 1, name: 'Suv 1L', price: 5000, stock: 6, trackStock: true, lowStockAt: 10, active: true },
-    { id: 3, categoryId: 2, name: "Ko'k choy (choynak)", price: 10000, stock: 0, trackStock: false, lowStockAt: 0, active: true },
-    { id: 4, categoryId: 3, name: 'Pista', price: 15000, stock: 20, trackStock: true, lowStockAt: 5, active: true }
+    { id: 1, categoryId: 1, name: 'Coca-Cola 0.5', price: 8000, stock: 48, trackStock: true, lowStockAt: 10, active: true, costPrice: 0 },
+    { id: 2, categoryId: 1, name: 'Suv 1L', price: 5000, stock: 6, trackStock: true, lowStockAt: 10, active: true, costPrice: 0 },
+    { id: 3, categoryId: 2, name: "Ko'k choy (choynak)", price: 10000, stock: 0, trackStock: false, lowStockAt: 0, active: true, costPrice: 0 },
+    { id: 4, categoryId: 3, name: 'Pista', price: 15000, stock: 20, trackStock: true, lowStockAt: 5, active: true, costPrice: 0 }
   ]
   const services: ServiceItem[] = [
     { id: 1, name: 'Klassik massaj', price: 150000, durationMin: 60, active: true },
@@ -281,7 +281,7 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
           v.lines.push({
             id: ++lineSeq, sessionId, guestId: null, kind: 'product', refId: p.id, name: p.name, unitPrice: p.price, qty, returnedQty: 0,
             providerId: null, createdAt: Date.now(), createdBy: current ? current.id : 0, activeQty: qty, amount: qty * p.price, providerName: null,
-            department: 'bar', waiterId: null, waiterPct: 0, createdByName: current ? current.name : ''
+            department: 'bar', waiterId: null, waiterPct: 0, costPrice: 0, createdByName: current ? current.name : ''
           })
         if (p.trackStock) p.stock -= qty
         return delay(clone(barTotals(v)), 60)
@@ -369,6 +369,13 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
     },
     debts: {
       list: () => delay([])
+    },
+    expenses: {
+      list: () => delay([]),
+      categories: () => delay([{ id: 1, name: 'Ijara', active: true }, { id: 2, name: 'Boshqa', active: true }]),
+      save: () => Promise.reject(new Error('Mock rejimida mavjud emas')),
+      remove: () => Promise.reject(new Error('Mock rejimida mavjud emas')),
+      saveCategory: () => Promise.reject(new Error('Mock rejimida mavjud emas'))
     }
   }
 

@@ -88,10 +88,25 @@ export function SoldTab({ range }: { range: ReportRange }) {
             <Card padding="md"><div className="hist-kpi__l">Jami summa</div><div className="hist-kpi__v" data-testid="sold-total"><Money value={total} size="xl" tone="accent" /></div></Card>
             <Card padding="md"><div className="hist-kpi__l">Sotuvlar soni</div><div className="hist-kpi__v num" data-testid="sold-count">{shown.length} ta</div></Card>
             <Card padding="md"><div className="hist-kpi__l">Eng ko'p sotgan xodim</div>
-              <div className="hist-kpi__v" data-testid="sold-top">{top ? top.name : '—'}{top && <span className="hist-kpi__s"> · {formatMoney(top.amount)} so'm</span>}</div></Card>
+              <div className="hist-kpi__v" data-testid="sold-top">{top ? top.name : '—'}{top && <div className="hist-kpi__s">{formatMoney(top.amount)} so'm</div>}</div></Card>
           </div>
 
           <div className="hist-split">
+            <div className="hist-bystaff">
+              <h3 className="hist-h">Xodimlar bo'yicha <span className="hist-sub">— bosing, xodim filtri o'rnatiladi</span></h3>
+              <div className="hist-bystaff-list" data-testid="sold-bystaff">
+                {byStaff.map((x) => (
+                  <button
+                    type="button" key={x.id} className={'hist-bs' + (String(x.id) === staffId ? ' is-on' : '')} data-testid="sold-bystaff-row"
+                    onClick={() => setStaffId(String(x.id) === staffId ? 'all' : String(x.id))}
+                  >
+                    <span className="hist-bs__n">{x.name}</span>
+                    <span className="hist-bs__c num">{x.count} ta</span>
+                    <Money value={x.amount} size="sm" currency={false} />
+                  </button>
+                ))}
+              </div>
+            </div>
             <table className="hist-table" data-testid="sold-table">
               <thead>
                 <tr>
@@ -107,7 +122,7 @@ export function SoldTab({ range }: { range: ReportRange }) {
                       <td className="nowrap num"><div>{formatClock(r.at)}</div><div className="hist-sub">{formatDateShort(r.at)}</div></td>
                       <td className="num">{r.receiptNo != null ? '№' + r.receiptNo : '—'}</td>
                       <td>{r.roomName}</td>
-                      <td>
+                      <td className="hist-wrap">
                         <span className={gone ? 'hist-strike hist-nm' : 'hist-nm'}>{r.name}</span>
                         {r.kind === 'service' && <> <Badge tone="info" size="sm">Xizmat</Badge></>}
                       </td>
@@ -124,20 +139,6 @@ export function SoldTab({ range }: { range: ReportRange }) {
               </tbody>
             </table>
 
-            <Card title="Xodimlar bo'yicha" subtitle="Bosing — xodim filtri" padding="md" className="hist-bystaff">
-              <div data-testid="sold-bystaff">
-                {byStaff.map((x) => (
-                  <button
-                    type="button" key={x.id} className={'hist-bs' + (String(x.id) === staffId ? ' is-on' : '')} data-testid="sold-bystaff-row"
-                    onClick={() => setStaffId(String(x.id) === staffId ? 'all' : String(x.id))}
-                  >
-                    <span className="hist-bs__n">{x.name}</span>
-                    <span className="hist-bs__c num">{x.count} ta</span>
-                    <Money value={x.amount} size="sm" currency={false} />
-                  </button>
-                ))}
-              </div>
-            </Card>
           </div>
         </>
       )}
