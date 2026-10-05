@@ -38,13 +38,18 @@ const BG = { dark: '#04223a', light: '#eaf7fd' }
 app.setName(APP_NAME)
 app.setPath('userData', path.join(app.getPath('appData'), USER_DATA_DIR))
 
-/** Eski versiya bazasini yangi papkaga nusxalash (agar yangisi hali yo'q bo'lsa). Asl fayl o'chirilmaydi. */
+/**
+ * Eski versiya bazasini yangi papkaga BIR MARTA ko'chirish (agar yangisi hali yo'q bo'lsa).
+ * Ko'chirilgach eski fayl `straus.db.imported` deb qayta nomlanadi — foydalanuvchi ma'lumotlarni
+ * o'chirib (DelfinSauna papkasini o'chirib) dasturni qayta ochsa, eski ma'lumot qayta tiklanib qolmasin.
+ */
 function importLegacyDb(dbFile: string): void {
   if (fs.existsSync(dbFile)) return
   const legacy = path.join(app.getPath('appData'), LEGACY_DIR, LEGACY_DB)
   if (!fs.existsSync(legacy)) return
   try {
     writeFileAtomic(dbFile, fs.readFileSync(legacy))
+    fs.renameSync(legacy, legacy + '.imported')
   } catch (e) {
     console.error('[main] eski bazani ko‘chirib bo‘lmadi:', e)
   }
