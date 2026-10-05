@@ -24,7 +24,7 @@ import { AddItemsDialog } from './AddItemsDialog'
 import { DiscountDialog, MoveRoomDialog, RenameGuestDialog, ReturnLineDialog } from './Dialogs'
 import { CheckoutDialog } from './checkoutModule'
 
-const POLL_MS = 15_000
+const POLL_MS = 3_000
 const VIEWER_POLL_MS = 3_000
 
 type DialogState =

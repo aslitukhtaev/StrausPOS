@@ -19,10 +19,8 @@ test('Sig\'im: ochishda 1..sig\'im, "Mehmon qo\'shish" to\'lganda o\'chiq, serve
   expect(await pos.backend.rpcError('sessions.open', 1, 7, 60, null)).toBe("Xona sig'imi 6 kishi")
   expect(await pos.backend.rpcError('sessions.open', 1, 0, 60, null)).toContain('kamida 1')
   expect(await pos.backend.rpcError('sessions.open', 1, 2.5, 60, null)).toContain('kamida 1')
-  // Olingan vaqt: 1..max butun daqiqa; ofitsiant — faqat ofitsiant xodim
-  for (const m of [0, -60, 30.5, null]) expect(await pos.backend.rpcError('sessions.open', 1, 1, m, null)).toContain('Olingan vaqt')
-  expect(await pos.backend.rpcError('sessions.open', 1, 1, 60, pos.ids.cashier)).toBe('Ofitsiant topilmadi')
-  expect(await pos.backend.rpcError('sessions.open', 1, 1, 60, 9999)).toBe('Ofitsiant topilmadi')
+  // Olingan vaqt: 1..max butun daqiqa (ofitsiant endi xonaga biriktirilmaydi)
+  for (const m of [0, -60, 30.5, null]) expect(await pos.backend.rpcError('sessions.open', 1, 1, m)).toContain('Olingan vaqt')
 
   await openRoom(pos, 'Sauna 1', 6)
   await expect(page.getByRole('button', { name: "Mehmon qo'shish" })).toBeDisabled()

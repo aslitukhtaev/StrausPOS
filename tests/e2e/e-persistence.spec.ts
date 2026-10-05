@@ -18,14 +18,14 @@ test('Sahifa yangilanishi: ochiq sessiya va jonli vaqt davom etadi', async ({ po
   await pos.advance(31)
   await expect(tile(pos, 'Sauna 1')).toHaveAttribute('aria-label', 'Sauna 1 — band')
   await enterSession(pos, 'Sauna 1')
-  // 1 soat olingan. M1: 61 daq → 1 daqiqa oshdi → keyingi soat to'liq: 2 × 50 000 = 100 000
+  // 1 soat olingan. M1: 61 daq → aynan 1 daqiqa qo'shiladi (blockMinutes=1): 61 × 50 000 / 60 = 50 833 → 51 000
   // M2: 30 daq (pauza) — olingan 1 soat baribir: 50 000; taymer 30 daqiqa qolganda to'xtagan
-  await expectGuest(pos, 'Mehmon 1', 100_000)
+  await expectGuest(pos, 'Mehmon 1', 51_000)
   await expectGuest(pos, 'Mehmon 2', 50_000)
   await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('+00:01:00')
   await expect(guest(pos, 'Mehmon 2').getByTestId('countdown')).toHaveText('00:30:00')
   await expect(guest(pos, 'Mehmon 2')).toHaveClass(/rooms-guest--paused/)
-  await expectWsTotal(pos, 150_000)
+  await expectWsTotal(pos, 101_000)
 })
 
 test('Dev-server qayta ishga tushirilsa: sessiya, vaqt, buyurtma va chegirma bazadan tiklanadi', async ({ pos, page }) => {

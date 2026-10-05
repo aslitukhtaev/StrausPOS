@@ -35,9 +35,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
   roundTo: 1000,
   defaultHours: 2,
-  blockMinutes: 60,
+  blockMinutes: 1,
   graceMinutes: 0,
   warnBeforeMinutes: 10,
+  kitchen: { sharePct: 100, printerName: '', paperWidth: 80, autoPrint: true },
   theme: 'auto',
   lockEnabled: true,
   autoLockMinutes: 5,
@@ -70,9 +71,9 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
     { id: 6, name: 'Oilaviy', pricePerHour: 180000, capacity: 12, active: true, sortOrder: 6 }
   ]
   const categories: ProductCategory[] = [
-    { id: 1, name: 'Ichimliklar', sortOrder: 1 },
-    { id: 2, name: 'Choy va qahva', sortOrder: 2 },
-    { id: 3, name: 'Gazaklar', sortOrder: 3 }
+    { id: 1, name: 'Ichimliklar', sortOrder: 1, department: 'bar' },
+    { id: 2, name: 'Choy va qahva', sortOrder: 2, department: 'bar' },
+    { id: 3, name: 'Gazaklar', sortOrder: 3, department: 'bar' }
   ]
   const products: Product[] = [
     { id: 1, categoryId: 1, name: 'Coca-Cola 0.5', price: 8000, stock: 48, trackStock: true, lowStockAt: 10, active: true },
@@ -277,7 +278,8 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
         else
           v.lines.push({
             id: ++lineSeq, sessionId, guestId: null, kind: 'product', refId: p.id, name: p.name, unitPrice: p.price, qty, returnedQty: 0,
-            providerId: null, createdAt: Date.now(), createdBy: current ? current.id : 0, activeQty: qty, amount: qty * p.price, providerName: null
+            providerId: null, createdAt: Date.now(), createdBy: current ? current.id : 0, activeQty: qty, amount: qty * p.price, providerName: null,
+            department: 'bar', waiterId: null, waiterPct: 0
           })
         if (p.trackStock) p.stock -= qty
         return delay(clone(barTotals(v)), 60)
@@ -307,7 +309,7 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
           settings: clone(settings.receipt), receiptNo: receiptSeq++, roomName: 'Bar', openedAt: v.session.openedAt, closedAt: now,
           cashier: current ? current.name : '', guests: [],
           lines: v.lines.filter((l) => l.activeQty > 0).map((l) => ({ name: l.name, qty: l.activeQty, unitPrice: l.unitPrice, amount: l.amount, guestLabel: null, providerName: null })),
-          timeTotal: 0, linesTotal: v.linesTotal, discount: 0, total: v.total, payments: clone(payments), debtor: debtor ? clone(debtor) : null
+          timeTotal: 0, linesTotal: v.linesTotal, discount: 0, total: v.total, payments: clone(payments), debtor: debtor ? clone(debtor) : null, provisional: false
         }
         barReceipts.set(sessionId, r)
         return delay(clone(r), 200)

@@ -9,7 +9,8 @@ import { api } from '@/api'
 import { getNow, toast } from '@/ui'
 import { useApp } from '@/store/app'
 
-export const REFRESH_MS = 10_000
+/** Ikki kompyuter (asosiy + terminal) sinxron ko'rinishi uchun tez yangilanish */
+export const REFRESH_MS = 3_000
 /** Terminal (ikkinchi kompyuter) — ikkala ekran sinxron bo'lishi uchun tezroq (har 3 soniya) */
 export const VIEWER_REFRESH_MS = 3_000
 

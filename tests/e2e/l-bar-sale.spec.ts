@@ -78,7 +78,9 @@ test('Bar savdo: savat → X → aralash to\'lov → chek → bugungi savdolar �
   await expect(co).toBeVisible()
   await co.getByRole('radio', { name: 'Aralash' }).click()
   await pos.typeDigits('20000')
-  await co.getByRole('button', { name: 'Qolganini karta' }).click()
+  // Aralash: 4 maydon (Naqd/Karta/Terminal/Qarz). Karta maydonini tanlab "Qolganini: Karta"
+  await co.locator('.checkout-row[data-method="card"]').click()
+  await co.getByRole('button', { name: /Qolganini: Karta/ }).click()
   await expect(co.locator('.checkout-row', { hasText: 'Karta' })).toContainText('30 000')
   await co.getByRole('button', { name: "To'lash · 50 000 so'm" }).click()
   const r = pos.dialog("To'lov qabul qilindi")

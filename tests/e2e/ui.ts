@@ -200,7 +200,8 @@ export async function addService(pos: Pos, d: Locator, name: string, provider: s
 }
 
 export async function closeAdd(pos: Pos, d: Locator): Promise<void> {
-  await d.getByRole('button', { name: 'Yopish', exact: true }).click()
+  // Oynada ikkita "Yopish" bor (sarlavhadagi × va pastdagi tugma) — pastdagisini bosamiz
+  await d.locator('button').filter({ hasText: /^Yopish$/ }).click()
   await expect(d).toHaveCount(0)
 }
 

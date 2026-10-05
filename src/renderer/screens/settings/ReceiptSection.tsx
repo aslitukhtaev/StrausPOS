@@ -44,7 +44,8 @@ function ownSample(settings: ReceiptSettings, cashier: string): ReceiptData {
       { method: 'cash', amount: 200_000 },
       { method: 'card', amount: 170_000 }
     ],
-    debtor: null
+    debtor: null,
+    provisional: false
   }
 }
 
