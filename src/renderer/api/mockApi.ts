@@ -42,7 +42,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'auto',
   lockEnabled: true,
   autoLockMinutes: 5,
-  language: 'uz'
+  language: 'uz',
+  instagram: { qrCodeBase64: '', handle: '@delfin_sauna' }
 }
 
 export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offline?: boolean } = {}): PosApi {

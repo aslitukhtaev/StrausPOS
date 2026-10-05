@@ -31,7 +31,7 @@ const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'security', label: 'Xavfsizlik', desc: 'Qulf, PIN', icon: 'shield' },
   { id: 'billing', label: 'Hisob-kitob', desc: 'Soat, blok, yaxlitlash', icon: 'percent' },
   { id: 'appearance', label: "Ko'rinish", desc: 'Kunduzgi / tungi', icon: 'sun' },
-  { id: 'instagram', label: 'Instagram', desc: 'QR kod va handle', icon: 'share2' },
+  { id: 'instagram', label: 'Instagram', desc: 'QR kod va handle', icon: 'inbox' },
   { id: 'network', label: 'Tarmoq', desc: "Boshqa kompyuterdan ko'rish", icon: 'eye' },
   { id: 'backup', label: 'Zaxira', desc: 'Nusxa, tiklash', icon: 'database' },
   { id: 'license', label: 'Litsenziya', desc: 'Aktivatsiya kaliti', icon: 'key' },

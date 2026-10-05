@@ -5,10 +5,10 @@ import { Note, SaveBar, SectionHead, jsonEqual, useReportDirty, type SectionProp
 
 export function InstagramSection({ settings, save, onDirty }: SectionProps) {
   const [s, setSettings] = useState(settings.instagram)
+  const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dirty = !jsonEqual(s, settings.instagram)
-
-  if (dirty) onDirty(true)
+  useReportDirty(dirty, onDirty)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -34,13 +34,21 @@ export function InstagramSection({ settings, save, onDirty }: SectionProps) {
   }
 
   const handleSave = async () => {
-    await save({ ...settings, instagram: s }, 'Instagram sozlamalari saqlandi')
-    onDirty(false)
+    setSaving(true)
+    try {
+      await save({ ...settings, instagram: s }, 'Instagram sozlamalari saqlandi')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReset = () => {
+    setSettings(settings.instagram)
   }
 
   return (
     <>
-      <SectionHead title="Instagram" description="QR kod va handle ni kiriting" />
+      <SectionHead icon="inbox" title="Instagram" description="QR kod va handle ni kiriting" />
 
       <div style={{ maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         <div>
@@ -88,7 +96,7 @@ export function InstagramSection({ settings, save, onDirty }: SectionProps) {
         </div>
       </div>
 
-      <SaveBar dirty={dirty} onSave={handleSave} />
+      <SaveBar dirty={dirty} saving={saving} onSave={handleSave} onReset={handleReset} />
     </>
   )
 }

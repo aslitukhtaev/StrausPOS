@@ -150,7 +150,7 @@ export default function ReportsScreen() {
           onChange={(v) => setTab(v as ReportTab)}
           items={[
             { id: 'sales', label: 'Savdo hisoboti', icon: 'receipt' },
-            { id: 'sessions', label: 'Sessiyalar tarixi', icon: 'history' }
+            { id: 'sessions', label: 'Sessiyalar tarixi', icon: 'inbox' }
           ]}
         />
         <div className="rep-period">
@@ -543,7 +543,7 @@ function DayChart({ s, range }: { s: SalesReport; range: ReportRange }) {
 
 function SessionsHistoryTable({ sessions }: { sessions: SessionHistoryRow[] }) {
   if (sessions.length === 0) {
-    return <EmptyState size="lg" icon="history" title="Sessiyalar yo'q" description="Bu davrda hech qanday sessiya yopilmagan." />
+    return <EmptyState size="lg" icon="inbox" title="Sessiyalar yo'q" description="Bu davrda hech qanday sessiya yopilmagan." />
   }
 
   return (
