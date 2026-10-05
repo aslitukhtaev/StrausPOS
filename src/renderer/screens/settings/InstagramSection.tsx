@@ -37,16 +37,16 @@ export function InstagramSection({ settings, save, onDirty }: SectionProps) {
 
   return (
     <div className="set-section">
-      <SectionHead icon="inbox" title="Instagram" description="Chekning pastida chiqadigan QR kod" />
+      <SectionHead icon="inbox" title="Instagram" description="Chekning pastida chiqadigan QR kod yoki logo" />
       <div className="set-section__body">
         <div className="set-group">
-          <div className="set-group__title">QR kod</div>
+          <div className="set-group__title">QR kod yoki logo</div>
           <div className="set-ig">
             <div className="set-ig__box" data-testid="ig-preview">
               {s.qrCodeBase64 ? (
                 <img src={s.qrCodeBase64} alt="Instagram QR kod" className="set-ig__img" />
               ) : (
-                <span className="set-ig__empty">QR kod yuklanmagan</span>
+                <span className="set-ig__empty">QR kod yoki logo yuklanmagan</span>
               )}
             </div>
             <div className="set-ig__caption">Bizning Instagram</div>
@@ -54,7 +54,7 @@ export function InstagramSection({ settings, save, onDirty }: SectionProps) {
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={onFile} data-testid="ig-file" />
             <div className="set-ig__actions">
               <Button icon="upload" onClick={() => fileRef.current?.click()}>
-                {s.qrCodeBase64 ? 'QR kodni almashtirish' : 'QR kod yuklash'}
+                {s.qrCodeBase64 ? 'QR kod yoki logoni almashtirish' : 'QR kod yoki logo yuklash'}
               </Button>
               {s.qrCodeBase64 && (
                 <Button variant="danger" icon="trash" onClick={() => setS((p) => ({ ...p, qrCodeBase64: '' }))}>
@@ -73,7 +73,7 @@ export function InstagramSection({ settings, save, onDirty }: SectionProps) {
             />
           </Field>
         </div>
-        <Note>PNG yoki JPG, 500 KB gacha. QR kod har bir chekning pastida chop etiladi (oshxona chekida chiqmaydi).</Note>
+        <Note>PNG yoki JPG, 500 KB gacha. QR kod yoki logo har bir chekning pastida chop etiladi (oshxona chekida chiqmaydi).</Note>
       </div>
       <SaveBar dirty={dirty} saving={saving} onSave={() => void onSave()} onReset={() => setS(settings.instagram)} />
     </div>
