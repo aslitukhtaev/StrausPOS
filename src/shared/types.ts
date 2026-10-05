@@ -35,7 +35,12 @@ export type Permission =
   | 'settings.manage' // xonalar, narxlar, mahsulotlar, chek, parol
   | 'staff.manage'
   | 'backup.manage'
-  | 'expense.manage' // xarajat qo'shish/o'zgartirish/o'chirish (ega, administrator)
+  | 'expense.manage' // xarajat qo'shish/o'zgartirish/o'chirish
+  | 'expense.view' // Xarajatlar bo'limini ko'rish
+  | 'profit.view' // Sof foyda bo'limini ko'rish
+  | 'history.view' // Tarix (sessiyalar, sotuvlar) bo'limini ko'rish
+  | 'kitchen.view' // Oshxona kunlik hisobini ko'rish
+  | 'waiters.view' // Ofitsiantlar oylik hisobini ko'rish
 
 // ───────────── Xonalar ─────────────
 export interface Room {
@@ -259,6 +264,11 @@ export interface AppSettings {
   roundTo: number
   /** Xona ochilganda standart tanlanadigan soat (1, 2, ...) */
   defaultHours: number
+  /**
+   * Rollar ruxsatlari (ega belgilaydi: Sozlamalar → Rollar va ruxsatlar). Ega (owner) HAR DOIM hamma ruxsatga ega — o'zgartirib bo'lmaydi.
+   * To'liq ro'yxat (samarali ruxsatlar); standart — shared/permissions.ts DEFAULT_ROLE_PERMISSIONS.
+   */
+  rolePermissions: Record<'admin' | 'cashier' | 'waiter', Permission[]>
   /** Obsluga (xizmat haqi) foizi: (vaqt + buyurtmalar − chegirma) dan. 0 = o'chiq. Standart 10. Bar savdosida yo'q. */
   serviceChargePct: number
   /** Olingan vaqtdan oshsa, shu daqiqalik bloklar bilan qo'shiladi. Standart 1 = aynan o'tirilgan daqiqa uchun (01:01 → 61 daq) */
