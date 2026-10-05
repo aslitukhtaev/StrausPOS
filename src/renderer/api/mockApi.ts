@@ -14,13 +14,14 @@
  */
 import type { PosApi } from '@shared/api'
 import type { AppSettings, BarSaleRow, ConnectionInfo, NetworkStatus, Permission, ReceiptData, SessionView, Product, ProductCategory, Room, RoomCard, ServiceItem, Staff } from '@shared/types'
-import { effectivePermissions } from '@shared/permissions'
+import { DEFAULT_ROLE_PERMISSIONS, effectivePermissions } from '@shared/permissions'
 
 const delay = <T>(v: T, ms = 120): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms))
 const fail = (msg: string, ms = 160): Promise<never> => new Promise((_r, j) => setTimeout(() => j(new Error(msg)), ms))
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
 const DEFAULT_SETTINGS: AppSettings = {
+  rolePermissions: { admin: DEFAULT_ROLE_PERMISSIONS.admin, cashier: DEFAULT_ROLE_PERMISSIONS.cashier, waiter: DEFAULT_ROLE_PERMISSIONS.waiter },
   receipt: {
     businessName: 'Delfin Sauna',
     address: "Toshkent sh., Chilonzor 12",

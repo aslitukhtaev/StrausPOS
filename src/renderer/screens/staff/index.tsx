@@ -4,10 +4,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Permission, Role, Staff } from '@shared/types'
-import { ROLE_LABELS, ROLE_PERMISSIONS } from '@shared/permissions'
+import { PERMISSION_CATALOG, ROLE_LABELS, effectivePermissions } from '@shared/permissions'
 import { api } from '../../api'
 import { useAuth, useCan } from '../../store/auth'
 import { useNav } from '../../store/nav'
+import { useApp } from '../../store/app'
 import {
   Switch, Avatar, Badge, Button, Card, EmptyState, Field, Icon, Input, Modal, Numpad, PageHeader, PinDots, Segmented, Spinner,
   Tabs, confirmDialog, formatMoney, toast, cx
@@ -33,21 +34,6 @@ const ROLE_HINT: Record<Role, string> = {
   cashier: "Xonalarni ochish, vaqt, to'lov va qarz",
   waiter: "Xonani ochish va bar buyurtmalari (to'lovsiz). Bar savdosidan foiz oladi"
 }
-
-const PERM_LABELS: { perm: Permission; label: string; hint: string }[] = [
-  { perm: 'session.open', label: 'Xonani ochish', hint: 'Yangi mehmonlar guruhini boshlash' },
-  { perm: 'session.manage', label: 'Sessiyani boshqarish', hint: "Pauza, tugatish, xona almashtirish, mahsulot qo'shish" },
-  { perm: 'session.pay', label: "To'lov qabul qilish", hint: 'Hisobni yopish va chek' },
-  { perm: 'line.return', label: 'Qaytarish (X)', hint: "Qo'shilgan mahsulot/xizmatni qaytarish" },
-  { perm: 'discount.apply', label: 'Chegirma berish', hint: 'Hisobga umumiy chegirma' },
-  { perm: 'price.override', label: "Narxni o'zgartirish", hint: 'Joyida narxni qo\'lda belgilash' },
-  { perm: 'debt.manage', label: 'Qarzlar', hint: "Qarzni ko'rish va qabul qilish" },
-  { perm: 'stock.manage', label: 'Bar va ombor', hint: "Mahsulot qoldig'ini boshqarish" },
-  { perm: 'reports.view', label: "Hisobotlarni ko'rish", hint: 'Tushum, qaytarishlar va h.k.' },
-  { perm: 'settings.manage', label: 'Sozlamalar', hint: 'Xonalar, narxlar, mahsulotlar, chek' },
-  { perm: 'staff.manage', label: 'Xodimlarni boshqarish', hint: "Qo'shish, PIN, nofaol qilish" },
-  { perm: 'backup.manage', label: 'Zaxira nusxa', hint: 'Saqlash va tiklash' }
-]
 
 type EditTarget = { mode: 'new'; waiter?: boolean } | { mode: 'edit'; staff: Staff }
 
@@ -226,6 +212,19 @@ export default function StaffScreen() {
 
 /* ───────────── Rol ruxsatlari (faqat o'qish) ───────────── */
 function PermissionsTable() {
+  const rp = useApp((s) => s.settings?.rolePermissions)
+  const canSettings = useCan('settings.manage')
+  const go = useNav((s) => s.go)
+  const openRoles = () => {
+    try { localStorage.setItem('straus.settings.tab', 'roles') } catch { /* ignore */ }
+    go('settings')
+  }
+  const eff: Record<Role, Permission[]> = {
+    owner: effectivePermissions('owner', rp),
+    admin: effectivePermissions('admin', rp),
+    cashier: effectivePermissions('cashier', rp),
+    waiter: effectivePermissions('waiter', rp)
+  }
   return (
     <Card padding="none" className="staff-perms">
       <div className="staff-perms__scroll">
@@ -242,14 +241,14 @@ function PermissionsTable() {
             </tr>
           </thead>
           <tbody>
-            {PERM_LABELS.map((p) => (
+            {PERMISSION_CATALOG.map((p) => (
               <tr key={p.perm}>
                 <td className="staff-table__perm">
                   <div className="t-bold">{p.label}</div>
-                  <div className="subtle">{p.hint}</div>
+                  <div className="subtle">{p.description}</div>
                 </td>
                 {ROLES.map((r) => {
-                  const yes = ROLE_PERMISSIONS[r].indexOf(p.perm) >= 0
+                  const yes = eff[r].indexOf(p.perm) >= 0
                   return (
                     <td key={r} className="staff-table__cell">
                       {yes ? (
@@ -265,7 +264,10 @@ function PermissionsTable() {
           </tbody>
         </table>
       </div>
-      <div className="staff-perms__note subtle">Ruxsatlar rolga bog'liq va o'zgartirilmaydi. Bu jadval faqat ma'lumot uchun.</div>
+      <div className="staff-perms__note subtle" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ flex: 1 }}>Joriy ruxsatlar (Sozlamalardagi sozlamaga ko'ra).</span>
+        {canSettings && <Button variant="secondary" icon="key" onClick={openRoles} data-testid="staff-open-roles">Rollar va ruxsatlarni sozlash</Button>}
+      </div>
     </Card>
   )
 }
