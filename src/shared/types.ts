@@ -254,6 +254,8 @@ export interface AppSettings {
   roundTo: number
   /** Xona ochilganda standart tanlanadigan soat (1, 2, ...) */
   defaultHours: number
+  /** Obsluga (xizmat haqi) foizi: (vaqt + buyurtmalar − chegirma) dan. 0 = o'chiq. Standart 10. Bar savdosida yo'q. */
+  serviceChargePct: number
   /** Olingan vaqtdan oshsa, shu daqiqalik bloklar bilan qo'shiladi. Standart 1 = aynan o'tirilgan daqiqa uchun (01:01 → 61 daq) */
   blockMinutes: number
   /** Oshib ketganda keyingi blok hisoblanishidan oldingi imtiyozli daqiqalar (0 = qattiq) */
@@ -290,6 +292,8 @@ export interface GuestView extends Guest {
 }
 
 export interface LineView extends OrderLine {
+  /** Qatorni qo'shgan xodim ismi (qachon — createdAt) */
+  createdByName: string
   activeQty: number // qty - returnedQty
   amount: number // activeQty * unitPrice
   providerName: string | null
@@ -307,7 +311,11 @@ export interface SessionView {
   timeTotal: number
   linesTotal: number
   discount: number
-  /** timeTotal + linesTotal - discount */
+  /** Obsluga foizi (ochiq sessiyada joriy sozlama; yopilganda muzlatilgan) */
+  serviceChargePct: number
+  /** Obsluga summasi = round((timeTotal + linesTotal − discount) × pct/100). Ofitsiant haqi/oshxona ulushiga kirmaydi */
+  serviceCharge: number
+  /** timeTotal + linesTotal - discount + serviceCharge */
   total: number
   paid: number
   /** total - paid (>= 0) */
@@ -337,6 +345,8 @@ export interface ReceiptData {
   timeTotal: number
   linesTotal: number
   discount: number
+  /** Obsluga: chekda alohida qator (pct=0 bo'lsa chiqmaydi) */
+  serviceCharge: { pct: number; amount: number }
   total: number
   payments: { method: PayMethod; amount: number }[]
   debtor: DebtorInput | null
@@ -353,6 +363,8 @@ export interface ReportRange {
 }
 
 export interface SalesReport {
+  /** Obsluga jami (umumiy tushumga kiradi; ofitsiant/oshxona ulushiga kirmaydi) */
+  serviceCharge: number
   range: ReportRange
   /** Faqat xona seanslari (bar savdolari — barSales.count) */
   sessionsCount: number
@@ -415,6 +427,8 @@ export interface WaiterSessionRow {
 }
 
 export interface SessionHistoryRow {
+  /** Obsluga summasi (total ga kiradi) */
+  serviceCharge: number
   sessionId: Id
   roomName: string
   roomId: Id
@@ -521,4 +535,14 @@ export interface KitchenPayout {
   note: string
   at: number
   by: Id
+}
+
+/** Yopilgan sessiya to'liq tafsiloti ("Tarix" ekrani) */
+export interface SessionDetail {
+  view: SessionView
+  receiptNo: number | null
+  openedBy: string
+  cashier: string | null
+  /** Qaytarishlar (X) — kim, nima, sabab */
+  returns: { lineId: Id; name: string; qty: number; reason: string; at: number; byName: string }[]
 }

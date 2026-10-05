@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail
 } from './types'
 import type { Permission } from './types'
 
@@ -53,6 +53,8 @@ export interface PosApi {
      */
     open(roomId: Id, guestCount: number, paidMinutes: number): Promise<SessionView>
     get(sessionId: Id): Promise<SessionView>
+    /** Yopilgan (yoki ochiq) sessiya to'liq tafsiloti: qatorlar (kim, qachon), qaytarishlar, to'lovlar. Ruxsat: reports.view */
+    detail(sessionId: Id): Promise<SessionDetail>
     addGuest(sessionId: Id, paidMinutes: number): Promise<SessionView>
     /** Mehmonga vaqt qo'shish (+1 soat va h.k.). minutes > 0 */
     extendGuest(guestId: Id, minutes: number): Promise<SessionView>
