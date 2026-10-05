@@ -62,7 +62,7 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     fs.writeFileSync(file, await buildV1())
     const svc = await PosService.create({ file, clock: new FakeClock().now })
     expect(svc.db.version).toBe(SCHEMA_VERSION)
-    expect(SCHEMA_VERSION).toBe(6)
+    expect(SCHEMA_VERSION).toBe(7)
     // FK yoqilgan va buzilmagan
     expect(svc.db.get<{ foreign_keys: number }>('PRAGMA foreign_keys')!.foreign_keys).toBe(1)
     expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])

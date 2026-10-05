@@ -56,7 +56,7 @@ export default function StaffScreen() {
   const canManage = useCan('staff.manage')
   const [list, setList] = useState<Staff[] | null>(null)
   const go = useNav((s) => s.go)
-  const canReports = useCan('reports.view')
+  const canReports = useCan('waiters.view')
   const [tab, setTab] = useState<'all' | 'waiters' | 'perms'>('all')
   const [edit, setEdit] = useState<EditTarget | null>(null)
   const [pinFor, setPinFor] = useState<Staff | null>(null)

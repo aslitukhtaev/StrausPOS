@@ -30,6 +30,7 @@ import { useAuth } from './auth'
 import { useNav } from './nav'
 import { syncClock } from './clock'
 import { errorMessage } from './toast'
+import { SCREENS, screenAllowed } from '../layout/routes'
 import { setLicenseBlockedHandler, startLicenseWatch, useLicense } from './license'
 
 export type Phase = 'boot' | 'setup' | 'lock' | 'shell' | 'error'
@@ -112,6 +113,8 @@ interface AppState {
   toggleTheme(): Promise<void>
   boot(): Promise<void>
   reloadSettings(): Promise<void>
+  /** Kirgan xodim ruxsatlarini serverdan qayta o'qish (menyu darhol yangilanadi) */
+  refreshPermissions(): Promise<void>
   setSettings(s: AppSettings): void
   /** Kirish muvaffaqiyatli bo'lgandan keyin (Lock/Setup ekranlari chaqiradi) */
   enter(session: { staff: Staff; permissions: Permission[] }): void
@@ -122,6 +125,16 @@ interface AppState {
   lock(): Promise<void>
   /** Setup tugagach */
   setupDone(businessName: string): void
+}
+
+let permTimer: ReturnType<typeof setInterval> | null = null
+function startPermWatch(): void {
+  if (permTimer) return
+  permTimer = setInterval(() => void useApp.getState().refreshPermissions(), 30000)
+}
+function stopPermWatch(): void {
+  if (permTimer) clearInterval(permTimer)
+  permTimer = null
 }
 
 const startPref = initialPref()
@@ -209,7 +222,27 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  async refreshPermissions() {
+    if (get().phase !== 'shell') return
+    try {
+      const cur = await getApi().auth.current()
+      if (!cur || get().phase !== 'shell') return
+      const auth = useAuth.getState()
+      const same = auth.permissions.length === cur.permissions.length && cur.permissions.every((p) => auth.permissions.indexOf(p) >= 0)
+      if (same && auth.staff && auth.staff.role === cur.staff.role) return
+      auth.set(cur)
+      // Joriy ekranga ruxsat yo'qolgan bo'lsa — Xonalarga
+      const nav = useNav.getState()
+      const def = SCREENS.find((d) => d.id === nav.screen)
+      if (def && !screenAllowed(def, (p) => cur.permissions.indexOf(p) >= 0)) nav.go('rooms')
+    } catch {
+      /* aloqa yo'q — keyingi safar */
+    }
+  },
+
   setSettings(s) {
+    const prev = get().settings
+    const changed = !!prev && JSON.stringify(prev.rolePermissions ?? null) !== JSON.stringify(s.rolePermissions ?? null)
     const name = s.receipt.businessName || ''
     lsSet(BN_KEY, name)
     const fromSettings = asPref(s.theme)
@@ -218,6 +251,7 @@ export const useApp = create<AppState>((set, get) => ({
     const pref = asPref(lsGet(THEME_LOCAL_KEY)) ?? fromSettings ?? get().themePref
     set({ settings: s, businessName: name })
     get().setThemePref(pref)
+    if (changed) void get().refreshPermissions()
   },
 
   async bootTerminal() {
@@ -241,6 +275,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   async relogin() {
     useAuth.getState().set(null)
+    stopPermWatch()
     set({ phase: 'lock' })
   },
 
@@ -250,6 +285,7 @@ export const useApp = create<AppState>((set, get) => ({
     useNav.getState().go('rooms')
     set({ phase: 'shell' })
     void get().reloadSettings()
+    startPermWatch()
   },
 
   async lock() {
@@ -259,6 +295,7 @@ export const useApp = create<AppState>((set, get) => ({
       /* oflayn — baribir qulflaymiz */
     }
     useAuth.getState().set(null)
+    stopPermWatch()
     set({ phase: 'lock' })
   },
 

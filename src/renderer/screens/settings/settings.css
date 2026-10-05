@@ -463,3 +463,27 @@
 .net-viewer__name { flex: 1 1 auto; min-width: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
 .net-viewer__ip { flex: none; font-size: var(--fs-md); }
 .net-viewer__seen { flex: none; width: 150px; text-align: right; font-size: var(--fs-sm); color: var(--text-3); }
+
+/* ── Rollar va ruxsatlar matritsasi ── */
+.set-section__body > .roles-grid { max-width: 1040px; width: 100%; }
+.roles-grid { border: 1px solid var(--line-soft); border-radius: var(--r-md); background: var(--surface); }
+.roles-grid__head, .roles-grid__row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(4, 150px); align-items: center; }
+.roles-grid__head {
+  position: sticky; top: calc(-1 * var(--sp-5)); z-index: 2; background: var(--bg-elev);
+  border-bottom: 1px solid var(--line); border-radius: var(--r-md) var(--r-md) 0 0; align-items: start;
+}
+.roles-grid__title { padding: var(--sp-3) var(--sp-4); font-weight: var(--fw-semibold); color: var(--text-3); }
+.roles-grid__col { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: var(--sp-2); text-align: center; }
+.roles-grid__head .roles-grid__col { padding: var(--sp-2) 4px; gap: 2px; }
+.roles-grid__role { font-weight: var(--fw-semibold); font-size: var(--fs-md); }
+.roles-grid__sub { font-size: var(--fs-xs); color: var(--text-3); }
+.roles-grid__acts { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+.roles-grid__acts .ui-btn { white-space: normal; line-height: 1.2; min-height: 32px; padding: 4px 6px; font-size: var(--fs-xs); }
+.roles-grid__gname {
+  padding: var(--sp-2) var(--sp-4); background: var(--surface-2); font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); border-top: 1px solid var(--line-soft);
+}
+.roles-grid__row { border-top: 1px solid var(--line-soft); min-height: 56px; }
+.roles-grid__perm { padding: var(--sp-2) var(--sp-4); min-width: 0; }
+.roles-grid__label { font-weight: var(--fw-semibold); font-size: var(--fs-md); }
+.roles-grid__desc { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.3; }

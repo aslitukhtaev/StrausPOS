@@ -15,7 +15,7 @@ import type {
   BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow,
   Expense, ExpenseCategory, ProfitReport
 } from '../../src/shared/types'
-import { ROLE_LABELS, ROLE_PERMISSIONS, can } from '../../src/shared/permissions'
+import { DEFAULT_ROLE_PERMISSIONS, EDITABLE_ROLES, ALL_PERMISSIONS, ROLE_LABELS, can, effectivePermissions } from '../../src/shared/permissions'
 import {
   MS_MIN, buildGuestView, buildLineView, computeTotals, lineAmount, waiterCommission, waiterProductSales
 } from '../../src/shared/billing'
@@ -95,7 +95,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lockEnabled: true,
   autoLockMinutes: 0,
   language: 'uz',
-  instagram: { qrCodeBase64: '', handle: '' }
+  instagram: { qrCodeBase64: '', handle: '' },
+  rolePermissions: {
+    admin: DEFAULT_ROLE_PERMISSIONS.admin.slice(),
+    cashier: DEFAULT_ROLE_PERMISSIONS.cashier.slice(),
+    waiter: DEFAULT_ROLE_PERMISSIONS.waiter.slice()
+  }
 }
 
 const PERMISSION_DENIED = "Bu amal uchun ruxsatingiz yo'q"
@@ -312,6 +317,7 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
   if (typeof qr !== 'string' || (qr !== '' && (qr.length > 600_000 || !/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(qr)))) {
     fail("QR kod rasmi noto'g'ri yoki juda katta (PNG/JPG/WEBP, 400 KB gacha)")
   }
+  const rolePermissions = sanitizeRolePermissions(s.rolePermissions, base.rolePermissions)
   return {
     receipt: {
       businessName: str(r.businessName, b.businessName, 100),
@@ -344,8 +350,35 @@ function sanitizeSettings(input: unknown, base: AppSettings): AppSettings {
     instagram: {
       qrCodeBase64: qr,
       handle: str(ig.handle, big.handle, 100)
-    }
+    },
+    rolePermissions
   }
+}
+
+/** Rollar ruxsatlari: faqat 3 ta rol, faqat tanish ruxsatlar; expense.manage → expense.view avtomatik. Yo'q bo'lsa — base/standart */
+function sanitizeRolePermissions(input: unknown, base: AppSettings['rolePermissions'] | undefined): AppSettings['rolePermissions'] {
+  const out = {} as AppSettings['rolePermissions']
+  const cur = (r: (typeof EDITABLE_ROLES)[number]): Permission[] => effectivePermissions(r, base)
+  if (input !== undefined && input !== null && (typeof input !== 'object' || Array.isArray(input))) fail("Rollar ruxsatlari noto'g'ri")
+  const inp = (input ?? {}) as Record<string, unknown>
+  for (const k of Object.keys(inp)) {
+    if (!(EDITABLE_ROLES as readonly string[]).includes(k)) fail(k === 'owner' ? "Ega ruxsatlarini o'zgartirib bo'lmaydi" : `Noma'lum rol: ${k}`)
+  }
+  for (const role of EDITABLE_ROLES) {
+    const v = inp[role]
+    if (v === undefined) {
+      out[role] = cur(role)
+      continue
+    }
+    if (!Array.isArray(v)) fail(`${ROLE_LABELS[role]} ruxsatlari ro'yxat bo'lishi kerak`)
+    for (const p of v) {
+      if (typeof p !== 'string' || !(ALL_PERMISSIONS as string[]).includes(p)) fail(`Noma'lum ruxsat: ${String(p)}`)
+    }
+    const set = new Set<string>(v as string[])
+    if (set.has('expense.manage')) set.add('expense.view')
+    out[role] = ALL_PERMISSIONS.filter((p) => set.has(p))
+  }
+  return out
 }
 
 // ───────────── Servis ─────────────
@@ -473,8 +506,13 @@ export class PosService implements PosApi {
       if (!VIEWER_PERMISSIONS.includes(perm)) fail(VIEW_ONLY_ERROR)
       return s
     }
-    if (!can(s.role, perm)) fail(PERMISSION_DENIED)
+    if (!this.can(s.role, perm)) fail(PERMISSION_DENIED)
     return s
+  }
+
+  /** Rolning samarali ruxsatlari (sozlamadan, har safar yangi o'qiladi — o'zgarish darhol amal qiladi) */
+  private can(role: Staff['role'], perm: Permission): boolean {
+    return can(role, perm, this.loadSettings().rolePermissions)
   }
 
   /** O'qish uchun ruxsat: ko'ruvchi kontekstiga ham ochiq (faqat ma'lumot ko'rish metodlarida). */
@@ -500,7 +538,7 @@ export class PosService implements PosApi {
 
   private authInfo(s: Staff): { staff: Staff; permissions: Permission[] } {
     if (this.viewer) return { staff: s, permissions: [...VIEWER_PERMISSIONS] }
-    return { staff: s, permissions: [...ROLE_PERMISSIONS[s.role]] }
+    return { staff: s, permissions: effectivePermissions(s.role, this.loadSettings().rolePermissions) }
   }
 
   private roomRow(id: Id): RoomRow {
@@ -930,7 +968,7 @@ export class PosService implements PosApi {
   // ═════════════ SESSIONS ═════════════
   sessions: PosApi['sessions'] = {
     soldItems: async (range, staffId) => {
-      this.need('reports.view')
+      this.needRead('history.view')
       const { from, to } = this.checkRange(range)
       if (staffId !== null && !isInt(staffId)) fail('Xodim noto\'g\'ri')
       const rows = this.db.all<
@@ -997,7 +1035,7 @@ export class PosService implements PosApi {
     },
 
     detail: async (sessionId) => {
-      this.needRead('reports.view')
+      this.needRead('history.view')
       const sr = this.sessionRow(sessionId)
       const view = this.view(sr.id)
       const names = this.staffNames()
@@ -1166,7 +1204,7 @@ export class PosService implements PosApi {
       if (v.lines.some((l) => l.activeQty > 0)) fail("Sessiyada buyurtmalar bor — bekor qilib bo'lmaydi")
       if (v.payments.length > 0) fail("Sessiyada to'lovlar bor — bekor qilib bo'lmaydi")
       // Oldindan olingan vaqt darhol hisoblanadi, shuning uchun "vaqt o'tganmi" bo'yicha tekshiramiz
-      if (v.guests.some((g) => g.elapsedMs >= CANCEL_FREE_MS) && !can(me.role, 'discount.apply'))
+      if (v.guests.some((g) => g.elapsedMs >= CANCEL_FREE_MS) && !this.can(me.role, 'discount.apply'))
         fail('Vaqt hisoblangan — bekor qilish uchun administrator ruxsati kerak')
       const now = this.now()
       this.db.tx(() => {
@@ -1387,7 +1425,7 @@ export class PosService implements PosApi {
       const debtAmount = merged.get('debt') ?? 0
       let debtorInput: { debtorId: Id | null; name: string; phone: string; key: string } | null = null
       if (debtAmount > 0) {
-        if (!can(me.role, 'debt.manage')) fail(PERMISSION_DENIED)
+        if (!this.can(me.role, 'debt.manage')) fail(PERMISSION_DENIED)
         if (!debtor || typeof debtor !== 'object') fail('Qarzdorning ismi va telefoni majburiy')
         if (debtor.debtorId != null) {
           const d = this.debtorRow(debtor.debtorId)
@@ -1758,7 +1796,7 @@ export class PosService implements PosApi {
   // ═════════════ OSHXONA ═════════════
   kitchen: PosApi['kitchen'] = {
     daily: async (month) => {
-      this.needRead('reports.view')
+      this.needRead('kitchen.view')
       const r = monthRange(month)
       const days = new Map<string, KitchenDayRow>()
       const row = (day: string): KitchenDayRow => {
@@ -1800,7 +1838,7 @@ export class PosService implements PosApi {
     },
 
     payouts: async (month) => {
-      this.needRead('reports.view')
+      this.needRead('kitchen.view')
       const r = monthRange(month)
       return this.db
         .all<KitchenPayoutRow>('SELECT * FROM kitchen_payouts WHERE day LIKE ? ORDER BY day, at, id', [r.month + '-%'])
@@ -1882,7 +1920,7 @@ export class PosService implements PosApi {
     changePin: async (staffId, newPin) => {
       this.noViewer()
       const me = this.requireLogin()
-      if (me.id !== staffId && !can(me.role, 'staff.manage')) fail(PERMISSION_DENIED)
+      if (me.id !== staffId && !this.can(me.role, 'staff.manage')) fail(PERMISSION_DENIED)
       const cur = this.staffRow(staffId)
       if (!cur) fail('Xodim topilmadi')
       if (!isValidPin(newPin)) fail("PIN 4–8 ta raqamdan iborat bo'lishi kerak")
@@ -1951,7 +1989,7 @@ export class PosService implements PosApi {
 
   expenses: PosApi['expenses'] = {
     list: async (range) => {
-      this.needRead('reports.view')
+      this.needRead('expense.view')
       const { from, to } = this.checkRange(range)
       return this.expenseRows(from, to).map(toExpense)
     },
@@ -1990,7 +2028,7 @@ export class PosService implements PosApi {
     },
 
     categories: async () => {
-      this.needRead('reports.view')
+      this.needRead('expense.view')
       return this.db.all<{ id: number; name: string; active: number }>('SELECT * FROM expense_categories ORDER BY id').map(toExpenseCategory)
     },
 
@@ -2015,7 +2053,7 @@ export class PosService implements PosApi {
 
   profit: PosApi['profit'] = {
     report: async (range) => {
-      this.needRead('reports.view')
+      this.needRead('profit.view')
       const { from, to } = this.checkRange(range)
       const days = new Map<string, { revenue: number; expenses: number; cost: number }>()
       const day = (k: string) => {
@@ -2090,12 +2128,13 @@ export class PosService implements PosApi {
   // ═════════════ WAITERS ═════════════
   waiters: PosApi['waiters'] = {
     list: async () => {
-      this.needRead('session.open')
+      if (!this.viewer && !this.can(this.requireLogin().role, 'waiters.view')) this.need('session.open')
+      else this.requireLogin()
       return this.db.all<StaffRow>('SELECT * FROM staff WHERE active=1 AND is_waiter=1 ORDER BY name, id').map(toStaff)
     },
 
     monthly: async (month) => {
-      this.need('reports.view')
+      this.needRead('waiters.view')
       const r = monthRange(month)
       const agg = this.waiterAgg(r.from, r.to)
       const paidRows = this.db.all<{ staff_id: number; a: number | null }>(
@@ -2128,7 +2167,7 @@ export class PosService implements PosApi {
     },
 
     sessions: async (staffId, month) => {
-      this.need('reports.view')
+      this.needRead('waiters.view')
       const r = monthRange(month)
       const sid = isInt(staffId) ? staffId : -1
       const out: WaiterSessionRow[] = []
@@ -2191,7 +2230,7 @@ export class PosService implements PosApi {
     },
 
     payouts: async (staffId, month) => {
-      this.need('reports.view')
+      this.needRead('waiters.view')
       const r = monthRange(month)
       return this.db
         .all<PayoutRow>('SELECT * FROM waiter_payouts WHERE staff_id=? AND month=? ORDER BY at, id', [isInt(staffId) ? staffId : -1, r.month])
@@ -2215,7 +2254,7 @@ export class PosService implements PosApi {
   // ═════════════ REPORTS ═════════════
   reports: PosApi['reports'] = {
     sales: async (range: ReportRange): Promise<SalesReport> => {
-      this.need('reports.view')
+      this.needRead('reports.view')
       const { from, to } = this.checkRange(range)
       const sessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
         `SELECT s.*, r.name AS room_name, st.name AS staff_name FROM sessions s
@@ -2327,7 +2366,7 @@ export class PosService implements PosApi {
     },
 
     returns: async (range) => {
-      this.need('reports.view')
+      this.needRead('reports.view')
       const { from, to } = this.checkRange(range)
       return this.db
         .all<{ at: number; name: string; qty: number; unit_price: number; reason: string; by_name: string | null; room_name: string }>(
@@ -2350,7 +2389,7 @@ export class PosService implements PosApi {
     },
 
     sessions: async (range) => {
-      this.need('reports.view')
+      this.needRead('history.view')
       const { from, to } = this.checkRange(range)
       const sessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null; cashier_name: string | null }>(
         `SELECT s.*, r.name AS room_name, st.name AS staff_name, cs.name AS cashier_name FROM sessions s

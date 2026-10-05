@@ -14,7 +14,7 @@
  */
 import type { PosApi } from '@shared/api'
 import type { AppSettings, BarSaleRow, ConnectionInfo, NetworkStatus, Permission, ReceiptData, SessionView, Product, ProductCategory, Room, RoomCard, ServiceItem, Staff } from '@shared/types'
-import { ROLE_PERMISSIONS } from '@shared/permissions'
+import { effectivePermissions } from '@shared/permissions'
 
 const delay = <T>(v: T, ms = 120): Promise<T> => new Promise((r) => setTimeout(() => r(v), ms))
 const fail = (msg: string, ms = 160): Promise<never> => new Promise((_r, j) => setTimeout(() => j(new Error(msg)), ms))
@@ -154,7 +154,7 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
     return v
   }
 
-  const session = () => (current ? { staff: clone(current), permissions: ROLE_PERMISSIONS[current.role].slice() as Permission[] } : null)
+  const session = () => (current ? { staff: clone(current), permissions: effectivePermissions(current.role, settings.rolePermissions) } : null)
   const needAuth = () => {
     if (!current) throw new Error('Avval tizimga kiring')
   }

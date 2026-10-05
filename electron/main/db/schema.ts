@@ -370,7 +370,9 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   );
   CREATE INDEX idx_expenses_day ON expenses(day);
-  `
+  `,
+  // v7 — rollar ruxsatlari qo'lda (sozlamadagi rolePermissions). Sxema o'zgarmaydi; ma'lumot qismi — MIGRATION_DATA[7].
+  `SELECT 1;`
 ]
 
 /** Ma'lumot migratsiyasi uchun minimal interfeys (sql.js Database ustida). */
@@ -450,10 +452,30 @@ function migrateV5Data(db: MigrationDb): void {
   }
 }
 
+/** v7 ma'lumot qismi: mavjud sozlamaga rolePermissions = standart (yo'q bo'lsa). Sozlama yo'q bo'lsa — standart PosService'da. */
+function migrateV7Data(db: MigrationDb): void {
+  const row = db.all("SELECT value FROM kv WHERE key='settings'")[0]
+  if (!row) return
+  try {
+    const s = JSON.parse(String(row.value)) as Record<string, unknown>
+    if (s && typeof s === 'object' && s.rolePermissions === undefined) {
+      s.rolePermissions = {
+        admin: DEFAULT_ROLE_PERMISSIONS.admin,
+        cashier: DEFAULT_ROLE_PERMISSIONS.cashier,
+        waiter: DEFAULT_ROLE_PERMISSIONS.waiter
+      }
+      db.run("UPDATE kv SET value=? WHERE key='settings'", [JSON.stringify(s)])
+    }
+  } catch {
+    /* buzilgan sozlama — PosService standartga qaytaradi */
+  }
+}
+
 /** Versiya → ma'lumot migratsiyasi (shu versiyaning SQL qismidan keyin bajariladi). */
 export const MIGRATION_DATA: Record<number, (db: MigrationDb) => void> = {
   4: migrateV4Data,
-  5: migrateV5Data
+  5: migrateV5Data,
+  7: migrateV7Data
 }
 
 export const SCHEMA_VERSION = MIGRATIONS.length

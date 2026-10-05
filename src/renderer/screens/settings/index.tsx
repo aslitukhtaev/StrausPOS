@@ -20,15 +20,17 @@ import { AboutSection, APP_VERSION } from './AboutSection'
 import { LicenseSection } from './LicenseSection'
 import { KitchenSection } from './KitchenSection'
 import { InstagramSection } from './InstagramSection'
+import { RolesSection } from './RolesSection'
 import './settings.css'
 
-type SectionId = 'rooms' | 'kitchen' | 'receipt' | 'security' | 'billing' | 'appearance' | 'network' | 'instagram' | 'backup' | 'license' | 'about'
+type SectionId = 'rooms' | 'kitchen' | 'receipt' | 'security' | 'roles' | 'billing' | 'appearance' | 'network' | 'instagram' | 'backup' | 'license' | 'about'
 
 const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'rooms', label: 'Xonalar', desc: 'Narx, sig\'im, tartib', icon: 'rooms' },
   { id: 'receipt', label: 'Chek', desc: 'Matn, printer', icon: 'receipt' },
   { id: 'kitchen', label: 'Oshxona', desc: 'Ulush, oshxona printeri', icon: 'flame' },
   { id: 'security', label: 'Xavfsizlik', desc: 'Qulf, PIN', icon: 'shield' },
+  { id: 'roles', label: 'Rollar va ruxsatlar', desc: 'Kim nima qila oladi', icon: 'key' },
   { id: 'billing', label: 'Hisob-kitob', desc: 'Soat, blok, yaxlitlash', icon: 'percent' },
   { id: 'appearance', label: "Ko'rinish", desc: 'Kunduzgi / tungi', icon: 'sun' },
   { id: 'instagram', label: 'Instagram', desc: 'QR kod va handle', icon: 'inbox' },
@@ -55,7 +57,7 @@ export default function SettingsScreen() {
   const [tabState, setTab] = useState<SectionId>(readTab)
   // Terminalda Tarmoq/Zaxira/Litsenziya/Oshxona (printer asosiyda) yashirin; "Chek"dagi printer — terminalning o'z printeri
   const isTerminal = useApp((s) => s.mode === 'terminal')
-  const terminalHidden: string[] = ['network', 'backup', 'license', 'kitchen']
+  const terminalHidden: string[] = ['network', 'backup', 'license', 'kitchen', 'roles']
   const nav = isTerminal ? NAV.filter((n) => terminalHidden.indexOf(n.id) < 0) : NAV
   const tab: SectionId = nav.some((n) => n.id === tabState) ? tabState : 'rooms'
   const [settings, setSettingsState] = useState<AppSettings | null>(() => useApp.getState().settings)
@@ -146,6 +148,7 @@ export default function SettingsScreen() {
       tab === 'receipt' ? <ReceiptSection {...p} />
         : tab === 'kitchen' ? <KitchenSection {...p} />
         : tab === 'security' ? <SecuritySection {...p} />
+        : tab === 'roles' ? <RolesSection {...p} />
           : tab === 'appearance' ? <AppearanceSection {...p} />
             : tab === 'instagram' ? <InstagramSection {...p} />
               : tab === 'billing' ? <BillingSection {...p} />

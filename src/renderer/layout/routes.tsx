@@ -29,11 +29,11 @@ const META: Record<ScreenId, { label: string; icon: IconName; permission?: Permi
   bar: { label: 'Bar', icon: 'bar', permission: 'stock.manage' },
   debts: { label: 'Qarzlar', icon: 'debts', permission: 'debt.manage' },
   reports: { label: 'Hisobot', icon: 'reports', permission: 'reports.view' },
-  expenses: { label: 'Xarajatlar', icon: 'wallet', permission: 'reports.view' },
-  profit: { label: 'Sof foyda', icon: 'percent', permission: 'reports.view' },
-  history: { label: 'Tarix', icon: 'clock', permission: 'reports.view' },
-  waiters: { label: 'Ofitsiantlar', icon: 'cash', permission: 'reports.view' },
-  kitchen: { label: 'Oshxona', icon: 'flame', permission: 'reports.view' },
+  expenses: { label: 'Xarajatlar', icon: 'wallet', permission: 'expense.view' },
+  profit: { label: 'Sof foyda', icon: 'percent', permission: 'profit.view' },
+  history: { label: 'Tarix', icon: 'clock', permission: 'history.view' },
+  waiters: { label: 'Ofitsiantlar', icon: 'cash', permission: 'waiters.view' },
+  kitchen: { label: 'Oshxona', icon: 'flame', permission: 'kitchen.view' },
   staff: { label: 'Xodimlar', icon: 'staff', permission: 'staff.manage' },
   settings: { label: 'Sozlamalar', icon: 'settings', permission: 'settings.manage' }
 }
