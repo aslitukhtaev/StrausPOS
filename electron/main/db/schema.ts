@@ -6,6 +6,7 @@
  */
 import type { Database, SqlValue } from 'sql.js'
 import { normalizePhone } from './phone'
+import { DEFAULT_ROLE_PERMISSIONS } from '../../../src/shared/permissions'
 
 export const MIGRATIONS: string[] = [
   // v1 — boshlang'ich sxema

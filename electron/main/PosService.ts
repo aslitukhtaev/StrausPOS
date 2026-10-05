@@ -2244,8 +2244,16 @@ export class PosService implements PosApi {
     get: async () => this.loadSettings(),
 
     save: async (s) => {
-      this.need('settings.manage')
-      const clean = sanitizeSettings(s, this.loadSettings())
+      const me = this.need('settings.manage')
+      const prev = this.loadSettings()
+      const clean = sanitizeSettings(s, prev)
+      if (me.role !== 'owner') {
+        for (const role of EDITABLE_ROLES) {
+          if (clean.rolePermissions[role].includes('settings.manage') && !prev.rolePermissions[role].includes('settings.manage')) {
+            fail("Sozlamalar ruxsatini faqat ega bera oladi")
+          }
+        }
+      }
       this.db.tx(() => this.storeSettings(clean))
       return this.loadSettings()
     }
