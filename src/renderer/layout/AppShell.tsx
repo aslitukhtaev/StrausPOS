@@ -143,7 +143,7 @@ export function AppShell() {
             </Button>
           </div>
         ) : (
-          <div className="side__foot">v0.3.1 · offline</div>
+          <div className="side__foot">v0.3.2 · offline</div>
         )}
       </aside>
 
