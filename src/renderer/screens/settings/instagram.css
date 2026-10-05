@@ -1,0 +1,7 @@
+.set-ig { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px; border: 1px dashed var(--line-strong); border-radius: var(--r-lg); background: var(--surface-2); }
+.set-ig__box { width: 220px; height: 220px; display: grid; place-items: center; background: #fff; border-radius: var(--r-md); border: 1px solid var(--line); overflow: hidden; }
+.set-ig__img { max-width: 100%; max-height: 100%; image-rendering: pixelated; object-fit: contain; }
+.set-ig__empty { color: var(--text-3); font-size: var(--fs-sm); padding: 0 16px; text-align: center; }
+.set-ig__caption { font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text); }
+.set-ig__handle { color: var(--accent-text, var(--accent)); font-weight: var(--fw-semibold); margin-top: -6px; }
+.set-ig__actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }

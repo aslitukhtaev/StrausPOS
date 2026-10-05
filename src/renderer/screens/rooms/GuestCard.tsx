@@ -2,10 +2,10 @@
  * Mehmon kartasi: nomi (bosib o'zgartiriladi), ORQAGA sanovchi taymer, olingan vaqt va progress,
  * jonli vaqt summasi; tugmalar: +1 soat, Pauza/Davom, Tugatish.
  * Bosqichlar: ok · warn (≤ warnBeforeMinutes, amber + yengil puls) · over (qizil, "+00:05:12 oshdi").
- * Oshganda aniq yozuv: "+00:01:00 oshdi · 1 daq qo'shildi" (billedMinutes − paidMinutes, formatHours).
+ * Oshganda aniq yozuv: "1 daq oshdi · 1 daq qo'shildi" (billedMinutes − paidMinutes, formatHours).
  */
 import type { GuestView } from '@shared/types'
-import { MS_MIN, formatCountdown, formatHours, formatTimeShown } from '@shared/billing'
+import { MS_MIN, formatHours, formatTimeShown } from '@shared/billing'
 import { Avatar, Button, Icon, Money, cx, formatMoney } from '@/ui'
 import { guestPhase } from './live'
 
@@ -63,7 +63,7 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
         <div className="rooms-guest__overnote" data-testid="overnote">
           <Icon name="alert" size={16} />
           <span>
-            <span className="num">{formatCountdown(g.remainingMs)}</span> oshdi · {extra > 0 ? `${formatHours(extra)} qo'shildi` : 'imtiyozli vaqt'}
+            {formatHours(Math.max(1, Math.floor(-g.remainingMs / 60_000)))} oshdi · {extra > 0 ? `${formatHours(extra)} qo'shildi` : 'imtiyozli vaqt'}
           </span>
         </div>
       )}

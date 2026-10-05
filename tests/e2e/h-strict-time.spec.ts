@@ -15,7 +15,7 @@
  *     Keyin blok 30 daq (grace 10): 71 daq → 11 daq oshdi → 1 × 30 daq: 90 daq × 50 000/60 = 75 000.
  *  3) Ogohlantirish (warnBeforeMinutes = 10): 50-daqiqada "10 daqiqa qoldi" toast'i BIR MARTA; vaqt tugaganda
  *     "vaqti tugadi" BIR MARTA (boshqa ekranda ham; qaytib kelganda va keyingi daqiqalarda takrorlanmaydi).
- *     Daqiqalik hisob: 61 daq → 51 000 (50 000 × 61/60 = 50 833 → 1000 ga yaxlitlangan); kartada "+00:01:00 oshdi · 1 daq qo'shildi".
+ *     Daqiqalik hisob: 61 daq → 51 000 (50 000 × 61/60 = 50 833 → 1000 ga yaxlitlangan); kartada "1 daq oshdi · 1 daq qo'shildi".
  */
 import type { Page } from '@playwright/test'
 import { test, expect, fm, T0, MIN } from './fixtures'
@@ -103,7 +103,7 @@ test('2 soat × 3 kishi: 5 daqiqada chiqqan ham to\'liq, +1 soat, hammaga +1 soa
   // ── +181: 1 daqiqa oshdi → keyingi soat to'liq ──
   await pos.setNow(T0 + 181 * MIN)
   await expect(guest(pos, 'Mehmon 3').getByTestId('countdown')).toContainText('03:01:00')
-  await expect(guest(pos, 'Mehmon 3').getByTestId('overnote')).toHaveText("+00:01:00 oshdi · 1 soat qo'shildi")
+  await expect(guest(pos, 'Mehmon 3').getByTestId('overnote')).toHaveText("1 daq oshdi · 1 soat qo'shildi")
   await expect(guest(pos, 'Mehmon 3')).toHaveClass(/rooms-guest--over/)
   await expectGuest(pos, 'Mehmon 3', 200_000)
   await expectWsTotal(pos, 500_000)
@@ -268,9 +268,9 @@ test('Vaqt ogohlantirishi: "10 daqiqa qoldi" va "vaqti tugadi" bir martadan (bos
   await enterSession(pos, 'Sauna 1')
   // Daqiqalik: 61 daq × 50 000/60 = 50 833 → 51 000
   await expectGuest(pos, 'Mehmon 1', 51_000)
-  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("+00:01:00 oshdi · 1 daq qo'shildi")
+  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("1 daq oshdi · 1 daq qo'shildi")
   await pos.setNow(T0 + 75 * MIN)
-  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("+00:15:00 oshdi · 15 daq qo'shildi")
+  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("15 daq oshdi · 15 daq qo'shildi")
   await expectGuest(pos, 'Mehmon 1', 63_000) // 75 × 50 000/60 = 62 500 → 63 000
   await pos.setNow(T0 + 90 * MIN)
   await page.waitForTimeout(2000)
