@@ -73,6 +73,7 @@ const line = (o: Partial<OrderLine> = {}): OrderLine => ({
   department: 'bar',
   waiterId: null,
   waiterPct: 0,
+  costPrice: 0,
   ...o
 })
 
