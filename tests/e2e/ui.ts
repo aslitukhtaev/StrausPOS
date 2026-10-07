@@ -175,7 +175,12 @@ export async function chooseCarrier(d: Locator, waiter: string | null): Promise<
 
 /** Tanlanganlarni bitta "Qo'shish (N ta · summa)" bilan qo'shadi → lines.addProducts; oyna yopiladi */
 export async function submitAdd(pos: Pos, d: Locator): Promise<void> {
-  await rpcClick(pos, d.getByTestId('add-submit'), 'lines.addProducts')
+  const resp = pos.page.waitForResponse((r) => r.url().includes('/rpc') && (r.request().postData() || '').includes('"lines.addProducts"'))
+  await d.getByTestId('add-submit').click()
+  // Ofitsiant tanlanmagan bo'lsa eslatma chiqadi — "Ofitsiantsiz qo'shish" bilan davom etamiz
+  const skip = pos.page.getByRole('button', { name: "Ofitsiantsiz qo'shish" })
+  await skip.waitFor({ state: 'visible', timeout: 700 }).then(() => skip.click()).catch(() => undefined)
+  await resp
   await expect(d).toHaveCount(0)
 }
 

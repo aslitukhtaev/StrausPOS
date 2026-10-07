@@ -162,3 +162,41 @@ test('Kassir "—" bilan qo\'shsa haq yo\'q; nofaol ofitsiant "kim olib bordi" r
   await closeAdd(pos, a2)
   void page
 })
+
+test('Ofitsiant tanlanmasa eslatma chiqadi: "Ofitsiant tanlash" oynani ochiq qoldiradi, "Ofitsiantsiz qo\'shish" haqsiz qo\'shadi, tanlansa eslatma yo\'q', async ({ pos, page }) => {
+  test.setTimeout(120_000)
+  await pos.open()
+  await pos.login('owner')
+  await openRoom(pos, 'Sauna 1', 1)
+  const d = await openAdd(pos)
+  await selectProduct(d, 'Coca-Cola 1 L', 1)
+
+  // 1) Ofitsiant tanlanmagan → eslatma; "Ofitsiant tanlash" → hech narsa qo'shilmaydi, oyna ochiq
+  await d.getByTestId('add-submit').click()
+  const warn = page.getByRole('button', { name: "Ofitsiantsiz qo'shish" })
+  await expect(warn).toBeVisible()
+  await expect(page.getByText('Ofitsiant tanlanmadi')).toBeVisible()
+  await page.getByRole('button', { name: 'Ofitsiant tanlash' }).click()
+  await expect(warn).toHaveCount(0)
+  await expect(d).toBeVisible()
+  expect((await pos.backend.rpc<{ lines: unknown[] }>('sessions.get', 1)).lines).toHaveLength(0)
+
+  // 2) Ofitsiant tanlandi → eslatmasiz qo'shiladi va ofitsiant qatorga yoziladi
+  await d.getByTestId('add-waiter').locator('.rooms-chip[data-waiter="Sardor"]').click()
+  const resp = page.waitForResponse((r) => r.url().includes('/rpc') && (r.request().postData() || '').includes('"lines.addProducts"'))
+  await d.getByTestId('add-submit').click()
+  await resp
+  await expect(warn).toHaveCount(0)
+  await expect(d).toHaveCount(0)
+  const lines = (await pos.backend.rpc<{ lines: { name: string; waiterId: number | null }[] }>('sessions.get', 1)).lines
+  expect(lines).toHaveLength(1)
+  expect(lines[0].waiterId).not.toBeNull()
+
+  // 3) Ofitsiantsiz qo'shish: yana bitta, eslatmadan keyin "Ofitsiantsiz qo'shish"
+  const d2 = await openAdd(pos)
+  await selectProduct(d2, 'Pivo 0.5 L', 1)
+  await submitAdd(pos, d2)
+  const after = (await pos.backend.rpc<{ lines: { name: string; waiterId: number | null }[] }>('sessions.get', 1)).lines
+  expect(after).toHaveLength(2)
+  expect(after.find((l) => l.name === 'Pivo 0.5 L')!.waiterId).toBeNull()
+})

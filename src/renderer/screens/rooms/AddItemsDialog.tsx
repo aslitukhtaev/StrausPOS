@@ -36,6 +36,7 @@ export function AddItemsDialog({
   const [who, setWho] = useState<number>(0) // 0 = butun guruh
   const [provider, setProvider] = useState<number>(0)
   const [waiterId, setWaiterId] = useState<number>(0) // 0 = "—"
+  const [nudge, setNudge] = useState(false)
   const [data, setData] = useState<Catalog | null>(null)
   const [cart, setCart] = useState<Record<number, number>>({})
   const [adding, setAdding] = useState(false)
@@ -114,6 +115,18 @@ export function AddItemsDialog({
 
   const submit = async () => {
     if (adding || items.length === 0) return
+    // Ofitsiant o'zi kirmaydi (monitori yo'q): kim olib borganini kassir/admin tanlaydi. Tanlanmasa — eslatma
+    if (!iAmWaiter && waiters.length > 0 && waiterId === 0) {
+      setNudge(true)
+      const skip = await confirmDialog({
+        title: 'Ofitsiant tanlanmadi',
+        message: "Bu buyurtma uchun ofitsiant haqi hisoblanmaydi. Ofitsiantni tanlaysizmi?",
+        confirmText: "Ofitsiantsiz qo'shish",
+        cancelText: 'Ofitsiant tanlash',
+        icon: 'user'
+      })
+      if (!skip) return
+    }
     setAdding(true)
     const kitchen = items.some((x) => productDept(x.p) === 'kitchen')
     try {
@@ -184,11 +197,11 @@ export function AddItemsDialog({
   }
 
   const waiterPicker = !iAmWaiter && waiters.length > 0 && (
-    <div className="rooms-add__waiter" data-testid="add-waiter">
+    <div className={cx('rooms-add__waiter', nudge && waiterId === 0 && 'is-nudge')} data-testid="add-waiter">
       <span className="rooms-add__wholabel">Kim olib bordi:</span>
       {waiters.length <= 3 ? (
         <div className="rooms-add__whoscroll">
-          <button type="button" className={cx('rooms-chip', waiterId === 0 && 'is-active')} onClick={() => setWaiterId(0)} aria-pressed={waiterId === 0}>
+          <button type="button" className={cx('rooms-chip', waiterId === 0 && 'is-active')} onClick={() => { setWaiterId(0); setNudge(false) }} aria-pressed={waiterId === 0}>
             —
           </button>
           {waiters.map((w) => (
@@ -196,7 +209,7 @@ export function AddItemsDialog({
               key={w.id}
               type="button"
               className={cx('rooms-chip', waiterId === w.id && 'is-active')}
-              onClick={() => setWaiterId(waiterId === w.id ? 0 : w.id)}
+              onClick={() => { setWaiterId(waiterId === w.id ? 0 : w.id); setNudge(false) }}
               aria-pressed={waiterId === w.id}
               data-waiter={w.name}
             >
