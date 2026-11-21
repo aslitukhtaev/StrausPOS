@@ -26,8 +26,8 @@ interface Catalog {
 }
 
 export function AddItemsDialog({
-  sessionId, guests, onClose, onUpdate
-}: { sessionId: number; guests: GuestView[]; onClose: () => void; onUpdate: (v: SessionView) => void }) {
+  sessionId, guests, roomWaiterId = null, onClose, onUpdate
+}: { sessionId: number; guests: GuestView[]; roomWaiterId?: number | null; onClose: () => void; onUpdate: (v: SessionView) => void }) {
   const me = useStaff()
   const iAmWaiter = isWaiterStaff(me)
   const staff = useStaffList()
@@ -116,7 +116,7 @@ export function AddItemsDialog({
   const submit = async () => {
     if (adding || items.length === 0) return
     // Ofitsiant o'zi kirmaydi (monitori yo'q): kim olib borganini kassir/admin tanlaydi. Tanlanmasa — eslatma
-    if (!iAmWaiter && waiters.length > 0 && waiterId === 0) {
+    if (!iAmWaiter && roomWaiterId == null && waiters.length > 0 && waiterId === 0) {
       setNudge(true)
       const skip = await confirmDialog({
         title: 'Ofitsiant tanlanmadi',
@@ -196,7 +196,7 @@ export function AddItemsDialog({
     }
   }
 
-  const waiterPicker = !iAmWaiter && waiters.length > 0 && (
+  const waiterPicker = !iAmWaiter && roomWaiterId == null && waiters.length > 0 && (
     <div className={cx('rooms-add__waiter', nudge && waiterId === 0 && 'is-nudge')} data-testid="add-waiter">
       <span className="rooms-add__wholabel">Kim olib bordi:</span>
       {waiters.length <= 3 ? (

@@ -386,7 +386,9 @@ export const MIGRATIONS: string[] = [
   -- mahsulot bo'yicha chek: yoqilgan bo'lsa buyurtma tushganda (oshxona printeriga) chek chiqadi; qatorda muzlatiladi
   ALTER TABLE products ADD COLUMN print_ticket INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE order_lines ADD COLUMN print_ticket INTEGER NOT NULL DEFAULT 0;
-  `
+  `,
+  // v9 — 2.0.1: 'bar.sale' ruxsati (rollar ruxsatlari sozlamada). Sxema o'zgarmaydi; ma'lumot qismi — MIGRATION_DATA[9].
+  `SELECT 1;`
 ]
 
 /** Ma'lumot migratsiyasi uchun minimal interfeys (sql.js Database ustida). */
@@ -485,11 +487,36 @@ function migrateV7Data(db: MigrationDb): void {
   }
 }
 
+/**
+ * v9 ma'lumot qismi (2.0.1): yangi 'bar.sale' ruxsati. Avval bar savdosi session.open + session.pay bilan ishlagan —
+ * shu ikkalasi bor rollarga 'bar.sale' beriladi (hech kim ruxsatini yo'qotmaydi); eski 'price.override' olib tashlanadi.
+ */
+function migrateV9Data(db: MigrationDb): void {
+  const row = db.all("SELECT value FROM kv WHERE key='settings'")[0]
+  if (!row) return
+  try {
+    const s = JSON.parse(String(row.value)) as Record<string, unknown>
+    const rp = s && typeof s === 'object' ? (s.rolePermissions as Record<string, unknown> | undefined) : undefined
+    if (!rp || typeof rp !== 'object') return
+    for (const role of Object.keys(rp)) {
+      const list = rp[role]
+      if (!Array.isArray(list)) continue
+      let out = list.filter((p) => p !== 'price.override')
+      if (out.includes('session.open') && out.includes('session.pay') && !out.includes('bar.sale')) out = [...out, 'bar.sale']
+      rp[role] = out
+    }
+    db.run("UPDATE kv SET value=? WHERE key='settings'", [JSON.stringify(s)])
+  } catch {
+    /* buzilgan sozlama — PosService standartga qaytaradi */
+  }
+}
+
 /** Versiya → ma'lumot migratsiyasi (shu versiyaning SQL qismidan keyin bajariladi). */
 export const MIGRATION_DATA: Record<number, (db: MigrationDb) => void> = {
   4: migrateV4Data,
   5: migrateV5Data,
-  7: migrateV7Data
+  7: migrateV7Data,
+  9: migrateV9Data
 }
 
 export const SCHEMA_VERSION = MIGRATIONS.length

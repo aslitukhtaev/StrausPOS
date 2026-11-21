@@ -24,8 +24,8 @@ const byOpened = (a: SessionView, b: SessionView) => a.session.openedAt - b.sess
 
 export default function SaleScreen() {
   const readOnly = useApp((s) => s.readOnly)
-  const canOpen = useCan('session.open')
-  const canPay = useCan('session.pay')
+  const canOpen = useCan('bar.sale')
+  const canPay = useCan('bar.sale') || useCan('session.pay')
   // To'lanmagan bar savatidan olib tashlash — session.manage yetarli (kassir ham)
   const canReturn = useCan('line.return')
 

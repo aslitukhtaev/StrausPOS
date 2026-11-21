@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import type { GuestView, LineView, RoomCard, SessionView } from '@shared/types'
 import { api } from '@/api'
+import { useStaffList } from './staffNames'
 import {
   Button, Field, Icon, Input, Modal, Money, Numpad, Spinner, Stepper, cx, formatMoney, toast, EmptyState
 } from '@/ui'
@@ -292,6 +293,51 @@ export function MoveRoomDialog({
           </div>
         </div>
       )}
+    </Modal>
+  )
+}
+
+
+// ───────────── Xona ofitsiantini almashtirish ─────────────
+export function WaiterDialog({
+  sessionId, current, onClose, onDone
+}: { sessionId: number; current: number | null; onClose: () => void; onDone: Done }) {
+  const staff = useStaffList()
+  const waiters = (staff || []).filter((s) => s.active && s.isWaiter)
+  const [sel, setSel] = useState<number>(current ?? 0)
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    setBusy(true)
+    try {
+      onDone(await api.sessions.setWaiter(sessionId, sel || null))
+    } catch (e) {
+      toast.error(e)
+      setBusy(false)
+    }
+  }
+  return (
+    <Modal
+      open
+      onClose={busy ? () => undefined : onClose}
+      title="Xona ofitsianti"
+      subtitle="Faqat shu ofitsiant xonaga mahsulot qo'sha oladi; haq unga hisoblanadi"
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Bekor</Button>
+          <div className="spacer" />
+          <Button variant="primary" icon="check" loading={busy} onClick={() => void save()} data-testid="waiter-save">Saqlash</Button>
+        </>
+      }
+    >
+      <div className="rooms-add__chips" data-testid="waiter-dialog">
+        <button type="button" className={cx('rooms-chip', sel === 0 && 'is-active')} onClick={() => setSel(0)} aria-pressed={sel === 0}>Ofitsiantsiz</button>
+        {waiters.map((w) => (
+          <button key={w.id} type="button" className={cx('rooms-chip', sel === w.id && 'is-active')} onClick={() => setSel(w.id)} aria-pressed={sel === w.id} data-waiter={w.name}>
+            {w.name}
+          </button>
+        ))}
+      </div>
     </Modal>
   )
 }

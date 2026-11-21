@@ -99,3 +99,8 @@
   .kt-table th { background: var(--print-head) !important; }
   .kt-total td { background: var(--paper) !important; }
 }
+
+/* Vaqt oralig'i */
+.kt-range { display: flex; flex-direction: column; gap: var(--sp-4); }
+.kt-range__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.kt-range__custom { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }

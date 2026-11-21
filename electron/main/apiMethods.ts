@@ -14,7 +14,7 @@ const MAP: MethodMap = {
     open: true, get: true, detail: true, addGuest: true, extendGuest: true, extendAll: true,
     guestPause: true, guestResume: true, guestFinish: true,
     renameGuest: true, soldItems: true, moveRoom: true, setDiscount: true, stopAll: true, cancel: true,
-    void: true, voided: true, setVoidPassword: true
+    void: true, voided: true, setVoidPassword: true, setWaiter: true
   },
   lines: { addProduct: true, addProducts: true, addService: true, returnLine: true },
   checkout: { pay: true, receipt: true, preBill: true },
@@ -26,7 +26,7 @@ const MAP: MethodMap = {
   },
   debts: { list: true, pay: true, payments: true },
   debtors: { search: true, list: true, debts: true, pay: true, rename: true },
-  kitchen: { daily: true, payout: true, payouts: true, reprint: true },
+  kitchen: { daily: true, range: true, payout: true, payouts: true, reprint: true },
   staff: { list: true, save: true, changePin: true },
   waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
   expenses: { list: true, save: true, remove: true, categories: true, saveCategory: true },

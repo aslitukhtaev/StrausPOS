@@ -1,7 +1,7 @@
 import type { Permission, Role } from './types'
 
 export const ALL_PERMISSIONS: Permission[] = [
-  'session.open', 'session.manage', 'session.pay', 'line.return', 'price.override',
+  'session.open', 'session.manage', 'session.pay', 'line.return', 'bar.sale',
   'discount.apply', 'debt.manage', 'stock.manage', 'reports.view', 'expense.view', 'expense.manage',
   'profit.view', 'history.view', 'kitchen.view', 'waiters.view',
   'settings.manage', 'staff.manage', 'backup.manage'
@@ -11,7 +11,7 @@ export const ALL_PERMISSIONS: Permission[] = [
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: ALL_PERMISSIONS,
   admin: ALL_PERMISSIONS.filter((p) => p !== 'staff.manage' && p !== 'settings.manage' && p !== 'backup.manage'),
-  cashier: ['session.open', 'session.manage', 'session.pay', 'line.return', 'discount.apply', 'debt.manage'],
+  cashier: ['session.open', 'session.manage', 'session.pay', 'line.return', 'bar.sale', 'discount.apply', 'debt.manage'],
   waiter: ['session.open', 'session.manage', 'line.return']
 }
 /** Eski nom (standart jadval) */
@@ -35,7 +35,7 @@ export const PERMISSION_CATALOG: PermissionInfo[] = [
   { perm: 'session.pay', group: 'Xonalar', label: "To'lovni qabul qilish", description: "Hisobni yopish va to'lov (naqd, Click, terminal, qarz)" },
   { perm: 'line.return', group: 'Xonalar', label: 'Qaytarish (X)', description: "Qo'shilgan mahsulot yoki xizmatni qaytarish" },
   { perm: 'discount.apply', group: 'Xonalar', label: 'Chegirma berish', description: 'Hisobga chegirma qo\'llash' },
-  { perm: 'price.override', group: 'Xonalar', label: "Narxni o'zgartirish", description: "Sessiyada narxni qo'lda o'zgartirish" },
+  { perm: 'bar.sale', group: 'Xonalar', label: 'Bar savdosi (xonasiz)', description: "Xonasiz bar savdosi: ochish, mahsulot qo'shish, to'lov qabul qilish (qarzga yozish — Qarzlar ruxsati bilan)" },
   { perm: 'debt.manage', group: 'Qarzlar', label: 'Qarzlar bilan ishlash', description: "Qarzdorlar ro'yxati, qarz to'lovini qabul qilish" },
   { perm: 'stock.manage', group: 'Bar va ombor', label: 'Bar va ombor', description: "Mahsulot, kategoriya, xizmatlar, ombor qoldig'i, tannarx" },
   { perm: 'reports.view', group: 'Hisobotlar', label: 'Savdo hisoboti', description: 'Hisobot bo\'limi' },

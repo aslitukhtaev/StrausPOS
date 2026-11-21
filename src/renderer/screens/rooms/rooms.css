@@ -500,3 +500,8 @@
 /* Ofitsiant tanlanmagan bo'lsa — e'tibor tortish */
 .rooms-add__waiter.is-nudge { animation: rooms-nudge 0.5s ease-in-out 2; border-radius: var(--r-md); outline: 2px solid var(--warning); outline-offset: 4px; }
 @keyframes rooms-nudge { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+
+/* Xonaga biriktirilgan ofitsiant */
+.rooms-ws__waiterchip { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 40px; padding: 0 var(--sp-3); border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: inherit; font: inherit; font-size: 1rem; cursor: pointer; }
+.rooms-ws__waiterchip:disabled { cursor: default; opacity: 0.85; }
+.rooms-add__chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }

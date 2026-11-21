@@ -10,9 +10,10 @@ import { api } from '@/api'
 import { useApp } from '@/store/app'
 import { useCan } from '@/store/auth'
 import {
-  Badge, Button, Card, EmptyState, Field, Icon, IconButton, Input, Modal, Money, MoneyInput, PageHeader, Spinner,
+  Badge, Button, Card, EmptyState, Field, Icon, IconButton, Input, Modal, Money, MoneyInput, PageHeader, Segmented, Spinner,
   confirmDialog, cx, formatClock, formatDateTime, formatMoney, getNow, MONTHS, WEEKDAYS, toast
 } from '@/ui'
+import { RangeReport } from './RangeReport'
 import './kitchen.css'
 
 const p2 = (n: number) => (n < 10 ? '0' + n : '' + n)
@@ -55,6 +56,7 @@ export default function KitchenScreen() {
   const sharePct = useApp((s) => (s.settings && s.settings.kitchen ? s.settings.kitchen.sharePct : null))
   const canPay = useCan('staff.manage') && !readOnly
   const nowMonth = todayKey().slice(0, 7)
+  const [mode, setMode] = useState<'month' | 'range'>('month')
   const [month, setMonth] = useState(nowMonth)
   const [rows, setRows] = useState<KitchenDayRow[] | null>(null)
   const [today, setToday] = useState<KitchenDayRow | null>(null)
@@ -168,6 +170,17 @@ export default function KitchenScreen() {
         </Card>
       )}
 
+      <Segmented
+        size="lg"
+        value={mode}
+        onChange={(v) => setMode(v as 'month' | 'range')}
+        options={[{ value: 'month', label: "Oy bo'yicha", icon: 'calendar' }, { value: 'range', label: "Vaqt oralig'i (soat bilan)", icon: 'clock' }]}
+        data-testid="kt-mode"
+      />
+
+      {mode === 'range' && <RangeReport />}
+
+      {mode === 'month' && (<>
       <div className="kt-bar">
         <div className="kt-month" role="group" aria-label="Oy tanlash">
           <IconButton icon="chevronLeft" label="Oldingi oy" size="lg" onClick={() => setMonth((m) => shiftMonth(m, -1))} />
@@ -282,6 +295,8 @@ export default function KitchenScreen() {
           </div>
         </Card>
       )}
+
+      </>)}
 
       {openDay && (
         <DayDialog

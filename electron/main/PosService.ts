@@ -12,7 +12,7 @@ import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow, VoidedSessionRow, SalesFilter,
+  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenRangeReport, KitchenPayout, SessionHistoryRow, SoldItemRow, VoidedSessionRow, SalesFilter,
   Expense, ExpenseCategory, ProfitReport
 } from '../../src/shared/types'
 import { DEFAULT_ROLE_PERMISSIONS, EDITABLE_ROLES, ALL_PERMISSIONS, ROLE_LABELS, can, effectivePermissions } from '../../src/shared/permissions'
@@ -372,6 +372,7 @@ function sanitizeRolePermissions(input: unknown, base: AppSettings['rolePermissi
     }
     if (!Array.isArray(v)) fail(`${ROLE_LABELS[role]} ruxsatlari ro'yxat bo'lishi kerak`)
     for (const p of v) {
+      if (p === 'price.override') continue // eski (olib tashlangan) ruxsat — e'tiborsiz
       if (typeof p !== 'string' || !(ALL_PERMISSIONS as string[]).includes(p)) fail(`Noma'lum ruxsat: ${String(p)}`)
     }
     const set = new Set<string>(v as string[])
@@ -508,6 +509,21 @@ export class PosService implements PosApi {
     }
     if (!this.can(s.role, perm)) fail(PERMISSION_DENIED)
     return s
+  }
+
+  /**
+   * Sessiya amali uchun ruxsat: oddiy `perm` yoki — XONASIZ BAR savdosi sessiyasida — 'bar.sale' (ofitsiantga alohida beriladi).
+   * Ruxsatsiz foydalanuvchi sessiya bor-yo'qligini bilmasligi uchun avval ruxsat tekshiriladi.
+   */
+  private needForId(sessionId: Id, perm: Permission): Staff {
+    if (this.viewer) return this.need(perm)
+    const me = this.requireLogin()
+    if (this.can(me.role, perm)) return me
+    if (this.can(me.role, 'bar.sale')) {
+      const s = this.db.get<SessionRow>('SELECT * FROM sessions WHERE id=?', [sessionId])
+      if (s && s.kind === 'bar') return me
+    }
+    return fail(PERMISSION_DENIED)
   }
 
   /** Rolning samarali ruxsatlari (sozlamadan, har safar yangi o'qiladi — o'zgarish darhol amal qiladi) */
@@ -1003,7 +1019,7 @@ export class PosService implements PosApi {
       )
     },
 
-    open: async (roomId, guestCount, paidMinutes) => {
+    open: async (roomId, guestCount, paidMinutes, waiterId) => {
       const me = this.need('session.open')
       const room = this.roomRow(roomId)
       if (!room.active) fail('Xona faol emas')
@@ -1012,11 +1028,12 @@ export class PosService implements PosApi {
       if (guestCount > room.capacity) fail(`Xona sig'imi ${room.capacity} kishi`)
       const paid = reqMinutes(paidMinutes, 'Olingan vaqt')
       const now = this.now()
-      // 2026-10: ofitsiant xonaga biriktirilmaydi (qatorga yoziladi — lines.addProduct/addProducts)
+      // 2.0.3: har bir xonaga bitta ofitsiant biriktiriladi (ochganda tanlanadi). 'waiter' roli ochsa — o'ziga biriktiriladi.
+      const wRow = me.role === 'waiter' ? this.staffRow(me.id) : waiterId != null ? this.waiterRow(waiterId) : null
       const id = this.db.tx(() => {
         const sid = this.db.insert(
-          "INSERT INTO sessions(kind, room_id, status, opened_at, opened_by, waiter_id, waiter_pct) VALUES('room', ?, 'open', ?, ?, NULL, 0)",
-          [room.id, now, me.id]
+          "INSERT INTO sessions(kind, room_id, status, opened_at, opened_by, waiter_id, waiter_pct) VALUES('room', ?, 'open', ?, ?, ?, ?)",
+          [room.id, now, me.id, wRow ? wRow.id : null, wRow ? wRow.commission_pct ?? 0 : 0]
         )
         for (let i = 1; i <= guestCount; i++) {
           const gid = this.db.insert("INSERT INTO guests(session_id, label, state, paid_minutes) VALUES(?, ?, 'running', ?)", [
@@ -1203,8 +1220,19 @@ export class PosService implements PosApi {
       return this.view(s.id)
     },
 
-    cancel: async (sessionId) => {
+    setWaiter: async (sessionId, waiterId) => {
       const me = this.need('session.manage')
+      if (me.role === 'waiter') fail("Ofitsiantni almashtirish uchun ruxsatingiz yo'q")
+      const s = this.requireRoomSession(this.openSessionRow(sessionId), "Bar savdosiga ofitsiant biriktirib bo'lmaydi")
+      const w = waiterId == null ? null : this.waiterRow(waiterId)
+      this.db.tx(() =>
+        this.db.run('UPDATE sessions SET waiter_id=?, waiter_pct=? WHERE id=?', [w ? w.id : null, w ? w.commission_pct ?? 0 : 0, s.id])
+      )
+      return this.view(s.id)
+    },
+
+    cancel: async (sessionId) => {
+      const me = this.needForId(sessionId, 'session.manage')
       const s = this.openSessionRow(sessionId)
       const v = this.view(s.id)
       if (v.lines.some((l) => l.activeQty > 0)) fail("Sessiyada buyurtmalar bor — bekor qilib bo'lmaydi")
@@ -1312,7 +1340,7 @@ export class PosService implements PosApi {
    * Bar savdosida ofitsiant yo'q. Oshxona mahsulotlari bo'lsa — bitta oshxona cheki (autoPrint yoqilgan bo'lsa).
    */
   private addItems(sessionId: Id, rawItems: unknown, guestId: Id | null, waiterId: Id | null | undefined): SessionView {
-    const me = this.need('session.manage')
+    const me = this.needForId(sessionId, 'session.manage')
     const s = this.openSessionRow(sessionId)
     if (!Array.isArray(rawItems) || rawItems.length === 0) fail('Hech qanday mahsulot tanlanmagan')
     if (rawItems.length > MAX_ADD_ITEMS) fail(`Bir martada ko'pi bilan ${MAX_ADD_ITEMS} xil mahsulot qo'shish mumkin`)
@@ -1344,8 +1372,14 @@ export class PosService implements PosApi {
       items.push({ p, dep: p.department === 'kitchen' ? 'kitchen' : 'bar', qty })
     }
     // Kim olib bordi
+    // Ofitsiant roli faqat o'ziga biriktirilgan xonaga qo'sha oladi. Xonada ofitsiant biriktirilgan bo'lsa, qator unga yoziladi,
+    // haq esa sessiya bo'yicha (biriktirilgan ofitsiantga) hisoblanadi (qator haqi ikkinchi marta hisoblanmaydi).
+    if (s.kind === 'room' && me.role === 'waiter' && s.waiter_id !== me.id) fail("Bu xona sizga biriktirilmagan — faqat o'z xonangizga mahsulot qo'sha olasiz")
     let waiter: { id: Id; pct: number; name: string } | null = null
-    if (s.kind !== 'bar') {
+    if (s.kind !== 'bar' && s.waiter_id != null) {
+      // Xonaga biriktirilgan ofitsiant: qator unga yoziladi (ko'rsatish uchun); haq sessiya bo'yicha hisoblanadi
+      waiter = { id: s.waiter_id, pct: s.waiter_pct ?? 0, name: this.staffRow(s.waiter_id)?.name ?? '' }
+    } else if (s.kind !== 'bar') {
       if (me.isWaiter) waiter = { id: me.id, pct: me.commissionPct, name: me.name }
       else if (waiterId != null) {
         const w = this.waiterRow(waiterId)
@@ -1434,11 +1468,11 @@ export class PosService implements PosApi {
     returnLine: async (lineId, qty, reason) => {
       // To'lanmagan BAR savdosi savatidan olib tashlash — kassir ham qila oladi (session.manage);
       // xona sessiyasidagi qaytarish esa line.return ruxsatini talab qiladi.
-      this.need('session.manage')
+      if (!this.viewer && !this.can(this.requireLogin().role, 'session.manage') && !this.can(this.requireLogin().role, 'bar.sale')) fail(PERMISSION_DENIED)
       const l = this.db.get<LineRow>('SELECT * FROM order_lines WHERE id=?', [lineId])
       if (!l) fail('Qator topilmadi')
       const s = this.openSessionRow(l.session_id)
-      const me = s.kind === 'bar' ? this.need('session.manage') : this.need('line.return')
+      const me = s.kind === 'bar' ? this.needForId(s.id, 'session.manage') : (this.need('session.manage'), this.need('line.return'))
       const active = l.qty - l.returned_qty
       if (active <= 0) fail('Bu qator allaqachon to‘liq qaytarilgan')
       reqInt(qty, `Qaytarish miqdori 1 dan ${active} gacha bo'lishi kerak`, 1, active)
@@ -1494,7 +1528,7 @@ export class PosService implements PosApi {
 
   checkout: PosApi['checkout'] = {
     pay: async (sessionId, payments, debtor) => {
-      const me = this.need('session.pay')
+      const me = this.needForId(sessionId, 'session.pay')
       const s = this.openSessionRow(sessionId)
       const now = this.now()
       const v = this.view(s.id, now)
@@ -1574,7 +1608,7 @@ export class PosService implements PosApi {
     },
 
     preBill: async (sessionId) => {
-      const me = this.need('session.manage')
+      const me = this.needForId(sessionId, 'session.manage')
       const s = this.sessionRow(sessionId)
       if (s.status !== 'open') fail("Sessiya yopilgan — to'langan chekni qayta chop eting")
       return this.buildReceipt(s.id, { by: me })
@@ -1584,7 +1618,7 @@ export class PosService implements PosApi {
   // ═════════════ BAR SAVDOSI (xonasiz) ═════════════
   barSales: PosApi['barSales'] = {
     open: async () => {
-      const me = this.need('session.open')
+      const me = this.need('bar.sale')
       const now = this.now()
       const id = this.db.tx(() =>
         this.db.insert(
@@ -1596,7 +1630,7 @@ export class PosService implements PosApi {
     },
 
     openList: async () => {
-      this.needRead('session.open')
+      this.needRead('bar.sale')
       const now = this.now()
       return this.db
         .all<{ id: number }>("SELECT id FROM sessions WHERE kind='bar' AND status='open' ORDER BY opened_at DESC, id DESC")
@@ -1604,7 +1638,7 @@ export class PosService implements PosApi {
     },
 
     history: async (range) => {
-      this.needRead('session.pay')
+      this.needRead('bar.sale')
       const { from, to } = this.checkRange(range)
       return this.db
         .all<{ id: number; receipt_no: number | null; closed_at: number; total: number | null; items: number | null; cashier: string | null }>(
@@ -1911,6 +1945,46 @@ export class PosService implements PosApi {
       )) row(p.day).paid += p.a ?? 0
       for (const x of days.values()) x.balance = x.due - x.paid
       return Array.from(days.values()).sort((a, b) => a.day.localeCompare(b.day))
+    },
+
+    range: async (range) => {
+      this.needRead('kitchen.view')
+      const { from, to } = this.checkRange(range)
+      const days = new Map<string, KitchenDayRow>()
+      const row = (day: string): KitchenDayRow => {
+        let x = days.get(day)
+        if (!x) {
+          x = { day, sales: 0, due: 0, paid: 0, balance: 0, orders: 0 }
+          days.set(day, x)
+        }
+        return x
+      }
+      const out: KitchenRangeReport = { range: { from, to }, orders: 0, sales: 0, due: 0, paid: 0, balance: 0, days: [], payouts: [] }
+      for (const s of this.db.all<{ closed_at: number; kitchen_sales: number; kitchen_share_pct: number | null }>(
+        `SELECT closed_at, kitchen_sales, kitchen_share_pct FROM sessions
+         WHERE status='closed' AND cancelled=0 AND kitchen_sales > 0 AND closed_at>=? AND closed_at<?`,
+        [from, to]
+      )) {
+        const due = waiterCommission(s.kitchen_sales, s.kitchen_share_pct ?? 100)
+        const x = row(localDay(s.closed_at))
+        x.sales += s.kitchen_sales
+        x.due += due
+        x.orders++
+        out.orders++
+        out.sales += s.kitchen_sales
+        out.due += due
+      }
+      out.payouts = this.db
+        .all<KitchenPayoutRow>('SELECT * FROM kitchen_payouts WHERE at>=? AND at<? ORDER BY at DESC, id DESC', [from, to])
+        .map(toKitchenPayout)
+      for (const p of out.payouts) {
+        row(localDay(p.at)).paid += p.amount
+        out.paid += p.amount
+      }
+      for (const x of days.values()) x.balance = x.due - x.paid
+      out.balance = out.due - out.paid
+      out.days = Array.from(days.values()).sort((a, b) => a.day.localeCompare(b.day))
+      return out
     },
 
     payout: async (day, amount, note) => {

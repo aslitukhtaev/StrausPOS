@@ -39,6 +39,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - Qator qaytarish (X): `returnedQty` oshadi, mahsulot omborga qaytadi, `ReturnRecord` yoziladi.
 - To'lov: naqd/Click/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy.
 - Xizmat (massaj): qat'iy narx, provider yoziladi, ulush YO'Q.
+- **Ruxsat 'bar.sale'** (2.0.1): xonasiz bar savdosi (ochish, mahsulot, to'lov) alohida ruxsat; qarzga yozish — debt.manage. Kassir va admin — standart bor, ofitsiant — yo'q (ega beradi).
 - **Ofitsiant**: xonaga BIRIKTIRILMAYDI (qarang: "2026-10 o'zgarishlari"). Haqi = o'zi qo'shgan bar va oshxona
   mahsulotlari qatorlari (qaytarishlar ayirilgan; xizmatlar va vaqt KIRMAYDI) × qatorda muzlatilgan `waiterPct`%.
   Oylik hisob: `waiters.monthly`, berilgan pullar `waiters.payout`.
@@ -73,6 +74,14 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - **Qo'shish oynasi** — mahsulot −/+ bilan tanlanadi, bitta "Qo'shish" bilan (`lines.addProducts`).
 - **Terminal rejimi** (ko'rish rejimi o'rniga): ikkinchi kompyuter TO'LIQ ishlaydi, o'z login'i bilan; baza bitta (asosiyda).
   Server har bir terminal uchun alohida login konteksti saqlaydi (token). Eski 'viewer' konfiguratsiyasi terminal deb o'qiladi.
+
+## 2.0.3 — xonaga ofitsiant biriktirish (2026-11, mijoz talabi; 2026-10 qoidasini almashtiradi)
+- Har bir ochiq xona sessiyasiga BITTA ofitsiant biriktiriladi (`sessions.open(..., waiterId)` — kassir tanlaydi; 'waiter' roli ochsa — o'ziga;
+  `sessions.setWaiter` — almashtirish/olib tashlash, 'waiter' roli qila olmaydi). Foiz biriktirilgan paytda muzlatiladi (`sessions.waiter_pct`).
+- 'waiter' roli faqat o'ziga biriktirilgan xonaga mahsulot qo'sha oladi (server `addItems` tekshiradi); kassir/admin hamma xonaga qo'shadi.
+  Boshqa ofitsiantning xonasi ham ko'rinadi, lekin qo'shish tugmasi yo'q. Ofitsiantlar alohida monitorda (terminal) o'z PIN'i bilan kiradi.
+- Haq: xonada ofitsiant bor bo'lsa — SESSIYA bo'yicha (bar + oshxona savdosi × waiter_pct); qatorlarga ko'rsatish uchun shu ofitsiant yoziladi,
+  lekin qator haqi ikkinchi marta hisoblanmaydi (`s.waiter_id IS NULL` shartli so'rovlar). Ofitsiantsiz xonada eski qator bo'yicha hisob qoladi.
 
 ## Dizayn tamoyillari
 Brend: **Delfin Sauna**, logotip — delfin. Ranglar rasmdagi suvdan: yorqin moviy-feruza (aqua/cyan), oq ko'pik,

@@ -46,7 +46,7 @@ async function scenario() {
   await svc.catalog.saveProduct({ ...suv, costPrice: 3_000 })
   await svc.catalog.saveProduct({ ...k.lagmon, costPrice: 20_000 })
 
-  const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+  const v0 = await svc.sessions.open(rooms.s1, 1, 60, ctx.staff.waiter.id)
   await ctx.loginAs('waiter')
   await svc.lines.addProducts(v0.session.id, [
     { productId: pivo.id, qty: 3 }, { productId: shashlik.id, qty: 1 }, { productId: k.lagmon.id, qty: 1 }

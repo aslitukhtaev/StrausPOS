@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, VoidedSessionRow, SalesFilter, SoldItemRow, Expense, ExpenseCategory, ProfitReport
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenRangeReport, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, VoidedSessionRow, SalesFilter, SoldItemRow, Expense, ExpenseCategory, ProfitReport
 } from './types'
 import type { Permission } from './types'
 
@@ -51,7 +51,12 @@ export interface PosApi {
      * Ofitsiant xonaga BIRIKTIRILMAYDI — har bir ofitsiant o'z profili bilan istalgan xonaga buyurtma qo'shadi
      * (OrderLine.waiterId). Eski sessiyalardagi waiterId/waiterPct faqat tarix uchun saqlanadi.
      */
-    open(roomId: Id, guestCount: number, paidMinutes: number): Promise<SessionView>
+    open(roomId: Id, guestCount: number, paidMinutes: number, waiterId?: Id | null): Promise<SessionView>
+    /**
+     * Xonaga ofitsiant biriktirish / almashtirish / olib tashlash (null). Faqat ochiq xona sessiyasi. Ruxsat: session.manage;
+     * 'waiter' roli buni qila olmaydi. Haq (waiterPct) biriktirilgan paytdagi ofitsiant foizi bilan muzlatiladi.
+     */
+    setWaiter(sessionId: Id, waiterId: Id | null): Promise<SessionView>
     get(sessionId: Id): Promise<SessionView>
     /** Yopilgan (yoki ochiq) sessiya to'liq tafsiloti: qatorlar (kim, qachon), qaytarishlar, to'lovlar. Ruxsat: reports.view */
     detail(sessionId: Id): Promise<SessionDetail>
@@ -180,6 +185,8 @@ export interface PosApi {
   kitchen: {
     /** Oy ichidagi kunlar ('YYYY-MM') */
     daily(month: string): Promise<KitchenDayRow[]>
+    /** Ixtiyoriy vaqt oralig'i (soat:daqiqagacha) bo'yicha jami va kunlar. Ruxsat: kitchen.view */
+    range(range: ReportRange): Promise<KitchenRangeReport>
     payout(day: string, amount: number, note: string): Promise<KitchenPayout>
     payouts(month: string): Promise<KitchenPayout[]>
     /** Oshxona chekini qayta chop etish (sessiyadagi barcha faol oshxona qatorlari) */

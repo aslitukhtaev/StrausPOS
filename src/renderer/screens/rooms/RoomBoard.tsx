@@ -12,6 +12,7 @@ import {
 } from '@/ui'
 import { liveTotals, roomTone, useBillingOptions, useWarnMs, type LiveTotals } from './live'
 import { OpenRoomDialog } from './OpenRoomDialog'
+import { staffName, useStaffList } from './staffNames'
 import { useBoard } from './boardStore'
 
 export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number) => void }) {
@@ -148,6 +149,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
 
 function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: LiveTotals | null; readOnly: boolean; onClick: () => void }) {
   const { room, session } = card
+  const staffList = useStaffList()
   const tone = roomTone(live)
   const cardTone = tone === 'free' ? 'success' : 'busy'
   const people = live ? live.running + live.paused : 0
@@ -177,6 +179,12 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
           <span>
             <Icon name="users" size={18} /> {room.capacity} kishi
           </span>
+          {session && session.session.waiterId != null && (
+            <>
+              <span className="rooms-tile__dot" />
+              <span data-testid="tile-waiter"><Icon name="user" size={18} /> {staffName(staffList, session.session.waiterId)}</span>
+            </>
+          )}
         </div>
 
         {!session || !live ? (

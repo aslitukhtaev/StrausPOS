@@ -46,7 +46,7 @@ function risks(saved: Draft, draft: Draft): string[] {
       out.push(has('admin', p) ? `Administratorga «${permLabel(p)}» beriladi` : `Administratordan «${permLabel(p)}» olinadi`)
     }
   }
-  for (const p of ['session.pay', 'discount.apply', 'reports.view'] as Permission[]) {
+  for (const p of ['session.pay', 'bar.sale', 'discount.apply', 'reports.view'] as Permission[]) {
     if (!had('waiter', p) && has('waiter', p)) out.push(`Ofitsiantga «${permLabel(p)}» beriladi`)
   }
   return out

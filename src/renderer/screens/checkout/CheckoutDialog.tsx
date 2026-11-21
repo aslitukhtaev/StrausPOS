@@ -52,7 +52,7 @@ interface Plan {
 }
 
 export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogProps) {
-  const canPay = useCan('session.pay')
+  const canPay = useCan('session.pay') || useCan('bar.sale')
   const canDebt = useCan('debt.manage')
   const roundTo = useApp((s) => (s.settings ? s.settings.roundTo : null))
   const blockMinutes = useApp((s) => (s.settings ? s.settings.blockMinutes : 1))

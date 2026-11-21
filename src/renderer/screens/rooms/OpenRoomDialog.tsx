@@ -9,6 +9,8 @@ import type { Room, SessionView } from '@shared/types'
 import { formatHours, guestTimeAmount } from '@shared/billing'
 import { api } from '@/api'
 import { Button, Modal, Stepper, cx, formatMoney, toast } from '@/ui'
+import { useStaff } from '@/store/auth'
+import { useStaffList } from './staffNames'
 import { useBillingOptions, useDefaultHours } from './live'
 import { TimePicker } from './TimePicker'
 
@@ -19,6 +21,11 @@ export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClos
   const [count, setCount] = useState(Math.min(2, cap))
   const [minutes, setMinutes] = useState(defaultHours * 60)
   const [busy, setBusy] = useState(false)
+  const me = useStaff()
+  const staff = useStaffList()
+  const iAmWaiter = me?.role === 'waiter'
+  const waiters = (staff || []).filter((s) => s.active && s.isWaiter)
+  const [waiterId, setWaiterId] = useState(0) // 0 = ofitsiantsiz
   const submitRef = useRef<() => void>(() => undefined)
 
   // Oldindan narx: bir kishi uchun olingan vaqt summasi (billing.ts) × kishi
@@ -29,7 +36,7 @@ export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClos
     if (busy) return
     setBusy(true)
     try {
-      const v = await api.sessions.open(room.id, count, minutes)
+      const v = await api.sessions.open(room.id, count, minutes, iAmWaiter ? undefined : waiterId || null)
       onOpened(v)
     } catch (e) {
       toast.error(e)
@@ -108,6 +115,28 @@ export function OpenRoomDialog({ room, onClose, onOpened }: { room: Room; onClos
           </div>
           <TimePicker value={minutes} onChange={setMinutes} />
         </section>
+
+        {!iAmWaiter && waiters.length > 0 && (
+          <section className="rooms-open__sec" data-testid="open-waiter">
+            <div className="rooms-open__label">
+              Ofitsiant <span className="rooms-open__labelhint">— xonaga biriktiriladi, faqat u mahsulot qo'sha oladi</span>
+            </div>
+            <div className="rooms-add__chips">
+              <button type="button" className={cx('rooms-chip', waiterId === 0 && 'is-active')} onClick={() => setWaiterId(0)} aria-pressed={waiterId === 0}>
+                Ofitsiantsiz
+              </button>
+              {waiters.map((w) => (
+                <button
+                  key={w.id} type="button" className={cx('rooms-chip', waiterId === w.id && 'is-active')}
+                  onClick={() => setWaiterId(w.id)} aria-pressed={waiterId === w.id} data-waiter={w.name}
+                >
+                  {w.name}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        {iAmWaiter && <div className="rooms-open__hint">Xona sizga biriktiriladi — mahsulotni faqat siz qo'sha olasiz.</div>}
 
         <div className="rooms-open__price" data-testid="open-price">
           <span className="rooms-open__formula num">

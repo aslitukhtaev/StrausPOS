@@ -58,9 +58,11 @@ describe('ofitsiant qatorda (2026-10: xonaga biriktirilmaydi)', () => {
     v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null, 99999) // noto'g'ri id ham e'tiborsiz
     expect(v.lines).toHaveLength(1)
     expect(v.lines[0].qty).toBe(2)
+    // Kassir+isWaiter boshqa ofitsiantning xonasiga qo'shsa — qator xonaning ofitsiantiga yoziladi
     await loginAs('waiter2')
     v = await svc.lines.addProduct(v0.session.id, beer.id, 1, null, null)
-    expect(v.lines[1]).toMatchObject({ waiterId: staff.waiter2.id, waiterPct: 12 })
+    expect(v.lines).toHaveLength(1)
+    expect(v.lines[0]).toMatchObject({ waiterId: staff.waiter.id, waiterPct: 10, qty: 3 })
   })
 
   it('xonasiz bar savdosida ofitsiant yo‘q (waiterId e’tiborsiz, ofitsiant o‘zi qo‘shsa ham)', async () => {
@@ -322,5 +324,58 @@ describe('ruxsatlar: ofitsiant roli', () => {
     await expect(svc.waiters.monthly('2026-01')).rejects.toThrow(DENIED)
     await svc.auth.logout()
     await expect(svc.waiters.list()).rejects.toThrow('Avval tizimga kiring')
+  })
+})
+
+describe('xonaga ofitsiant biriktirish (2.0.3)', () => {
+  it('ofitsiant ochsa — o‘ziga biriktiriladi; kassir ochganda tanlanadi; faqat o‘z xonasiga qo‘sha oladi', async () => {
+    const { svc, rooms, staff, loginAs } = await setup()
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    // kassir Sauna 1 ni Sardorga, Sauna 2 ni ofitsiantsiz ochadi
+    await loginAs('cashier')
+    const a = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
+    const b = await svc.sessions.open(rooms.s2, 1, 60)
+    expect(a.session).toMatchObject({ waiterId: staff.waiter.id, waiterPct: 10 })
+    expect(b.session.waiterId).toBeNull()
+    await expect(svc.sessions.open(rooms.vip, 1, 60, 99999)).rejects.toThrow('Ofitsiant topilmadi')
+
+    await loginAs('waiter')
+    await svc.lines.addProduct(a.session.id, beer.id, 1, null) // o'z xonasi
+    await expect(svc.lines.addProduct(b.session.id, beer.id, 1, null)).rejects.toThrow('sizga biriktirilmagan') // biriktirilmagan
+    await expect(svc.lines.addProducts(b.session.id, [{ productId: beer.id, qty: 1 }], null)).rejects.toThrow('sizga biriktirilmagan')
+    const own = await svc.sessions.open(rooms.vip, 1, 60) // o'zi ochsa — o'ziga
+    expect(own.session.waiterId).toBe(staff.waiter.id)
+    await expect(svc.sessions.setWaiter(own.session.id, null)).rejects.toThrow('ruxsatingiz yo')
+
+    // Kassir hamma xonaga qo'sha oladi; ofitsiantni almashtiradi — endi eskisi qo'sholmaydi
+    await loginAs('cashier')
+    await svc.lines.addProduct(b.session.id, beer.id, 1, null)
+    const moved = await svc.sessions.setWaiter(a.session.id, staff.waiter2.id)
+    expect(moved.session).toMatchObject({ waiterId: staff.waiter2.id, waiterPct: 12 })
+    await loginAs('waiter')
+    await expect(svc.lines.addProduct(a.session.id, beer.id, 1, null)).rejects.toThrow('sizga biriktirilmagan')
+    await loginAs('cashier')
+    expect((await svc.sessions.setWaiter(a.session.id, null)).session.waiterId).toBeNull()
+    await expect(svc.sessions.setWaiter(a.session.id, 99999)).rejects.toThrow('Ofitsiant topilmadi')
+    // xonasiz bar savdosiga biriktirib bo'lmaydi
+    await expect(svc.sessions.setWaiter((await svc.barSales.open()).session.id, staff.waiter.id)).rejects.toThrow()
+  })
+
+  it('haq sessiya bo‘yicha (biriktirilgan ofitsiantga), qatorlar ikki marta hisoblanmaydi', async () => {
+    const { svc, rooms, staff, clock, loginAs } = await setup()
+    const beer = await productByName(svc, 'Pivo 0.5 L') // 20 000
+    await loginAs('cashier')
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
+    await svc.lines.addProduct(v0.session.id, beer.id, 2, null) // kassir qo'shdi — 40 000
+    await loginAs('waiter')
+    await svc.lines.addProduct(v0.session.id, beer.id, 3, null) // ofitsiant — 60 000
+    clock.advanceMin(60)
+    await loginAs('cashier')
+    const total = (await svc.sessions.get(v0.session.id)).total
+    await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: total }], null)
+    await loginAs('owner')
+    const month = await svc.waiters.monthly('2026-01')
+    const row = month.find((r) => r.staffId === staff.waiter.id)!
+    expect(row).toMatchObject({ sessions: 1, productSales: 100_000, commission: 10_000 })
   })
 })

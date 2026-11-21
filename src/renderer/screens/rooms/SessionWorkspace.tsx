@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GuestView, LineView, ReceiptData, SessionView } from '@shared/types'
 import { api } from '@/api'
-import { useCan } from '@/store/auth'
+import { useCan, useStaff } from '@/store/auth'
 import { useApp } from '@/store/app'
 import { MS_MIN, formatHours } from '@shared/billing'
 import {
@@ -21,7 +21,7 @@ import { PreBillDialog } from './PreBillDialog'
 import { staffName, useStaffList } from './staffNames'
 import { useBoard } from './boardStore'
 import { AddItemsDialog } from './AddItemsDialog'
-import { DiscountDialog, MoveRoomDialog, RenameGuestDialog, ReturnLineDialog } from './Dialogs'
+import { DiscountDialog, MoveRoomDialog, RenameGuestDialog, ReturnLineDialog, WaiterDialog } from './Dialogs'
 import { CheckoutDialog } from './checkoutModule'
 
 const POLL_MS = 3_000
@@ -32,6 +32,7 @@ type DialogState =
   | { kind: 'return'; line: LineView }
   | { kind: 'move' }
   | { kind: 'add' }
+  | { kind: 'waiter' }
   | { kind: 'discount' }
   | { kind: 'checkout' }
   | { kind: 'addGuest' }
@@ -56,6 +57,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   const canPay = useCan('session.pay') && !readOnly
   const canReturn = useCan('line.return') && !readOnly
   const canDiscount = useCan('discount.apply') && !readOnly
+  const me = useStaff()
 
   const setView = useCallback((v: SessionView) => {
     setState({ view: v, at: getNow() })
@@ -141,6 +143,10 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
 
   const view = state.view
   const room = view.room
+  const roomWaiterId = view.session.waiterId ?? null
+  // 'waiter' roli faqat o'ziga biriktirilgan xonaga mahsulot qo'sha oladi (server ham tekshiradi)
+  const canAdd = canManage && (me?.role !== 'waiter' || roomWaiterId === me.id)
+  const canSetWaiter = canManage && me?.role !== 'waiter' && view.session.kind !== 'bar'
   const tone = roomTone(live)
   const active = live.running + live.paused
   const capFull = active >= room.capacity
@@ -247,6 +253,16 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
           <div className="rooms-ws__titlerow">
             <h1 className="rooms-ws__room">{room.name}</h1>
             {tone === 'busy' && <StatusPill status="busy" />}
+            {view.session.kind !== 'bar' && (
+              <button
+                type="button" className="rooms-ws__waiterchip" disabled={!canSetWaiter}
+                onClick={canSetWaiter ? () => setDialog({ kind: 'waiter' }) : undefined}
+                title={canSetWaiter ? "Ofitsiantni o'zgartirish" : undefined} data-testid="ws-waiter"
+              >
+                <Icon name="user" size={16} /> {roomWaiterId != null ? staffName(staffList, roomWaiterId) : 'Ofitsiantsiz'}
+                {canSetWaiter && <Icon name="edit" size={15} />}
+              </button>
+            )}
           </div>
           <div className="rooms-ws__sub">
             <span>
@@ -351,9 +367,13 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
                 >
                   Chek
                 </Button>
-                <Button variant="primary" icon="plus" onClick={() => setDialog({ kind: 'add' })} className="rooms-bill__add">
-                  Qo'shish
-                </Button>
+                {canAdd ? (
+                  <Button variant="primary" icon="plus" onClick={() => setDialog({ kind: 'add' })} className="rooms-bill__add">
+                    Qo'shish
+                  </Button>
+                ) : (
+                  <span className="subtle" data-testid="not-your-room">Boshqa ofitsiantning xonasi</span>
+                )}
               </div>
             )}
           </div>
@@ -463,6 +483,9 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
           onDone={(v) => { setView(v); setDialog(null) }}
         />
       )}
+      {dialog && dialog.kind === 'waiter' && (
+        <WaiterDialog sessionId={view.session.id} current={roomWaiterId} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />
+      )}
       {dialog && dialog.kind === 'discount' && (
         <DiscountDialog
           sessionId={view.session.id}
@@ -476,7 +499,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
         <MoveRoomDialog view={view} activeGuests={active} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />
       )}
       {dialog && dialog.kind === 'add' && (
-        <AddItemsDialog sessionId={view.session.id} guests={view.guests} onClose={() => setDialog(null)} onUpdate={setView} />
+        <AddItemsDialog sessionId={view.session.id} guests={view.guests} roomWaiterId={roomWaiterId} onClose={() => setDialog(null)} onUpdate={setView} />
       )}
       {dialog && dialog.kind === 'addGuest' && (
         <AddGuestDialog view={view} onClose={() => setDialog(null)} onDone={(v) => { setView(v); setDialog(null) }} />

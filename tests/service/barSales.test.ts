@@ -259,7 +259,8 @@ describe('bar savdosi: ofitsiant haqi yo‘q', () => {
     await svc.lines.addProduct(room.session.id, pivo.id, 2, null, staff.waiter.id)
     const rv = await svc.sessions.get(room.session.id)
     await svc.checkout.pay(room.session.id, [{ method: 'cash', amount: rv.total }], null)
-    // Bar: ofitsiant (Sardor) o'zi sotsa ham haq yo'q
+    // Bar: ofitsiant (Sardor) o'zi sotsa ham haq yo'q (unga 'bar.sale' beriladi)
+    await grantWaiterBar(ctx)
     await ctx.loginAs('waiter')
     const bar = (await svc.barSales.open()).session.id
     await svc.lines.addProduct(bar, pivo.id, 5, null)
@@ -365,22 +366,52 @@ describe('bar savdosi: hisobotlar (qo‘lda hisoblangan)', () => {
   })
 })
 
+async function grantWaiterBar(ctx: Awaited<ReturnType<typeof setup>>) {
+  await ctx.loginAs('owner')
+  const st = await ctx.svc.settings.get()
+  await ctx.svc.settings.save({ ...st, rolePermissions: { ...st.rolePermissions, waiter: [...st.rolePermissions.waiter, 'bar.sale'] } })
+}
+
 describe('bar savdosi: ruxsatlar va ko‘ruvchi', () => {
-  it('open: session.open; history: session.pay; kirmagan foydalanuvchi rad etiladi', async () => {
+  it('bar.sale: ruxsatsiz ofitsiant rad etiladi; ruxsat bilan ochadi, sotadi, naqd/Click oladi, qarzga yozolmaydi', async () => {
     const ctx = await setup()
     const { svc } = ctx
+    const pivo = await productByName(svc, 'Pivo 0.5 L')
+    await ctx.loginAs('waiter')
+    await expect(svc.barSales.open()).rejects.toThrow(DENIED)
+    await expect(svc.barSales.openList()).rejects.toThrow(DENIED)
+    await grantWaiterBar(ctx)
     await ctx.loginAs('waiter')
     const v = await svc.barSales.open()
     expect(v.session.openedBy).toBe(ctx.staff.waiter.id)
     expect(await svc.barSales.openList()).toHaveLength(1)
-    await expect(svc.barSales.history({ from: 0, to: T0 + HOUR })).rejects.toThrow(DENIED)
-    await expect(svc.checkout.pay(v.session.id, [], null)).rejects.toThrow(DENIED)
-    await ctx.loginAs('cashier')
-    expect(await svc.barSales.history({ from: 0, to: T0 + HOUR })).toEqual([])
+    await svc.lines.addProduct(v.session.id, pivo.id, 1, null)
+    await expect(svc.checkout.pay(v.session.id, [{ method: 'debt', amount: 20_000 }], { debtorId: null, name: 'A', phone: '901112233' })).rejects.toThrow(DENIED)
+    await svc.checkout.pay(v.session.id, [{ method: 'card', amount: 20_000 }], null)
+    expect(await svc.barSales.history({ from: 0, to: T0 + HOUR })).toHaveLength(1)
+    // Xona sessiyasiga ta'sir qilmaydi: xona to'lovi hamon ruxsatsiz
+    await ctx.loginAs('owner')
+    const room = await svc.sessions.open(ctx.rooms.s1, 1, 60)
+    await ctx.loginAs('waiter')
+    await expect(svc.checkout.pay(room.session.id, [], null)).rejects.toThrow(DENIED)
     await svc.auth.logout()
     await expect(svc.barSales.open()).rejects.toThrow('Avval tizimga kiring')
     await expect(svc.barSales.openList()).rejects.toThrow('Avval tizimga kiring')
     await expect(svc.barSales.history({ from: 0, to: 1 })).rejects.toThrow('Avval tizimga kiring')
+  })
+
+  it('migratsiya v9: session.open + session.pay bor rollarga bar.sale beriladi, price.override olib tashlanadi', async () => {
+    const { MIGRATION_DATA, migrationDb } = await import('../../electron/main/db/schema')
+    const sql = (await import('sql.js')).default
+    const SQL = await sql()
+    const db = new SQL.Database()
+    db.run('CREATE TABLE kv(key TEXT PRIMARY KEY, value TEXT)')
+    db.run('INSERT INTO kv VALUES(?,?)', ['settings', JSON.stringify({ rolePermissions: {
+      admin: ['session.open', 'session.pay', 'price.override'], cashier: ['session.open', 'session.pay'], waiter: ['session.open', 'session.manage']
+    } })])
+    MIGRATION_DATA[9](migrationDb(db))
+    const rp = JSON.parse(String(db.exec('SELECT value FROM kv')[0].values[0][0])).rolePermissions
+    expect(rp).toEqual({ admin: ['session.open', 'session.pay', 'bar.sale'], cashier: ['session.open', 'session.pay', 'bar.sale'], waiter: ['session.open', 'session.manage'] })
   })
 
   it('ko‘ruvchi konteksti: openList/history o‘qiladi, open rad etiladi', async () => {

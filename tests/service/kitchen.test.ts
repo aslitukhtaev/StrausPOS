@@ -306,3 +306,33 @@ describe('mahsulot bo‘yicha chek (printTicket)', () => {
     expect(printed).toHaveLength(2)
   })
 })
+
+describe('oshxona hisobi: vaqt oralig‘i (soat:daqiqa)', () => {
+  it('kitchen.range: faqat oraliqdagi savdo va berilgan pul; kunlar kesimi', async () => {
+    const { svc, rooms, k, clock } = await kitchenCtx()
+    const sellAt = async (hh: number, mm: number, qty: number) => {
+      clock.t = new Date(2026, 0, 15, hh, mm, 0, 0).getTime()
+      const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+      await svc.lines.addProduct(v0.session.id, k.osh.id, qty, null)
+      const v = await svc.sessions.get(v0.session.id)
+      await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: v.total }], null)
+    }
+    await sellAt(10, 0, 1) // Osh 40 000 (sessiya yopilishi 10:00)
+    await sellAt(12, 30, 2) // 80 000
+    await sellAt(15, 0, 1) // 40 000
+    clock.t = new Date(2026, 0, 15, 12, 45).getTime()
+    await svc.kitchen.payout('2026-01-15', 30_000, 'oshpaz')
+    const at = (hh: number, mm: number) => new Date(2026, 0, 15, hh, mm).getTime()
+
+    const mid = await svc.kitchen.range({ from: at(12, 0), to: at(13, 0) })
+    expect(mid).toMatchObject({ orders: 1, sales: 80_000, due: 80_000, paid: 30_000, balance: 50_000 })
+    expect(mid.days).toEqual([{ day: '2026-01-15', sales: 80_000, due: 80_000, paid: 30_000, balance: 50_000, orders: 1 }])
+    expect(mid.payouts).toHaveLength(1)
+
+    const all = await svc.kitchen.range({ from: at(0, 0), to: at(23, 59) })
+    expect(all).toMatchObject({ orders: 3, sales: 160_000, paid: 30_000 })
+    const none = await svc.kitchen.range({ from: at(12, 46), to: at(14, 0) })
+    expect(none).toMatchObject({ orders: 0, sales: 0, paid: 0, days: [], payouts: [] })
+    await expect(svc.kitchen.range({ from: 5, to: 1 })).rejects.toThrow("noto'g'ri")
+  })
+})

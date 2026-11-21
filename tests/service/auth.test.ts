@@ -66,7 +66,7 @@ describe('kirish / chiqish', () => {
     await expect(svc.auth.login(staff.cashier.id, '0000')).rejects.toThrow("PIN noto'g'ri")
     const r = await svc.auth.login(staff.cashier.id, '3333')
     expect(r.staff.id).toBe(staff.cashier.id)
-    expect(r.permissions).toEqual(['session.open', 'session.manage', 'session.pay', 'line.return', 'discount.apply', 'debt.manage'])
+    expect(r.permissions).toEqual(['session.open', 'session.manage', 'session.pay', 'line.return', 'bar.sale', 'discount.apply', 'debt.manage'])
     expect((await svc.auth.current())?.staff.id).toBe(staff.cashier.id)
   })
 

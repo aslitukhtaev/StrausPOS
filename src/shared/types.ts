@@ -27,7 +27,7 @@ export type Permission =
   | 'session.manage' // vaqtni pauza/tugatish, xona almashtirish, mahsulot qo'shish
   | 'session.pay'
   | 'line.return' // X tugmasi: qaytarish
-  | 'price.override'
+  | 'bar.sale' // Xonasiz bar savdosi: ochish, mahsulot qo'shish, to'lov (qarz — debt.manage)
   | 'discount.apply'
   | 'debt.manage'
   | 'stock.manage'
@@ -585,6 +585,20 @@ export interface KitchenDayRow {
   paid: number
   balance: number
   orders: number
+}
+
+/** Oshxona hisobi ixtiyoriy vaqt oralig'i (soat:daqiqagacha) uchun. Savdo — hisob yopilgan vaqt, berilgan pul — berilgan vaqt bo'yicha */
+export interface KitchenRangeReport {
+  range: ReportRange
+  orders: number
+  sales: number
+  due: number
+  paid: number
+  balance: number
+  /** Kunlar kesimi (oraliq ichidagi) */
+  days: KitchenDayRow[]
+  /** Oraliqda berilgan pullar */
+  payouts: KitchenPayout[]
 }
 
 export interface KitchenPayout {

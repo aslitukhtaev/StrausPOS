@@ -22,7 +22,7 @@ export const READ_METHODS: ReadonlySet<string> = new Set([
   'catalog.categories', 'catalog.products', 'catalog.services',
   'debts.list', 'debts.payments',
   'debtors.search', 'debtors.list', 'debtors.debts',
-  'kitchen.daily', 'kitchen.payouts',
+  'kitchen.daily', 'kitchen.range', 'kitchen.payouts',
   'reports.sales', 'reports.returns', 'reports.sessions',
   'expenses.list', 'expenses.categories', 'profit.report',
   'waiters.monthly', 'waiters.sessions', 'waiters.payouts', 'waiters.list',
