@@ -109,7 +109,7 @@ export default function Gallery() {
           <div style={{ marginTop: 16 }}>
             <Segmented value={seg} onChange={setSeg} block size="lg" options={[
               { value: 'cash', label: 'Naqd', icon: 'cash' },
-              { value: 'card', label: 'Karta', icon: 'card' },
+              { value: 'card', label: 'Click', icon: 'card' },
               { value: 'debt', label: 'Qarz', icon: 'wallet' }
             ]} />
           </div>
@@ -164,7 +164,7 @@ export default function Gallery() {
           <div className="row"><span className="grow t-lg t-semibold">Jami</span><Money value={406000} size="3xl" tone="accent" /></div>
           <Segmented value={seg} onChange={setSeg} block size="lg" options={[
             { value: 'cash', label: 'Naqd', icon: 'cash' },
-            { value: 'card', label: 'Karta', icon: 'card' },
+            { value: 'card', label: 'Click', icon: 'card' },
             { value: 'debt', label: 'Qarz', icon: 'wallet' }
           ]} />
         </div>

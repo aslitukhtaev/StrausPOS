@@ -373,7 +373,20 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX idx_expenses_day ON expenses(day);
   `,
   // v7 — rollar ruxsatlari qo'lda (sozlamadagi rolePermissions). Sxema o'zgarmaydi; ma'lumot qismi — MIGRATION_DATA[7].
-  `SELECT 1;`
+  `SELECT 1;`,
+  // v8 — 2026-11: yopilgan hisobni bekor qilish (parol bilan): cancelled=1 + voided_* (kim, qachon, sabab, qaytarilgan pul);
+  // chegirma kim va qachon berilgani.
+  `
+  ALTER TABLE sessions ADD COLUMN voided_at INTEGER;
+  ALTER TABLE sessions ADD COLUMN voided_by INTEGER REFERENCES staff(id);
+  ALTER TABLE sessions ADD COLUMN void_reason TEXT NOT NULL DEFAULT '';
+  ALTER TABLE sessions ADD COLUMN void_refund INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE sessions ADD COLUMN discount_by INTEGER REFERENCES staff(id);
+  ALTER TABLE sessions ADD COLUMN discount_at INTEGER;
+  -- mahsulot bo'yicha chek: yoqilgan bo'lsa buyurtma tushganda (oshxona printeriga) chek chiqadi; qatorda muzlatiladi
+  ALTER TABLE products ADD COLUMN print_ticket INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE order_lines ADD COLUMN print_ticket INTEGER NOT NULL DEFAULT 0;
+  `
 ]
 
 /** Ma'lumot migratsiyasi uchun minimal interfeys (sql.js Database ustida). */

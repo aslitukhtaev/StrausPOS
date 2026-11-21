@@ -103,7 +103,7 @@ test('Obsluga 10%: sessiya, oraliq chek, to\'lov, chek; Tarix: qator va tafsilot
   await page.getByTestId('hist-search').fill('')
   await page.getByTestId('hist-cashier').selectOption(cashierName!)
   await expect(rows).toHaveCount(1)
-  await page.getByTestId('hist-method').selectOption('Karta')
+  await page.getByTestId('hist-method').selectOption('Click')
   await expect(rows).toHaveCount(0)
   await page.getByTestId('hist-method').selectOption('Naqd')
   await expect(rows).toHaveCount(1)

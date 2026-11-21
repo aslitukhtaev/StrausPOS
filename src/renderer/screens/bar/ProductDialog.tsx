@@ -13,6 +13,7 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
   const [stock, setStock] = useState(product.stock ?? 0)
   const [lowStockAt, setLowStockAt] = useState(product.lowStockAt ?? 5)
   const [active, setActive] = useState(product.active ?? true)
+  const [printTicket, setPrintTicket] = useState(product.printTicket ?? false)
   const [busy, setBusy] = useState(false)
 
   const save = async () => {
@@ -29,7 +30,8 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
         trackStock,
         stock: trackStock ? stock : 0,
         lowStockAt: trackStock ? lowStockAt : 0,
-        active
+        active,
+        printTicket
       })
       toast.success('Saqlandi')
       await onSaved()
@@ -85,6 +87,9 @@ export function ProductDialog({ product, cats, onClose, onSaved }: { product: Pa
             </Field>
           </div>
         )}
+        <Field as="div" label="Chek chiqarish" hint="Yoqilgan bo'lsa, bu mahsulot xonaga buyurtma qilinganda chek avtomatik chiqadi (oshxona printeriga)">
+          <Segmented size="lg" block value={printTicket ? 'y' : 'n'} onChange={(v) => setPrintTicket(v === 'y')} options={[{ value: 'y', label: 'Ha, chiqarish', icon: 'printer' }, { value: 'n', label: "Yo'q", icon: 'x' }]} data-testid="product-print-ticket" />
+        </Field>
         <Field as="div" label="Holati">
           <Segmented size="lg" block value={active ? 'y' : 'n'} onChange={(v) => setActive(v === 'y')} options={[{ value: 'y', label: 'Faol', icon: 'check' }, { value: 'n', label: 'Nofaol', icon: 'lock' }]} />
         </Field>

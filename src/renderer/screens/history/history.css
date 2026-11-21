@@ -58,3 +58,8 @@
 .hist-bs.is-on { background: var(--accent-soft, var(--surface-2)); box-shadow: inset 0 0 0 2px var(--accent, var(--line)); }
 .hist-bs__n { font-weight: var(--fw-semibold); }
 .hist-bs__c { color: var(--text-3); font-size: var(--fs-sm); }
+
+/* Filtrlangan hisoblar: usul bo'yicha tushum */
+.hist-summary { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-5); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md, 12px); background: var(--surface-2); font-size: 1.125rem; }
+.hist-summary b { margin-left: var(--sp-1); }
+.hist-void { display: flex; flex-direction: column; gap: var(--sp-4); }

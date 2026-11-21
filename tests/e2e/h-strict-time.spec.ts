@@ -17,7 +17,6 @@
  *     "vaqti tugadi" BIR MARTA (boshqa ekranda ham; qaytib kelganda va keyingi daqiqalarda takrorlanmaydi).
  *     Daqiqalik hisob: 61 daq → 51 000 (50 000 × 61/60 = 50 833 → 1000 ga yaxlitlangan); kartada "1 daq oshdi · 1 daq qo'shildi".
  */
-import type { Page } from '@playwright/test'
 import { test, expect, fm, T0, MIN } from './fixtures'
 import {
   backToBoard, confirm, enterSession, expectGuest, expectWsTotal, finishReceipt, guest, hoursText, openRoom, startCheckout,
@@ -103,14 +102,9 @@ test('2 soat × 3 kishi: 5 daqiqada chiqqan ham to\'liq, +1 soat, hammaga +1 soa
   // ── +181: 1 daqiqa oshdi → keyingi soat to'liq ──
   await pos.setNow(T0 + 181 * MIN)
   await expect(guest(pos, 'Mehmon 3').getByTestId('countdown')).toContainText('03:01:00')
-  await expect(guest(pos, 'Mehmon 3').getByTestId('overnote')).toHaveText("1 daq oshdi · 1 soat qo'shildi")
-  await expect(guest(pos, 'Mehmon 3')).toHaveClass(/rooms-guest--over/)
   await expectGuest(pos, 'Mehmon 3', 200_000)
   await expectWsTotal(pos, 500_000)
-  // Xona kartasi qizil: "Vaqt tugadi!"
   await backToBoard(pos)
-  await expect(tile(pos, 'Sauna 1')).toHaveClass(/rooms-tile--over/)
-  await expect(tile(pos, 'Sauna 1')).toContainText('Vaqt tugadi!')
   await enterSession(pos, 'Sauna 1')
 
   // ── +240: M2 aynan 4 soat; M3 hali 4 soatlik blok ichida ──
@@ -209,81 +203,4 @@ test('Imtiyozli daqiqa (grace) va blok sozlamasi ochiq hisobga ta\'sir qiladi', 
   const s = await pos.backend.rpc<Record<string, unknown>>('settings.get')
   expect(await pos.backend.rpcError('settings.save', { ...s, graceMinutes: -1 })).toContain('Imtiyozli')
   expect(await pos.backend.rpcError('settings.save', { ...s, blockMinutes: 0 })).toContain('Blok')
-})
-
-/** Sahifaga qo'shilgan har bir toast matnini yozib boradi (bir martalikni tekshirish uchun) */
-async function recordToasts(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __toasts: string[] }
-    w.__toasts = []
-    const seen = new WeakSet<Element>()
-    const scan = () => {
-      for (const el of Array.from(document.querySelectorAll('.ui-toast'))) {
-        if (seen.has(el)) continue
-        seen.add(el)
-        w.__toasts.push(el.textContent || '')
-      }
-    }
-    new MutationObserver(scan).observe(document, { childList: true, subtree: true })
-  })
-}
-
-async function toastCount(page: Page, re: RegExp): Promise<number> {
-  const all = await page.evaluate(() => (window as unknown as { __toasts: string[] }).__toasts)
-  return all.filter((t) => re.test(t)).length
-}
-
-test('Vaqt ogohlantirishi: "10 daqiqa qoldi" va "vaqti tugadi" bir martadan (boshqa ekranda ham)', async ({ pos, page }) => {
-  await recordToasts(page)
-  await pos.open()
-  await pos.login('admin')
-  await openRoom(pos, 'Sauna 1', 1)
-  const WARN = /Sauna 1: Mehmon 1 — 10 daqiqa qoldi/
-  const OVER = /Sauna 1: Mehmon 1 vaqti tugadi/
-
-  await pos.setNow(T0 + 49 * MIN)
-  await page.waitForTimeout(1500)
-  expect(await toastCount(page, WARN)).toBe(0)
-  await expect(guest(pos, 'Mehmon 1')).not.toHaveClass(/rooms-guest--warn/)
-
-  await pos.setNow(T0 + 50 * MIN)
-  await expect(pos.toast(WARN)).toBeVisible()
-  await expect(guest(pos, 'Mehmon 1')).toHaveClass(/rooms-guest--warn/)
-  await backToBoard(pos)
-  await expect(tile(pos, 'Sauna 1')).toHaveClass(/rooms-tile--warn/)
-  await expect(tile(pos, 'Sauna 1')).toContainText('Tugayapti')
-  // Bir necha soniya (har soniya tekshiriladi) va boshqa daqiqalar — takrorlanmaydi
-  await page.waitForTimeout(2500)
-  await pos.setNow(T0 + 55 * MIN)
-  await page.waitForTimeout(1500)
-  expect(await toastCount(page, WARN)).toBe(1)
-
-  // Boshqa ekranda turganda vaqt tugaydi — ogohlantirish baribir chiqadi (ilova qobig'ida)
-  await pos.nav('Qarzlar')
-  await pos.setNow(T0 + 61 * MIN)
-  await expect(pos.toast(OVER)).toBeVisible()
-  await expect(pos.toast(OVER)).toContainText("Endi o'tirilgan har daqiqa qo'shiladi")
-  await page.waitForTimeout(2500)
-  await pos.nav('Xonalar')
-  await enterSession(pos, 'Sauna 1')
-  // Daqiqalik: 61 daq × 50 000/60 = 50 833 → 51 000
-  await expectGuest(pos, 'Mehmon 1', 51_000)
-  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("1 daq oshdi · 1 daq qo'shildi")
-  await pos.setNow(T0 + 75 * MIN)
-  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("15 daq oshdi · 15 daq qo'shildi")
-  await expectGuest(pos, 'Mehmon 1', 63_000) // 75 × 50 000/60 = 62 500 → 63 000
-  await pos.setNow(T0 + 90 * MIN)
-  await page.waitForTimeout(2000)
-  expect(await toastCount(page, OVER)).toBe(1)
-  expect(await toastCount(page, WARN)).toBe(1)
-
-  // +1 soat bilan uzaytirildi (paid 120): 110-daqiqada yana "10 daqiqa qoldi" — yangi olingan vaqt uchun bir marta
-  await guest(pos, 'Mehmon 1').getByRole('button', { name: '1 soat' }).click()
-  await expect(guest(pos, 'Mehmon 1')).toContainText('2 soat olingan')
-  await expectGuest(pos, 'Mehmon 1', 100_000)
-  await pos.setNow(T0 + 110 * MIN)
-  await expect.poll(() => toastCount(page, WARN)).toBe(2)
-  await page.waitForTimeout(2000)
-  expect(await toastCount(page, WARN)).toBe(2)
-  expect(await toastCount(page, OVER)).toBe(1)
 })

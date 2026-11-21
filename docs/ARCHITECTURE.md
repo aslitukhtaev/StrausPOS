@@ -37,7 +37,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - Xona almashtirish: eski narx eski vaqtda qoladi; qolgan (oldindan olingan) daqiqalar yangi xona narxida.
 - `warnBeforeMinutes` qolganda xona kartasi va mehmon taymeri qizaradi, ovozli/vizual ogohlantirish.
 - Qator qaytarish (X): `returnedQty` oshadi, mahsulot omborga qaytadi, `ReturnRecord` yoziladi.
-- To'lov: naqd/karta/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy.
+- To'lov: naqd/Click/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy.
 - Xizmat (massaj): qat'iy narx, provider yoziladi, ulush YO'Q.
 - **Ofitsiant**: xonaga BIRIKTIRILMAYDI (qarang: "2026-10 o'zgarishlari"). Haqi = o'zi qo'shgan bar va oshxona
   mahsulotlari qatorlari (qaytarishlar ayirilgan; xizmatlar va vaqt KIRMAYDI) × qatorda muzlatilgan `waiterPct`%.
@@ -67,7 +67,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - **Oshxona bo'limi** bardan alohida (kategoriya `department`). Oshxona mahsuloti qo'shilganda asosiy kompyuterdagi
   oshxona printeriga avtomatik oshxona cheki (xona, mahsulotlar, miqdor, ofitsiant, vaqt; qaytarishda "BEKOR" cheki).
   Oshxona kunlik hisobi: savdo × `kitchen.sharePct`% = oshxonaga beriladigan, kunlik pul berish (`kitchen.*`).
-- **To'lov usullari**: Naqd · Karta · Terminal · Qarz; Aralash — to'rttasi ham (qarz ham).
+- **To'lov usullari**: Naqd · Click · Terminal · Qarz; Aralash — to'rttasi ham (qarz ham).
 - **Qarzdorlar** bitta odam = bitta yozuv (telefon bo'yicha). Qarz yozishda qidirib tanlanadi; to'lov FIFO.
 - **Oraliq chek** — sessiya yopilmasdan (`checkout.preBill`), "Qo'shish" tugmasi yonida.
 - **Qo'shish oynasi** — mahsulot −/+ bilan tanlanadi, bitta "Qo'shish" bilan (`lines.addProducts`).

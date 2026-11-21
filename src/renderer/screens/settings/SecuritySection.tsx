@@ -17,14 +17,19 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
   const [pin2, setPin2] = useState('')
   const [pinSaving, setPinSaving] = useState(false)
 
+  const [vpCur, setVpCur] = useState('')
+  const [vpNew, setVpNew] = useState('')
+  const [vpSaving, setVpSaving] = useState(false)
+
   useEffect(() => {
     setLockEnabled(settings.lockEnabled)
     setAutoLock(settings.autoLockMinutes)
   }, [settings.lockEnabled, settings.autoLockMinutes])
 
+  const vpDirty = vpCur.length > 0 || vpNew.length > 0
   const dirty = lockEnabled !== settings.lockEnabled || autoLock !== settings.autoLockMinutes
   const pinDirty = pin1.length > 0 || pin2.length > 0
-  useReportDirty(dirty || pinDirty, onDirty)
+  useReportDirty(dirty || pinDirty || vpDirty, onDirty)
 
   const onSave = async () => {
     setSaving(true)
@@ -49,6 +54,21 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
       toast.error(e)
     } finally {
       setPinSaving(false)
+    }
+  }
+
+  const changeVoidPassword = async () => {
+    if (!vpCur || !vpNew) return
+    setVpSaving(true)
+    try {
+      await api.sessions.setVoidPassword(vpCur, vpNew)
+      toast.success("Bekor qilish paroli o'zgartirildi")
+      setVpCur('')
+      setVpNew('')
+    } catch (e) {
+      toast.error(e)
+    } finally {
+      setVpSaving(false)
     }
   }
 
@@ -136,6 +156,24 @@ export function SecuritySection({ settings, save, onDirty }: SectionProps) {
           <Note tone="warning" icon="alert">
             Yangi PINni unutmang va hech kimga aytmang. Ega PINi barcha sozlamalar va hisobotlarga kirish kaliti.
           </Note>
+        </div>
+
+        <div className="set-group">
+          <div className="set-group__title">Hisobni bekor qilish paroli</div>
+          <div className="set-form__row">
+            <Field label="Hozirgi parol" hint="Boshlang'ich parol: 2">
+              <Input size="lg" type="password" autoComplete="off" icon="key" value={vpCur} onChange={(e) => setVpCur(e.target.value)} data-testid="vp-cur" />
+            </Field>
+            <Field label="Yangi parol" hint="1–32 belgi">
+              <Input size="lg" type="password" autoComplete="new-password" icon="key" maxLength={32} value={vpNew} onChange={(e) => setVpNew(e.target.value)} data-testid="vp-new" />
+            </Field>
+          </div>
+          <div className="row">
+            <Button icon="key" variant="success" onClick={() => void changeVoidPassword()} disabled={!vpCur || !vpNew} loading={vpSaving} data-testid="vp-save">
+              Parolni o'zgartirish
+            </Button>
+          </div>
+          <Note tone="info" icon="info">Tarixda yopilgan hisobni bekor qilishda shu parol so'raladi.</Note>
         </div>
       </div>
       <SaveBar dirty={dirty} saving={saving} onSave={() => void onSave()} onReset={() => { setLockEnabled(settings.lockEnabled); setAutoLock(settings.autoLockMinutes) }} />

@@ -6,6 +6,7 @@ import { Badge, Button, EmptyState, Input, Money, Select, Spinner, formatClock, 
 import { methodBadges, roomLabel } from './common'
 import { DetailDialog } from './Detail'
 import { ReceiptDialog } from './ReceiptDialog'
+import { VoidDialog } from './VoidDialog'
 
 export function SessionsTab({ range }: { range: ReportRange }) {
   const [rows, setRows] = useState<SessionHistoryRow[] | null>(null)
@@ -14,9 +15,11 @@ export function SessionsTab({ range }: { range: ReportRange }) {
   const [roomId, setRoomId] = useState('all')
   const [cashier, setCashier] = useState('all')
   const [method, setMethod] = useState('all')
+  const [disc, setDisc] = useState('all')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<number | null>(null)
   const [receiptId, setReceiptId] = useState<number | null>(null)
+  const [voidRow, setVoidRow] = useState<SessionHistoryRow | null>(null)
   const seq = useRef(0)
 
   useEffect(() => {
@@ -47,16 +50,22 @@ export function SessionsTab({ range }: { range: ReportRange }) {
       .filter((r) => roomId === 'all' || r.roomId === Number(roomId))
       .filter((r) => cashier === 'all' || r.cashier === cashier)
       .filter((r) => method === 'all' || methodBadges(r.paymentMethods).indexOf(method) >= 0)
+      .filter((r) => disc === 'all' || (disc === 'yes' ? r.discount > 0 : r.discount === 0))
       .filter((r) => {
         if (!needle) return true
         const hay = [roomLabel(r), r.openedBy, r.cashier || '', r.paymentMethods, String(r.receiptNo ?? ''), ...r.items.map((i) => i.name)].join(' ').toLowerCase()
         return hay.indexOf(needle) >= 0
       })
       .sort((a, b) => b.closedAt - a.closedAt)
-  }, [rows, roomId, cashier, method, q])
+  }, [rows, roomId, cashier, method, disc, q])
 
   const sum = shown.reduce((a, r) => a + r.total, 0)
   const svc = shown.reduce((a, r) => a + (r.serviceCharge || 0), 0)
+  const discSum = shown.reduce((a, r) => a + (r.discount || 0), 0)
+  const discCount = shown.filter((r) => r.discount > 0).length
+  // Usul bo'yicha tushum (filtrlangan hisoblar bo'yicha)
+  const byMethod = { cash: 0, card: 0, terminal: 0, debt: 0 }
+  for (const r of shown) for (const p of r.payments || []) byMethod[p.method] += p.amount
   const guests = shown.reduce((a, r) => a + (r.roomId === 0 ? 0 : r.guestCount), 0)
 
   return (
@@ -73,12 +82,27 @@ export function SessionsTab({ range }: { range: ReportRange }) {
         </Select></div>
         <div className="hist-sel"><Select size="lg" value={method} onChange={(e) => setMethod(e.target.value)} aria-label="To'lov usuli" data-testid="hist-method">
           <option value="all">Barcha to'lovlar</option>
-          {['Naqd', 'Karta', 'Terminal', 'Qarz'].map((m) => <option key={m} value={m}>{m}</option>)}
+          {['Naqd', 'Click', 'Terminal', 'Qarz'].map((m) => <option key={m} value={m}>{m}</option>)}
+        </Select></div>
+        <div className="hist-sel"><Select size="lg" value={disc} onChange={(e) => setDisc(e.target.value)} aria-label="Chegirma" data-testid="hist-discount">
+          <option value="all">Chegirma: hammasi</option>
+          <option value="yes">Chegirmali</option>
+          <option value="no">Chegirmasiz</option>
         </Select></div>
         <div className="hist-search">
           <Input size="lg" icon="search" placeholder="Chek №, xona, mahsulot..." value={q} onChange={(e) => setQ(e.target.value)} data-testid="hist-search" />
         </div>
       </div>
+
+      {rows && shown.length > 0 && (
+        <div className="hist-summary" data-testid="hist-summary">
+          <span>Naqd <b className="num">{formatMoney(byMethod.cash)}</b></span>
+          <span>Click <b className="num">{formatMoney(byMethod.card)}</b></span>
+          <span>Terminal <b className="num">{formatMoney(byMethod.terminal)}</b></span>
+          <span>Qarz <b className="num">{formatMoney(byMethod.debt)}</b></span>
+          <span>Chegirma <b className="num">{formatMoney(discSum)}</b> ({discCount} ta chekdan)</span>
+        </div>
+      )}
 
       {failed ? (
         <EmptyState icon="alert" title="Tarixni yuklab bo'lmadi" action={<Button icon="refresh" onClick={() => load(range)}>Qayta urinish</Button>} />
@@ -96,6 +120,7 @@ export function SessionsTab({ range }: { range: ReportRange }) {
               <th>Yopilgan</th>
               <th className="r">Mehmonlar</th>
               <th className="r">Jami</th>
+              <th className="r">Chegirma</th>
               <th className="r">Obsluga</th>
               <th>To'lov</th>
               <th>Kassir</th>
@@ -115,6 +140,7 @@ export function SessionsTab({ range }: { range: ReportRange }) {
                 <td className="nowrap num"><div>{formatClock(r.closedAt)}</div><div className="hist-sub">{formatDateShort(r.closedAt)}</div></td>
                 <td className="r num">{r.roomId === 0 ? '—' : r.guestCount}</td>
                 <td className="r"><Money value={r.total} size="md" currency={false} /></td>
+                <td className="r">{r.discount > 0 ? <Money value={r.discount} size="md" currency={false} tone="warning" /> : <span className="subtle">—</span>}</td>
                 <td className="r">{r.serviceCharge > 0 ? <Money value={r.serviceCharge} size="md" currency={false} /> : <span className="subtle">—</span>}</td>
                 <td>
                   <div className="hist-pm">
@@ -128,7 +154,11 @@ export function SessionsTab({ range }: { range: ReportRange }) {
                     onClick={(e) => { e.stopPropagation(); setReceiptId(r.sessionId) }}
                   >
                     Chek
-                  </Button>
+                  </Button>{' '}
+                  <Button
+                    size="sm" variant="danger" icon="xCircle" aria-label="Hisobni bekor qilish" title="Bekor qilish (parol kerak)" data-testid="hist-void-btn"
+                    onClick={(e) => { e.stopPropagation(); setVoidRow(r) }}
+                  />
                 </td>
               </tr>
             ))}
@@ -138,6 +168,7 @@ export function SessionsTab({ range }: { range: ReportRange }) {
               <td colSpan={4}><b>{shown.length}</b> ta hisob</td>
               <td className="r num">{guests}</td>
               <td className="r"><b className="num">{formatMoney(sum)}</b></td>
+              <td className="r"><b className="num">{discSum > 0 ? formatMoney(discSum) : '—'}</b></td>
               <td className="r"><b className="num">{svc > 0 ? formatMoney(svc) : '—'}</b></td>
               <td colSpan={3} />
             </tr>
@@ -146,6 +177,7 @@ export function SessionsTab({ range }: { range: ReportRange }) {
       )}
 
       {openId != null && <DetailDialog sessionId={openId} onClose={() => setOpenId(null)} />}
+      {voidRow && <VoidDialog row={voidRow} onClose={() => setVoidRow(null)} onDone={() => { setVoidRow(null); load(range) }} />}
       {receiptId != null && <ReceiptDialog sessionId={receiptId} onClose={() => setReceiptId(null)} />}
     </>
   )

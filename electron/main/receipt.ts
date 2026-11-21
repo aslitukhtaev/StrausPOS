@@ -5,7 +5,7 @@
 import type { PayMethod, ReceiptData } from '../../src/shared/types'
 import { formatDuration, formatMoney } from '../../src/shared/billing'
 
-export const PAY_METHOD_LABELS: Record<PayMethod, string> = { cash: 'Naqd', card: 'Karta', terminal: 'Terminal', debt: 'Qarz' }
+export const PAY_METHOD_LABELS: Record<PayMethod, string> = { cash: 'Naqd', card: 'Click', terminal: 'Terminal', debt: 'Qarz' }
 
 export function escapeHtml(s: unknown): string {
   return String(s ?? '')

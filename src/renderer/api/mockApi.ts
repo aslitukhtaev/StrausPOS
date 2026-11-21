@@ -79,10 +79,10 @@ export function createMockApi(opts: { empty?: boolean; terminal?: boolean; offli
     { id: 3, name: 'Gazaklar', sortOrder: 3, department: 'bar' }
   ]
   const products: Product[] = [
-    { id: 1, categoryId: 1, name: 'Coca-Cola 0.5', price: 8000, stock: 48, trackStock: true, lowStockAt: 10, active: true, costPrice: 0 },
-    { id: 2, categoryId: 1, name: 'Suv 1L', price: 5000, stock: 6, trackStock: true, lowStockAt: 10, active: true, costPrice: 0 },
-    { id: 3, categoryId: 2, name: "Ko'k choy (choynak)", price: 10000, stock: 0, trackStock: false, lowStockAt: 0, active: true, costPrice: 0 },
-    { id: 4, categoryId: 3, name: 'Pista', price: 15000, stock: 20, trackStock: true, lowStockAt: 5, active: true, costPrice: 0 }
+    { id: 1, categoryId: 1, name: 'Coca-Cola 0.5', price: 8000, stock: 48, trackStock: true, lowStockAt: 10, active: true, costPrice: 0, printTicket: false },
+    { id: 2, categoryId: 1, name: 'Suv 1L', price: 5000, stock: 6, trackStock: true, lowStockAt: 10, active: true, costPrice: 0, printTicket: false },
+    { id: 3, categoryId: 2, name: "Ko'k choy (choynak)", price: 10000, stock: 0, trackStock: false, lowStockAt: 0, active: true, costPrice: 0, printTicket: false },
+    { id: 4, categoryId: 3, name: 'Pista', price: 15000, stock: 20, trackStock: true, lowStockAt: 5, active: true, costPrice: 0, printTicket: false }
   ]
   const services: ServiceItem[] = [
     { id: 1, name: 'Klassik massaj', price: 150000, durationMin: 60, active: true },

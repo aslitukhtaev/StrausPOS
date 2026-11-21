@@ -1,6 +1,6 @@
 /**
  * Qarzdorning qarzini to'lash (odam bo'yicha, `debtors.pay`): eng eski qarzdan boshlab yopiladi (FIFO).
- * Usul: Naqd / Karta / Terminal.
+ * Usul: Naqd / Click / Terminal.
  */
 import { useState } from 'react'
 import type { Debtor, DebtPayMethod } from '@shared/types'

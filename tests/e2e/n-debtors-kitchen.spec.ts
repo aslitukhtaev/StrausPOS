@@ -103,7 +103,7 @@ test('Qarz: bir odamga ikki marta — bitta qarzdor (qidirib tanlash), odam bo\'
   await expect(pos.dialog('Ali Valiyev (aka)')).toBeVisible()
 })
 
-test('Aralash: Naqd + Karta + Terminal + Qarz (yangi qarzdor); chek va hisobotda Terminal', async ({ pos, page }) => {
+test('Aralash: Naqd + Click + Terminal + Qarz (yangi qarzdor); chek va hisobotda Terminal', async ({ pos, page }) => {
   await pos.open()
   await pos.login('owner')
   await openPaid(pos, 'Sauna 1')

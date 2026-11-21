@@ -1,13 +1,12 @@
 /**
- * Sof foyda — tushum − tannarx − ofitsiant haqi − oshxona ulushi − xarajatlar (`profit.report`).
+ * Sof foyda (Hisobot ichidagi tab; davr Hisobotdan keladi) — tushum − tannarx − ofitsiant haqi − oshxona ulushi − xarajatlar (`profit.report`).
  * Hisob backendda; bu yerda faqat ko'rsatiladi.
  */
 import { useEffect, useRef, useState } from 'react'
 import type { ProfitReport, ReportRange } from '@shared/types'
 import { api } from '@/api'
 import { useNav } from '@/store/nav'
-import { Button, Card, EmptyState, Icon, Money, PageHeader, Spinner, cx, formatMoney, toast } from '@/ui'
-import { RangePicker, initialRange } from '../expenses/RangePicker'
+import { Button, Card, EmptyState, Icon, Money, Spinner, cx, formatMoney, toast } from '@/ui'
 import { CAT_COLORS, dayDMY, dayShort } from '../expenses/range'
 import './profit.css'
 
@@ -39,9 +38,8 @@ function Chart({ days }: { days: ProfitReport['byDay'] }) {
   )
 }
 
-export default function ProfitScreen() {
+export default function ProfitView({ range }: { range: ReportRange }) {
   const go = useNav((s) => s.go)
-  const [range, setRange] = useState<ReportRange>(() => initialRange('month'))
   const [rep, setRep] = useState<ProfitReport | null>(null)
   const [loading, setLoading] = useState(true)
   const seq = useRef(0)
@@ -69,9 +67,6 @@ export default function ProfitScreen() {
 
   return (
     <div className="pf">
-      <PageHeader title="Sof foyda" icon="percent" subtitle="Tushumdan barcha xarajatlar ayirilgandan keyingi foyda" />
-      <RangePicker initial="month" onChange={setRange} />
-
       {!r ? (
         <div className="pf-center">{loading ? <Spinner size={40} /> : <EmptyState icon="alert" title="Hisobotni yuklab bo'lmadi" description="Davrni qayta tanlang." />}</div>
       ) : (

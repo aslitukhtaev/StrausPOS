@@ -19,6 +19,15 @@ export const fromInput = (s: string): number | null => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : null
 }
+/** 'YYYY-MM-DDTHH:mm' (datetime-local) */
+export const toInputDT = (ts: number) => {
+  const d = new Date(ts)
+  return toInput(ts) + 'T' + p2(d.getHours()) + ':' + p2(d.getMinutes())
+}
+export const fromInputDT = (s: string): number | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(s)
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTime() : null
+}
 export function presetRange(p: Exclude<Preset, 'custom'>, now: number): ReportRange {
   const today = startOfDay(now)
   const tomorrow = addDays(today, 1)
@@ -29,10 +38,10 @@ export function presetRange(p: Exclude<Preset, 'custom'>, now: number): ReportRa
   return { from: new Date(d.getFullYear(), d.getMonth(), 1).getTime(), to: tomorrow }
 }
 
-export const METHOD_LABEL: Record<string, string> = { cash: 'Naqd', card: 'Karta', terminal: 'Terminal', debt: 'Qarz' }
+export const METHOD_LABEL: Record<string, string> = { cash: 'Naqd', card: 'Click', terminal: 'Terminal', debt: 'Qarz' }
 export const roomLabel = (r: { roomId: number; roomName: string }) => (r.roomId === 0 ? 'Bar' : r.roomName)
 
-/** paymentMethods ("cash,card" yoki "Naqd, Karta") ni yorliqlarga aylantiradi */
+/** paymentMethods ("cash,card" yoki "Naqd, Click") ni yorliqlarga aylantiradi */
 export function methodBadges(s: string): string[] {
   return s
     .split(/[,+/]\s*/)

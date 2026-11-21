@@ -77,6 +77,8 @@ export interface Product {
   active: boolean
   /** Tannarx (bitta dona sotib olish narxi), 0 = kiritilmagan. Sotuv paytida qatorda muzlatiladi; sof foyda hisobida ishlatiladi */
   costPrice: number
+  /** Buyurtma tushganda avtomatik chek chiqarish (oshxona printeriga). Oshxona bo'limi mahsulotlari uchun har doim */
+  printTicket: boolean
 }
 
 /** Xizmat (massaj va h.k.) — qat'iy narx, ulush yo'q. */
@@ -182,7 +184,7 @@ export interface ReturnRecord {
 }
 
 // ───────────── To'lov va qarz ─────────────
-/** Naqd · Karta (o'tkazma) · Terminal (POS) · Qarz. Aralash to'lovda to'rttasi ham (qarz ham) bo'lishi mumkin */
+/** Naqd · Click (o'tkazma) · Terminal (POS) · Qarz. Aralash to'lovda to'rttasi ham (qarz ham) bo'lishi mumkin */
 export type PayMethod = 'cash' | 'card' | 'terminal' | 'debt'
 /** Qarzni to'lash usullari */
 export type DebtPayMethod = 'cash' | 'card' | 'terminal'
@@ -387,10 +389,21 @@ export interface SalesReport {
   productRevenue: number
   serviceRevenue: number
   discounts: number
+  /** Nechta chekda chegirma berilgan */
+  discountCount: number
   total: number
   byMethod: { cash: number; card: number; terminal: number; debt: number }
   /** Shu davrda qarzdan undirilgan to'lovlar (kassadagi naqd = byMethod.cash + debtPayments.cash) */
   debtPayments: { cash: number; card: number; terminal: number }
+  /** Shu davrda undirilgan qarzlar: har biri — qachon, kim, QACHONGI qarz (debtDate), usul, summa. Savdo ko'rsatkichlariga kirmaydi */
+  debtCollections: { at: number; debtorName: string; debtDate: number; method: DebtPayMethod; amount: number }[]
+  /** Shu davrda bekor qilingan hisoblar (sessions.void): soni va qaytarilgan pul (naqd qismi alohida) */
+  voided: { count: number; refund: number; cashRefund: number }
+  /**
+   * Kassadagi naqd (hisob-kitob): naqd savdo + naqd qarz undirildi − naqd qaytarilgan pul − xarajatlar − ofitsiantlarga va
+   * oshxonaga berilgan pul (hammasi naqd deb olinadi). Hammasi shu davr ichidagi amal vaqti bo'yicha.
+   */
+  cashDrawer: { sales: number; debtCollected: number; refunds: number; expenses: number; waiterPayouts: number; kitchenPayouts: number; expected: number }
   returnsAmount: number
   byDay: { day: string; total: number }[]
   byRoom: { roomId: Id; roomName: string; sessions: number; total: number }[]
@@ -462,6 +475,8 @@ export interface SessionHistoryRow {
   total: number
   paid: number
   paymentMethods: string
+  /** To'lovlar usul bo'yicha (summalar filtr natijasida jamlanadi) */
+  payments: { method: PayMethod; amount: number }[]
   items: { name: string; qty: number; amount: number }[]
 }
 
@@ -582,11 +597,37 @@ export interface KitchenPayout {
 }
 
 /** Yopilgan sessiya to'liq tafsiloti ("Tarix" ekrani) */
+/** Bekor qilingan (parol bilan) yopilgan hisob. `refund` — qaytarilgan pul (naqd + Click + terminal; qarz hisobga kirmaydi) */
+/** Savdo hisoboti filtri (ixtiyoriy). Filtr yoqilganda savdo bo'limlari filtrlanadi; kassa hisobi va qarz undirish filtrlanmaydi */
+export interface SalesFilter {
+  /** Xona id; 0 = xonasiz bar savdosi */
+  roomId?: Id | null
+  /** Hisobni yopgan xodim */
+  cashierId?: Id | null
+  /** Shu usul bilan to'lov bor hisoblar; byMethod faqat shu usul summasini ko'rsatadi */
+  method?: PayMethod | null
+}
+
+export interface VoidedSessionRow {
+  sessionId: Id
+  receiptNo: number | null
+  roomName: string
+  closedAt: number
+  voidedAt: number
+  voidedBy: string
+  reason: string
+  total: number
+  refund: number
+  paymentMethods: string
+}
+
 export interface SessionDetail {
   view: SessionView
   receiptNo: number | null
   openedBy: string
   cashier: string | null
+  /** Chegirmani kim va qachon bergan (chegirma bo'lmasa null) */
+  discountBy: { name: string; at: number } | null
   /** Qaytarishlar (X) — kim, nima, sabab */
   returns: { lineId: Id; name: string; qty: number; reason: string; at: number; byName: string }[]
 }

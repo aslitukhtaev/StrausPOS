@@ -7,7 +7,6 @@
 import type { GuestView } from '@shared/types'
 import { MS_MIN, formatHours, formatTimeShown } from '@shared/billing'
 import { Avatar, Button, Icon, Money, cx, formatMoney } from '@/ui'
-import { guestPhase } from './live'
 
 export interface GuestCardProps {
   guest: GuestView
@@ -21,18 +20,17 @@ export interface GuestCardProps {
   onExtend: () => void
 }
 
-export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause, onResume, onFinish, onExtend }: GuestCardProps) {
-  const phase = guestPhase(g, warnMs)
+export function GuestCard({ guest: g, canManage, busy, onRename, onPause, onResume, onFinish, onExtend }: GuestCardProps) {
   const k = (a: string) => busy === a + ':' + g.id
   const anyBusy = busy != null && busy.endsWith(':' + g.id)
   const paidMs = Math.max(1, g.paidMinutes * MS_MIN)
   const leftPct = Math.max(0, Math.min(100, (g.remainingMs / paidMs) * 100))
   const extra = g.billedMinutes - g.paidMinutes
   const over = g.remainingMs <= 0
-  const stateText = g.state === 'finished' ? 'Chiqib ketdi' : g.state === 'paused' ? 'Pauza' : over ? 'Vaqt tugadi' : phase === 'warn' ? 'Tugayapti' : 'Qoldi'
+  const stateText = g.state === 'finished' ? 'Chiqib ketdi' : g.state === 'paused' ? 'Pauza' : 'Qoldi'
 
   return (
-    <div className={cx('rooms-guest', 'rooms-guest--' + g.state, g.state !== 'finished' && 'rooms-guest--' + phase)} data-guest={g.label}>
+    <div className={cx('rooms-guest', 'rooms-guest--' + g.state,)} data-guest={g.label}>
       <div className="rooms-guest__head">
         <Avatar name={g.label} size={36} />
         <button
@@ -59,14 +57,6 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
       <div className="rooms-guest__progress" aria-hidden>
         <span style={{ width: (over ? 100 : leftPct) + '%' }} />
       </div>
-      {g.remainingMs < 0 && (
-        <div className="rooms-guest__overnote" data-testid="overnote">
-          <Icon name="alert" size={16} />
-          <span>
-            {formatHours(Math.max(1, Math.floor(-g.remainingMs / 60_000)))} oshdi · {extra > 0 ? `${formatHours(extra)} qo'shildi` : 'imtiyozli vaqt'}
-          </span>
-        </div>
-      )}
 
       <div className="rooms-guest__money">
         <div className="rooms-guest__meta">
@@ -81,13 +71,13 @@ export function GuestCard({ guest: g, warnMs, canManage, busy, onRename, onPause
             </span>
           )}
         </div>
-        <Money value={g.timeAmount} size="xl" tone={g.state === 'finished' ? 'muted' : over ? 'danger' : 'default'} />
+        <Money value={g.timeAmount} size="xl" tone={g.state === 'finished' ? 'muted' : 'default'} />
       </div>
 
       {canManage &&
         (g.state !== 'finished' ? (
           <div className="rooms-guest__actions">
-            <Button size="md" variant={over || phase === 'warn' ? 'primary' : 'secondary'} icon="plus" onClick={onExtend} loading={k('extend')} disabled={anyBusy && !k('extend')} className="rooms-guest__extend">
+            <Button size="md" variant="secondary" icon="plus" onClick={onExtend} loading={k('extend')} disabled={anyBusy && !k('extend')} className="rooms-guest__extend">
               1 soat
             </Button>
             {g.state === 'running' ? (

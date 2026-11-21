@@ -10,7 +10,7 @@ import { useApp } from '@/store/app'
 import {
   Button, Card, EmptyState, Icon, IconButton, Money, PageHeader, Spinner, StatusPill, cx, formatMoney, toast, useNow
 } from '@/ui'
-import { alertLabel, liveTotals, roomTone, useBillingOptions, useWarnMs, type LiveTotals } from './live'
+import { liveTotals, roomTone, useBillingOptions, useWarnMs, type LiveTotals } from './live'
 import { OpenRoomDialog } from './OpenRoomDialog'
 import { useBoard } from './boardStore'
 
@@ -149,7 +149,7 @@ export function RoomBoard({ onOpenSession }: { onOpenSession: (sessionId: number
 function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: LiveTotals | null; readOnly: boolean; onClick: () => void }) {
   const { room, session } = card
   const tone = roomTone(live)
-  const cardTone = tone === 'free' ? 'success' : tone === 'busy' ? 'busy' : tone === 'warn' ? 'warning' : 'danger'
+  const cardTone = tone === 'free' ? 'success' : 'busy'
   const people = live ? live.running + live.paused : 0
   const left = live ? live.minRemainingMs : null
   return (
@@ -168,9 +168,6 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
           <div className="rooms-tile__name" title={room.name}>{room.name}</div>
           {tone === 'free' && <StatusPill status="free" size="lg" />}
           {tone === 'busy' && <StatusPill status="busy" size="lg" />}
-          {tone === 'warn' && <StatusPill status="paused" size="lg">Tugayapti</StatusPill>}
-          {tone === 'over' && <StatusPill status="ending" size="lg">Vaqt tugadi!</StatusPill>}
-          {tone === 'alert' && live && <StatusPill status="ending" size="lg">{alertLabel(live)}</StatusPill>}
         </div>
         <div className="rooms-tile__meta">
           <span>
@@ -223,7 +220,7 @@ function RoomTile({ card, live, readOnly, onClick }: { card: RoomCard; live: Liv
                   <span className="num">{people}/{room.capacity}</span>
                 </span>
               </span>
-              <Money value={live.due} size="3xl" tone={tone === 'alert' || tone === 'over' ? 'danger' : 'accent'} />
+              <Money value={live.due} size="3xl" tone="accent" />
             </div>
           </>
         )}

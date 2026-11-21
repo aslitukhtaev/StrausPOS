@@ -12,7 +12,7 @@ import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow,
+  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenPayout, SessionHistoryRow, SoldItemRow, VoidedSessionRow, SalesFilter,
   Expense, ExpenseCategory, ProfitReport
 } from '../../src/shared/types'
 import { DEFAULT_ROLE_PERMISSIONS, EDITABLE_ROLES, ALL_PERMISSIONS, ROLE_LABELS, can, effectivePermissions } from '../../src/shared/permissions'
@@ -125,7 +125,7 @@ interface StaffRow {
 }
 interface RoomRow { id: number; name: string; price_per_hour: number; capacity: number; active: number; sort_order: number; deleted: number }
 interface CategoryRow { id: number; name: string; sort_order: number; department: Department }
-interface ProductRow { id: number; category_id: number; name: string; price: number; stock: number; track_stock: number; low_stock_at: number; active: number; deleted: number; cost_price: number }
+interface ProductRow { id: number; category_id: number; name: string; price: number; stock: number; track_stock: number; low_stock_at: number; active: number; deleted: number; cost_price: number; print_ticket: number }
 interface ServiceRow { id: number; name: string; price: number; duration_min: number | null; active: number; deleted: number }
 interface SessionRow {
   id: number; kind: SessionKind; room_id: number | null; status: 'open' | 'closed'; opened_at: number; closed_at: number | null; opened_by: number
@@ -140,7 +140,7 @@ interface IntervalRow { id: number; guest_id: number; room_id: number; rate: num
 interface LineRow {
   id: number; session_id: number; guest_id: number | null; kind: 'product' | 'service'; ref_id: number; name: string
   unit_price: number; qty: number; returned_qty: number; provider_id: number | null; created_at: number; created_by: number
-  department: Department | null; waiter_id: number | null; waiter_pct: number; cost_price: number
+  department: Department | null; waiter_id: number | null; waiter_pct: number; cost_price: number; print_ticket: number
 }
 interface PaymentRow { id: number; session_id: number; method: PayMethod; amount: number; at: number; by: number }
 interface DebtRow {
@@ -167,7 +167,7 @@ const toCategory = (r: CategoryRow): ProductCategory => ({
 })
 const toProduct = (r: ProductRow): Product => ({
   id: r.id, categoryId: r.category_id, name: r.name, price: r.price, stock: r.stock, trackStock: !!r.track_stock, lowStockAt: r.low_stock_at, active: !!r.active,
-  costPrice: r.cost_price ?? 0
+  costPrice: r.cost_price ?? 0, printTicket: !!r.print_ticket
 })
 const toService = (r: ServiceRow): ServiceItem => ({ id: r.id, name: r.name, price: r.price, durationMin: r.duration_min, active: !!r.active })
 const toSession = (r: SessionRow): Session => ({
@@ -1051,6 +1051,10 @@ export class PosService implements PosApi {
         receiptNo: sr.receipt_no ?? null,
         openedBy: names.get(sr.opened_by) ?? '',
         cashier: sr.closed_by != null ? names.get(sr.closed_by) ?? null : null,
+        discountBy: (() => {
+          const r = this.db.get<{ discount_by: number | null; discount_at: number | null }>('SELECT discount_by, discount_at FROM sessions WHERE id=?', [sr.id])
+          return r && r.discount_by != null && r.discount_at != null ? { name: names.get(r.discount_by) ?? '', at: r.discount_at } : null
+        })(),
         returns
       }
     },
@@ -1174,12 +1178,14 @@ export class PosService implements PosApi {
     },
 
     setDiscount: async (sessionId, amount) => {
-      this.need('discount.apply')
+      const me = this.need('discount.apply')
       const s = this.openSessionRow(sessionId)
       reqInt(amount, "Chegirma 0 yoki musbat butun son bo'lishi kerak", 0)
       const v = this.view(s.id)
       if (amount > v.timeTotal + v.linesTotal) fail('Chegirma jami summadan oshmasligi kerak')
-      this.db.tx(() => this.db.run('UPDATE sessions SET discount=? WHERE id=?', [amount, s.id]))
+      this.db.tx(() =>
+        this.db.run('UPDATE sessions SET discount=?, discount_by=?, discount_at=? WHERE id=?', [amount, amount > 0 ? me.id : null, amount > 0 ? this.now() : null, s.id])
+      )
       return this.view(s.id)
     },
 
@@ -1215,6 +1221,87 @@ export class PosService implements PosApi {
         this.db.run("UPDATE guests SET state='finished' WHERE session_id=?", [s.id])
         this.db.run("UPDATE sessions SET status='closed', cancelled=1, closed_at=?, closed_by=? WHERE id=?", [now, me.id, s.id])
       })
+    },
+
+    void: async (sessionId, password, reason) => {
+      const me = this.need('history.view')
+      this.checkVoidPassword(password)
+      const s = this.sessionRow(sessionId)
+      if (s.status !== 'closed' || s.cancelled) fail("Faqat yopilgan va bekor qilinmagan hisobni bekor qilish mumkin")
+      const why = typeof reason === 'string' ? reason.trim().slice(0, 200) : ''
+      const debts = this.db.all<DebtRow>('SELECT * FROM debts WHERE session_id=?', [s.id])
+      for (const d of debts) {
+        const n = this.db.get<{ c: number }>('SELECT COUNT(*) AS c FROM debt_payments WHERE debt_id=?', [d.id])?.c ?? 0
+        if (n > 0) fail("Bu hisobdagi qarz qisman to'langan — bekor qilib bo'lmaydi")
+      }
+      const pays = this.db.all<PaymentRow>('SELECT * FROM payments WHERE session_id=?', [s.id])
+      const refund = pays.filter((p) => p.method !== 'debt').reduce((a, p) => a + p.amount, 0)
+      const now = this.now()
+      this.db.tx(() => {
+        // Sotilgan (qaytarilmagan) mahsulotlar omborga qaytadi
+        const rows = this.db.all<LineRow>("SELECT * FROM order_lines WHERE session_id=? AND kind='product'", [s.id])
+        for (const l of rows) {
+          const q = l.qty - l.returned_qty
+          if (q <= 0) continue
+          const p = this.db.get<ProductRow>('SELECT * FROM products WHERE id=?', [l.ref_id])
+          if (p && p.track_stock) {
+            this.db.run('UPDATE products SET stock=stock+? WHERE id=?', [q, p.id])
+            this.addStockMove(p.id, q, 'Hisob bekor qilindi' + (why ? ': ' + why : ''), l.id, me.id)
+          }
+        }
+        this.db.run('DELETE FROM debts WHERE session_id=?', [s.id])
+        this.db.run('UPDATE sessions SET cancelled=1, voided_at=?, voided_by=?, void_reason=?, void_refund=? WHERE id=?', [now, me.id, why, refund, s.id])
+      })
+    },
+
+    voided: async (range) => {
+      this.needRead('history.view')
+      const { from, to } = this.checkRange(range)
+      const rows = this.db.all<SessionRow & { room_name: string | null; by_name: string | null; voided_at: number; void_reason: string; void_refund: number }>(
+        `SELECT s.*, r.name AS room_name, st.name AS by_name FROM sessions s
+         LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.voided_by
+         WHERE s.voided_at IS NOT NULL AND s.voided_at>=? AND s.voided_at<? ORDER BY s.voided_at DESC`,
+        [from, to]
+      )
+      return rows.map((s): VoidedSessionRow => {
+        const pays = this.db.all<PaymentRow>('SELECT * FROM payments WHERE session_id=? ORDER BY id', [s.id])
+        const names: Record<string, string> = { cash: 'Naqd', card: 'Click', terminal: 'Terminal', debt: 'Qarz' }
+        return {
+          sessionId: s.id,
+          receiptNo: s.receipt_no ?? null,
+          roomName: s.kind === 'bar' ? BAR_ROOM.name : s.room_name ?? '',
+          closedAt: s.closed_at ?? 0,
+          voidedAt: s.voided_at,
+          voidedBy: s.by_name ?? '',
+          reason: s.void_reason,
+          total: s.total ?? 0,
+          refund: s.void_refund,
+          paymentMethods: pays.map((p) => names[p.method] || p.method).join(', ') || '—'
+        }
+      })
+    },
+
+    setVoidPassword: async (current, next) => {
+      this.need('settings.manage')
+      this.checkVoidPassword(current)
+      if (typeof next !== 'string' || next.length < 1 || next.length > 32) fail("Yangi parol 1 dan 32 belgigacha bo'lishi kerak")
+      this.db.tx(() =>
+        this.db.run("INSERT INTO kv(key, value) VALUES('voidPass', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [hashPin(next)])
+      )
+    }
+  }
+
+  private voidFails: number[] = []
+  /** Bekor qilish parolini tekshirish (standart "2"); 5 marta xato — 1 daqiqa to'siq */
+  private checkVoidPassword(pw: unknown): void {
+    const now = this.now()
+    this.voidFails = this.voidFails.filter((t) => now - t < 60_000)
+    if (this.voidFails.length >= 5) fail("Parol ko'p marta noto'g'ri kiritildi — 1 daqiqadan keyin urinib ko'ring")
+    const row = this.db.get<{ value: string }>("SELECT value FROM kv WHERE key='voidPass'")
+    const ok = typeof pw === 'string' && (row ? verifyPin(pw, row.value) : pw === '2')
+    if (!ok) {
+      this.voidFails.push(now)
+      fail("Bekor qilish paroli noto'g'ri")
     }
   }
 
@@ -1266,12 +1353,12 @@ export class PosService implements PosApi {
       }
     }
     const settings = this.loadSettings()
-    const kitchenItems = items.filter((x) => x.dep === 'kitchen').map((x) => ({ name: x.p.name, qty: x.qty }))
+    const kitchenItems = items.filter((x) => x.dep === 'kitchen' || x.p.print_ticket).map((x) => ({ name: x.p.name, qty: x.qty }))
     const now = this.now()
     const ticketId = this.db.tx(() => {
       for (const { p, dep, qty } of items) {
-        const params: (number | string)[] = [s.id, p.id, p.price, dep, p.cost_price ?? 0]
-        let where = 'session_id=? AND kind=\'product\' AND ref_id=? AND unit_price=? AND department=? AND cost_price=?'
+        const params: (number | string)[] = [s.id, p.id, p.price, dep, p.cost_price ?? 0, p.print_ticket ? 1 : 0]
+        let where = 'session_id=? AND kind=\'product\' AND ref_id=? AND unit_price=? AND department=? AND cost_price=? AND print_ticket=?'
         if (guestId == null) where += ' AND guest_id IS NULL'
         else {
           where += ' AND guest_id=?'
@@ -1290,9 +1377,9 @@ export class PosService implements PosApi {
         } else {
           lineId = this.db.insert(
             `INSERT INTO order_lines(session_id, guest_id, kind, ref_id, name, unit_price, qty, returned_qty, provider_id, created_at, created_by,
-               department, waiter_id, waiter_pct, cost_price)
-             VALUES(?,?,'product',?,?,?,?,0,NULL,?,?,?,?,?,?)`,
-            [s.id, guestId ?? null, p.id, p.name, p.price, qty, now, me.id, dep, waiter ? waiter.id : null, waiter ? waiter.pct : 0, p.cost_price ?? 0]
+               department, waiter_id, waiter_pct, cost_price, print_ticket)
+             VALUES(?,?,'product',?,?,?,?,0,NULL,?,?,?,?,?,?,?)`,
+            [s.id, guestId ?? null, p.id, p.name, p.price, qty, now, me.id, dep, waiter ? waiter.id : null, waiter ? waiter.pct : 0, p.cost_price ?? 0, p.print_ticket ? 1 : 0]
           )
         }
         if (p.track_stock) {
@@ -1358,7 +1445,7 @@ export class PosService implements PosApi {
       const why = optText(reason, 200)
       const now = this.now()
       const settings = this.loadSettings()
-      const cancelKitchen = l.kind === 'product' && l.department === 'kitchen' && settings.kitchen.autoPrint
+      const cancelKitchen = l.kind === 'product' && (l.department === 'kitchen' || !!l.print_ticket) && settings.kitchen.autoPrint
       const ticketId = this.db.tx(() => {
         this.db.run('UPDATE order_lines SET returned_qty=returned_qty+? WHERE id=?', [qty, l.id])
         this.db.insert('INSERT INTO returns(line_id, session_id, qty, reason, at, by) VALUES(?,?,?,?,?,?)', [l.id, s.id, qty, why, now, me.id])
@@ -1604,8 +1691,8 @@ export class PosService implements PosApi {
         const active = bool(p.active, !!cur.active)
         this.db.tx(() => {
           this.db.run(
-            'UPDATE products SET category_id=?, name=?, price=?, stock=?, track_stock=?, low_stock_at=?, active=?, cost_price=? WHERE id=?',
-            [cat.id, name, price, stock, b2i(track), low, b2i(active), cost ?? cur.cost_price ?? 0, cur.id]
+            'UPDATE products SET category_id=?, name=?, price=?, stock=?, track_stock=?, low_stock_at=?, active=?, cost_price=?, print_ticket=? WHERE id=?',
+            [cat.id, name, price, stock, b2i(track), low, b2i(active), cost ?? cur.cost_price ?? 0, b2i(bool(p.printTicket, !!cur.print_ticket)), cur.id]
           )
           if (stock !== cur.stock) this.addStockMove(cur.id, stock - cur.stock, 'Tahrirlash', null, me.id)
         })
@@ -1615,8 +1702,8 @@ export class PosService implements PosApi {
       const low = p.lowStockAt === undefined ? 5 : reqInt(p.lowStockAt, "Kam qoldiq chegarasi noto'g'ri", 0)
       const id = this.db.tx(() => {
         const nid = this.db.insert(
-          'INSERT INTO products(category_id, name, price, stock, track_stock, low_stock_at, active, cost_price) VALUES(?,?,?,?,?,?,?,?)',
-          [cat.id, name, price, stock, b2i(bool(p.trackStock, true)), low, b2i(bool(p.active, true)), cost ?? 0]
+          'INSERT INTO products(category_id, name, price, stock, track_stock, low_stock_at, active, cost_price, print_ticket) VALUES(?,?,?,?,?,?,?,?,?)',
+          [cat.id, name, price, stock, b2i(bool(p.trackStock, true)), low, b2i(bool(p.active, true)), cost ?? 0, b2i(bool(p.printTicket, false))]
         )
         if (stock > 0) this.addStockMove(nid, stock, 'Boshlang‘ich qoldiq', null, me.id)
         return nid
@@ -1850,7 +1937,7 @@ export class PosService implements PosApi {
       const s = this.sessionRow(sessionId)
       if (s.cancelled) fail('Sessiya bekor qilingan')
       const lines = this.db.all<LineRow>(
-        "SELECT * FROM order_lines WHERE session_id=? AND kind='product' AND department='kitchen' AND qty>returned_qty ORDER BY id",
+        "SELECT * FROM order_lines WHERE session_id=? AND kind='product' AND (department='kitchen' OR print_ticket=1) AND qty>returned_qty ORDER BY id",
         [s.id]
       )
       if (lines.length === 0) fail("Bu buyurtmada oshxona mahsulotlari yo'q")
@@ -2261,22 +2348,33 @@ export class PosService implements PosApi {
 
   // ═════════════ REPORTS ═════════════
   reports: PosApi['reports'] = {
-    sales: async (range: ReportRange): Promise<SalesReport> => {
+    sales: async (range: ReportRange, filter?: SalesFilter): Promise<SalesReport> => {
       this.needRead('reports.view')
       const { from, to } = this.checkRange(range)
-      const sessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
+      const allSessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
         `SELECT s.*, r.name AS room_name, st.name AS staff_name FROM sessions s
          LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.closed_by
          WHERE s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<? ORDER BY s.closed_at`,
         [from, to]
       )
+      const allPays = this.db.all<PaymentRow>(
+        `SELECT * FROM payments WHERE session_id IN (${allSessions.length ? allSessions.map((s) => s.id).join(',') : '-1'})`
+      )
+      const fMethod = filter && filter.method ? filter.method : null
+      if (fMethod && !PAY_METHODS.includes(fMethod)) fail("To'lov usuli noto'g'ri")
+      const sessions = allSessions.filter((s) => {
+        if (filter && isInt(filter.roomId) && (s.kind === 'bar' ? BAR_ROOM.id : s.room_id ?? 0) !== filter.roomId) return false
+        if (filter && isInt(filter.cashierId) && (s.closed_by ?? s.opened_by) !== filter.cashierId) return false
+        if (fMethod && !allPays.some((p) => p.session_id === s.id && p.method === fMethod)) return false
+        return true
+      })
       const ids = sessions.map((s) => s.id)
       const inList = ids.length ? ids.join(',') : '-1'
       const lines = this.db.all<LineRow & { provider_name: string | null }>(
         `SELECT l.*, st.name AS provider_name FROM order_lines l LEFT JOIN staff st ON st.id=l.provider_id
          WHERE l.session_id IN (${inList})`
       )
-      const pays = this.db.all<PaymentRow>(`SELECT * FROM payments WHERE session_id IN (${inList})`)
+      const pays = allPays.filter((p) => ids.includes(p.session_id) && (!fMethod || p.method === fMethod))
 
       const report: SalesReport = {
         range: { from, to },
@@ -2286,10 +2384,14 @@ export class PosService implements PosApi {
         productRevenue: 0,
         serviceRevenue: 0,
         discounts: 0,
+        discountCount: 0,
         serviceCharge: 0,
         total: 0,
         byMethod: { cash: 0, card: 0, terminal: 0, debt: 0 },
         debtPayments: { cash: 0, card: 0, terminal: 0 },
+        debtCollections: [],
+        voided: { count: 0, refund: 0, cashRefund: 0 },
+        cashDrawer: { sales: 0, debtCollected: 0, refunds: 0, expenses: 0, waiterPayouts: 0, kitchenPayouts: 0, expected: 0 },
         returnsAmount: 0,
         byDay: [],
         byRoom: [],
@@ -2312,6 +2414,7 @@ export class PosService implements PosApi {
         const total = s.total ?? 0
         report.timeRevenue += s.time_total ?? 0
         report.discounts += s.discount_applied ?? 0
+        if ((s.discount_applied ?? 0) > 0) report.discountCount += 1
         report.serviceCharge += s.service_charge ?? 0
         report.total += total
         const day = localDay(s.closed_at ?? s.opened_at)
@@ -2358,6 +2461,31 @@ export class PosService implements PosApi {
         'SELECT method, SUM(amount) AS a FROM debt_payments WHERE at>=? AND at<? GROUP BY method',
         [from, to]
       )) if (d.method in report.debtPayments) report.debtPayments[d.method] += d.a ?? 0
+      report.debtCollections = this.db
+        .all<{ at: number; method: DebtPayMethod; amount: number; created_at: number; name: string | null; customer_name: string }>(
+          `SELECT dp.at, dp.method, dp.amount, d.created_at, dr.name AS name, d.customer_name
+           FROM debt_payments dp JOIN debts d ON d.id=dp.debt_id LEFT JOIN debtors dr ON dr.id=d.debtor_id
+           WHERE dp.at>=? AND dp.at<? ORDER BY dp.at DESC, dp.id DESC`,
+          [from, to]
+        )
+        .map((r) => ({ at: r.at, debtorName: r.name ?? r.customer_name, debtDate: r.created_at, method: r.method, amount: r.amount }))
+      const vs = this.db.all<{ id: number; void_refund: number }>('SELECT id, void_refund FROM sessions WHERE voided_at>=? AND voided_at<?', [from, to])
+      report.voided.count = vs.length
+      report.voided.refund = vs.reduce((a, r) => a + r.void_refund, 0)
+      report.voided.cashRefund = vs.length
+        ? this.db.get<{ a: number | null }>(
+            `SELECT SUM(amount) AS a FROM payments WHERE method='cash' AND session_id IN (${vs.map((r) => r.id).join(',')})`
+          )?.a ?? 0
+        : 0
+      const sum1 = (sql: string): number => this.db.get<{ a: number | null }>(sql, [from, to])?.a ?? 0
+      const cd = report.cashDrawer
+      cd.sales = report.byMethod.cash
+      cd.debtCollected = report.debtPayments.cash
+      cd.refunds = report.voided.cashRefund
+      cd.expenses = sum1('SELECT SUM(amount) AS a FROM expenses WHERE created_at>=? AND created_at<?')
+      cd.waiterPayouts = sum1('SELECT SUM(amount) AS a FROM waiter_payouts WHERE at>=? AND at<?')
+      cd.kitchenPayouts = sum1('SELECT SUM(amount) AS a FROM kitchen_payouts WHERE at>=? AND at<?')
+      cd.expected = cd.sales + cd.debtCollected - cd.refunds - cd.expenses - cd.waiterPayouts - cd.kitchenPayouts
       const ret = this.db.get<{ a: number | null }>(
         `SELECT SUM(r.qty * l.unit_price) AS a FROM returns r JOIN order_lines l ON l.id=r.line_id
          JOIN sessions s ON s.id=r.session_id WHERE s.cancelled=0 AND r.at>=? AND r.at<?`,
@@ -2442,7 +2570,7 @@ export class PosService implements PosApi {
           ? sessionPays.map((p) => {
             const methods: Record<string, string> = {
               cash: 'Naqd',
-              card: 'Karta',
+              card: 'Click',
               terminal: 'Terminal',
               debt: 'Qarz'
             }
@@ -2471,6 +2599,7 @@ export class PosService implements PosApi {
           total,
           paid,
           paymentMethods,
+          payments: sessionPays.map((p) => ({ method: p.method, amount: p.amount })),
           items
         }
       })

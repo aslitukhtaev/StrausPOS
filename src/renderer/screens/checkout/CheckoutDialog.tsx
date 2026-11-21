@@ -3,7 +3,7 @@
  *
  *   <CheckoutDialog sessionId={id} onClose={() => setPayId(null)} onPaid={(r) => { setPayId(null); reload() }} />
  *
- * Oqim: sessions.get → xulosa + to'lov usuli (Naqd / Karta / Terminal / Qarz / Aralash) → checkout.pay →
+ * Oqim: sessions.get → xulosa + to'lov usuli (Naqd / Click / Terminal / Qarz / Aralash) → checkout.pay →
  * chek oynasi (ko'rish, chop etish). Aralash — to'rttala usul (qarz ham) summalar bilan; qarz bo'lsa qarzdor maydoni.
  * Qarzdor `debtors.search` bilan qidiriladi: mavjud odam tanlansa qarz unga qo'shiladi (debtorId).
  * To'lovdan keyin oyna yopilsa FAQAT `onPaid(receipt)` chaqiriladi (sessiya allaqachon yopilgan); to'lovgacha yopilsa — `onClose()`.
@@ -293,7 +293,7 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
 
   const methodOptions: { value: Method; label: string; icon: IconName; disabled?: boolean }[] = [
     { value: 'cash', label: 'Naqd', icon: METHOD_ICON.cash },
-    { value: 'card', label: 'Karta', icon: METHOD_ICON.card },
+    { value: 'card', label: 'Click', icon: METHOD_ICON.card },
     { value: 'terminal', label: 'Terminal', icon: METHOD_ICON.terminal },
     { value: 'debt', label: 'Qarz', icon: METHOD_ICON.debt, disabled: !canDebt },
     { value: 'mixed', label: 'Aralash', icon: 'swap' }
@@ -437,13 +437,13 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
                 <Icon name={METHOD_ICON[method]} size={44} />
               </span>
               <div className="checkout-card__label">
-                {method === 'terminal' ? 'Terminaldan yechiladigan summa' : "Kartaga o'tkaziladigan summa"}
+                {method === 'terminal' ? 'Terminaldan yechiladigan summa' : "Click orqali o'tkaziladigan summa"}
               </div>
               <Money value={total} size="3xl" tone="accent" />
               <div className="checkout-card__hint">
                 {method === 'terminal'
                   ? "Terminalda to'lov o'tganini (chek chiqqanini) tekshirib, «To'lash» ni bosing."
-                  : "Pul kartaga tushganini tekshirib, «To'lash» ni bosing."}
+                  : "Pul Click orqali tushganini tekshirib, «To'lash» ni bosing."}
               </div>
             </div>
           ) : (

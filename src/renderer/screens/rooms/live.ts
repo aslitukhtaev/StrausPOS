@@ -119,22 +119,10 @@ export function useLive(view: SessionView | null, anchor: number): LiveTotals | 
   return useMemo(() => (view ? liveTotals(view, anchor, now, opts, warnMs) : null), [view, anchor, now, opts, warnMs])
 }
 
-/**
- * Xona holati (rang): bo'sh / band (feruza) / tugayapti (amber) / oshdi (qizil) /
- * alert — hamma vaqt to'xtagan yoki to'lov kutilmoqda (qizil).
- */
-export type RoomTone = 'free' | 'busy' | 'warn' | 'over' | 'alert'
+/** Xona holati (rang): faqat bo'sh (yashil) yoki band (moviy). Vaqt tugashi uchun alohida rang/ogohlantirish yo'q. */
+export type RoomTone = 'free' | 'busy'
 
 export function roomTone(live: LiveTotals | null): RoomTone {
-  if (!live) return 'free'
-  if (!live.anyRunning) return 'alert'
-  if (live.phase === 'over') return 'over'
-  if (live.phase === 'warn') return 'warn'
-  return 'busy'
-}
-
-export function alertLabel(live: LiveTotals): string {
-  if (live.guests.length > 0 && live.finished === live.guests.length) return "To'lov kutilmoqda"
-  return "Vaqt to'xtagan"
+  return live ? 'busy' : 'free'
 }
 

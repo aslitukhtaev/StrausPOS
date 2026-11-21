@@ -52,7 +52,7 @@ import { guestElapsedMs, guestTimeAmount } from '@shared/billing'
 | `Numpad` | `value: string`, `onChange`, `mode`: `pin`\|`amount`\|`qty`; `maxLength`, `onSubmit?`, `submitLabel?`, `submitDisabled`, `keyboard` (std true), `disabled`, `size`: `md` 72\|`lg` 80 | Jismoniy klaviatura ham ishlaydi (input fokusda bo'lmasa; modal ichidagisi faqat eng yuqori modalda). `amount`: `[000][0][⌫]`, bosh nol yo'q; `Number(value \|\| 0)` |
 | `PinDots` | `length`, `max`, `error` | PIN nuqtalari |
 | `Stepper` | `value: number`, `onChange`, `min`, `max`, `step`, `size`: `md`\|`lg`, `suffix?` ("kishi") | [−] n [+] |
-| `Segmented` | `value`, `onChange`, `options: {value,label,icon?,disabled?}[]`, `size`: `md`\|`lg`, `block` | Masalan to'lov usuli: Naqd/Karta/Qarz |
+| `Segmented` | `value`, `onChange`, `options: {value,label,icon?,disabled?}[]`, `size`: `md`\|`lg`, `block` | Masalan to'lov usuli: Naqd/Click/Qarz |
 | `Tabs` | `value`, `onChange`, `items: {id,label,icon?,badge?,disabled?}[]` | Kontentni o'zingiz shartli chizasiz |
 | `Field` | `label`, `hint?`, `error?`, `required`, `inline` | `<label>` o'rami |
 | `Input` | `size`: `md` 56\|`lg` 68; `icon?`, `suffix?`, `invalid` + `<input>` atributlari | forwardRef |

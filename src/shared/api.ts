@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, SoldItemRow, Expense, ExpenseCategory, ProfitReport
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, VoidedSessionRow, SalesFilter, SoldItemRow, Expense, ExpenseCategory, ProfitReport
 } from './types'
 import type { Permission } from './types'
 
@@ -78,6 +78,16 @@ export interface PosApi {
     stopAll(sessionId: Id): Promise<SessionView>
     /** Bo'sh (hech narsa qo'shilmagan) sessiyani bekor qilish */
     cancel(sessionId: Id): Promise<void>
+    /**
+     * YOPILGAN hisobni bekor qilish (Tarix → X). Alohida parol kerak (standart "2", Sozlamalarda o'zgartiriladi).
+     * Hisob hisobotlardan chiqadi, mahsulotlar omborga qaytadi, to'langan pul "qaytarilgan pul" bo'lib yoziladi.
+     * Qisman to'langan qarzi bor hisobni bekor qilib bo'lmaydi. Ruxsat: history.view
+     */
+    void(sessionId: Id, password: string, reason: string): Promise<void>
+    /** Bekor qilingan hisoblar ro'yxati. Ruxsat: history.view */
+    voided(range: ReportRange): Promise<VoidedSessionRow[]>
+    /** Bekor qilish parolini almashtirish. Ruxsat: settings.manage */
+    setVoidPassword(current: string, next: string): Promise<void>
   }
 
   // ── Qatorlar (bar/xizmat) ──
@@ -245,7 +255,7 @@ export interface PosApi {
     save(s: AppSettings): Promise<AppSettings>
   }
   reports: {
-    sales(range: ReportRange): Promise<SalesReport>
+    sales(range: ReportRange, filter?: SalesFilter): Promise<SalesReport>
     returns(range: ReportRange): Promise<{ at: number; productName: string; qty: number; amount: number; reason: string; by: string; roomName: string }[]>
     sessions(range: ReportRange): Promise<SessionHistoryRow[]>
   }

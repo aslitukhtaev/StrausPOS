@@ -272,3 +272,37 @@ describe('oshxona kunlik hisobi', () => {
     expect(saved.kitchen).toEqual({ sharePct: 30.56, printerName: 'XP-58', paperWidth: 58, autoPrint: false })
   })
 })
+
+describe('mahsulot bo‘yicha chek (printTicket)', () => {
+  it('belgilangan bar mahsuloti qo‘shilganda chek chiqadi, boshqasida chiqmaydi; qaytarishda BEKOR cheki', async () => {
+    const { svc, rooms, printed } = await kitchenCtx()
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const cola = await productByName(svc, 'Suv 0.5 L')
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+
+    await svc.lines.addProduct(v0.session.id, cola.id, 1, null)
+    expect(printed).toHaveLength(0)
+
+    const saved = await svc.catalog.saveProduct({ ...beer, printTicket: true })
+    expect(saved.printTicket).toBe(true)
+    expect((await productByName(svc, 'Pivo 0.5 L')).printTicket).toBe(true)
+    const v = await svc.lines.addProduct(v0.session.id, beer.id, 2, null)
+    await svc.flushKitchenPrints()
+    expect(printed).toHaveLength(1)
+    expect(printed[0].html).toContain('Pivo 0.5 L')
+    expect(printed[0].html).not.toContain('Suv 0.5')
+    // bar mahsuloti bo'lib qoladi (oshxona ulushiga kirmaydi)
+    expect(v.lines.find((l) => l.name === 'Pivo 0.5 L')!.department).toBe('bar')
+
+    await svc.lines.returnLine(v.lines.find((l) => l.name === 'Pivo 0.5 L')!.id, 1, '')
+    await svc.flushKitchenPrints()
+    expect(printed).toHaveLength(2)
+    expect(printed[1].html).toContain('BEKOR')
+
+    // belgi olib tashlansa — keyingi buyurtmada chek yo'q
+    await svc.catalog.saveProduct({ ...beer, printTicket: false })
+    await svc.lines.addProduct(v0.session.id, beer.id, 1, null)
+    await svc.flushKitchenPrints()
+    expect(printed).toHaveLength(2)
+  })
+})

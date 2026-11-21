@@ -7,7 +7,6 @@ import { useEffect } from 'react'
 import { isAnyModalOpen } from '@/ui'
 import { REFRESH_MS, VIEWER_REFRESH_MS, useBoard } from './boardStore'
 import { useApp } from '@/store/app'
-import { useTimeAlerts } from './useTimeAlerts'
 
 export function useRoomsBackground(): void {
   const fast = useApp((s) => s.readOnly || s.mode !== 'main')
@@ -18,5 +17,4 @@ export function useRoomsBackground(): void {
     }, fast ? VIEWER_REFRESH_MS : REFRESH_MS)
     return () => clearInterval(id)
   }, [fast])
-  useTimeAlerts()
 }

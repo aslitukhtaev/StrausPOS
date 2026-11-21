@@ -3,7 +3,7 @@
  *
  *   <Segmented value={method} onChange={setMethod} options={[
  *     { value: 'cash', label: 'Naqd', icon: 'cash' },
- *     { value: 'card', label: 'Karta', icon: 'card' },
+ *     { value: 'card', label: 'Click', icon: 'card' },
  *     { value: 'debt', label: 'Qarz', icon: 'wallet' },
  *   ]} block size="lg" />
  *

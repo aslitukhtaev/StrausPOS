@@ -102,8 +102,6 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   // M1: 10 daq oshdi → keyingi soat: 50 000 + 10 000 + 50 000 = 110 000
   await expectGuest(pos, 'Mehmon 1', 110_000)
   await expect(guest(pos, 'Mehmon 1').getByTestId('countdown')).toContainText('01:10:00')
-  await expect(guest(pos, 'Mehmon 1').getByTestId('overnote')).toHaveText("10 daq oshdi · 1 soat qo'shildi")
-  await expect(guest(pos, 'Mehmon 1')).toHaveClass(/rooms-guest--over/)
   await guest(pos, 'Mehmon 2').getByRole('button', { name: /Davom/ }).click()
   await expect(guest(pos, 'Mehmon 2')).toHaveClass(/rooms-guest--running/)
   await expect(guest(pos, 'Mehmon 2')).toContainText('× 60 000') // yangi xona narxida yuradi
@@ -145,11 +143,11 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   await expectWsTotal(pos, 400_000)
   let co = await startCheckout(pos)
   expect(await checkoutTotal(co)).toBe(400_000)
-  await co.getByRole('radio', { name: 'Karta' }).click()
+  await co.getByRole('radio', { name: 'Click' }).click()
   await expect(co.locator('.checkout-card')).toContainText("400 000 so'm")
   await co.getByRole('button', { name: "To'lash · 400 000 so'm" }).click()
   let rc = await finishReceipt(pos, 400_000)
-  expect(rc).toContain('Karta')
+  expect(rc).toContain('Click')
   await expect(tile(pos, 'VIP xona')).toHaveAttribute('aria-label', "VIP xona — bo'sh")
 
   // ───── +100: A to'lov (naqd, qaytim) ─────
@@ -207,8 +205,8 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   await co.getByRole('radio', { name: 'Aralash' }).click()
   await pos.typeDigits('20000')
   await co.locator('.checkout-row[data-method="card"]').click()
-  await co.getByRole('button', { name: 'Qolganini: Karta' }).click()
-  await expect(co.locator('.checkout-row', { hasText: 'Karta' })).toContainText('80 000')
+  await co.getByRole('button', { name: 'Qolganini: Click' }).click()
+  await expect(co.locator('.checkout-row', { hasText: 'Click' })).toContainText('80 000')
   await expect(co.locator('.checkout-change')).toContainText('0')
   await co.getByRole('button', { name: "To'lash · 100 000 so'm" }).click()
   rc = await finishReceipt(pos, 100_000)
@@ -258,7 +256,7 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   await pos.setNow(T0 + 210 * MIN)
   await row.getByRole('button', { name: "To'lash" }).click()
   pd = pos.dialog("Qarzni to'lash")
-  await pd.getByRole('radio', { name: 'Karta' }).click()
+  await pd.getByRole('radio', { name: 'Click' }).click()
   await pd.getByRole('button', { name: 'Hammasi' }).click()
   await pd.getByRole('button', { name: "20 000 so'm qabul qilish" }).click()
   await expect(pos.toast("Qarz to'liq yopildi")).toBeVisible()

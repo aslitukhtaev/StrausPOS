@@ -10,9 +10,10 @@ import { presetRange } from './common'
 import { DateFilter } from './DateFilter'
 import { SessionsTab } from './SessionsTab'
 import { SoldTab } from './SoldTab'
+import { VoidedTab } from './VoidedTab'
 import './history.css'
 
-type Tab = 'sessions' | 'sold'
+type Tab = 'sessions' | 'sold' | 'voided'
 
 export default function HistoryScreen() {
   const [tab, setTab] = useState<Tab>('sessions')
@@ -25,11 +26,12 @@ export default function HistoryScreen() {
         onChange={setTab}
         items={[
           { id: 'sessions', label: 'Sessiyalar', icon: 'receipt' },
-          { id: 'sold', label: 'Sotuvlar', icon: 'user' }
+          { id: 'sold', label: 'Sotuvlar', icon: 'user' },
+          { id: 'voided', label: 'Bekor qilinganlar', icon: 'xCircle' }
         ]}
       />
       <div className="hist-filters"><DateFilter onChange={setRange} /></div>
-      {tab === 'sessions' ? <SessionsTab range={range} /> : <SoldTab range={range} />}
+      {tab === 'sessions' ? <SessionsTab range={range} /> : tab === 'sold' ? <SoldTab range={range} /> : <VoidedTab range={range} />}
     </div>
   )
 }

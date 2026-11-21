@@ -14,7 +14,7 @@ import {
   Badge, Button, EmptyState, Icon, IconButton, Money, Spinner, StatusPill, confirmDialog, cx, formatClock,
   formatMoney, getNow, isAnyModalOpen, toast
 } from '@/ui'
-import { alertLabel, roomTone, useLive, useWarnMs } from './live'
+import { roomTone, useLive, useWarnMs } from './live'
 import { GuestCard } from './GuestCard'
 import { AddGuestDialog } from './AddGuestDialog'
 import { PreBillDialog } from './PreBillDialog'
@@ -247,9 +247,6 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
           <div className="rooms-ws__titlerow">
             <h1 className="rooms-ws__room">{room.name}</h1>
             {tone === 'busy' && <StatusPill status="busy" />}
-            {tone === 'warn' && <StatusPill status="paused">Tugayapti</StatusPill>}
-            {tone === 'over' && <StatusPill status="ending">Vaqt tugadi!</StatusPill>}
-            {tone === 'alert' && <StatusPill status="ending">{alertLabel(live)}</StatusPill>}
           </div>
           <div className="rooms-ws__sub">
             <span>
@@ -405,8 +402,27 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
                 )}
               </div>
             )}
-            {(canDiscount || canCancel) && (
+            {(canDiscount || canCancel || canManage) && (
               <div className="rooms-bill__tools">
+                {canManage && live.running + live.paused > 0 && (
+                  <Button
+                    icon={live.running > 0 ? 'pause' : 'play'}
+                    loading={busy === 'pauseAll'}
+                    onClick={() =>
+                      void run('pauseAll', async () => {
+                        let v = view
+                        const pausing = live.running > 0
+                        for (const g of live.guests) {
+                          if (pausing && g.state === 'running') v = await api.sessions.guestPause(g.id)
+                          else if (!pausing && g.state === 'paused') v = await api.sessions.guestResume(g.id)
+                        }
+                        return v
+                      })
+                    }
+                  >
+                    {live.running > 0 ? 'Pauza' : 'Davom ettirish'}
+                  </Button>
+                )}
                 {canDiscount && (
                   <Button
                     icon="percent"

@@ -201,7 +201,7 @@ export function DetailDialog({ sessionId, onClose }: { sessionId: number; onClos
               <div className="hist-totals" data-testid="hist-totals">
                 {!isBar && (<><span>Vaqt</span><Money value={v.timeTotal} /></>)}
                 <span>Buyurtmalar</span><Money value={v.linesTotal} />
-                {v.discount > 0 && (<><span>Chegirma</span><Money value={-v.discount} tone="success" /></>)}
+                {v.discount > 0 && (<><span data-testid="hist-discount-by">Chegirma{d.discountBy ? ' · ' + (d.discountBy.name || '—') + ', ' + formatClock(d.discountBy.at) : ''}</span><Money value={-v.discount} tone="success" /></>)}
                 {v.serviceCharge > 0 && (<><span>Obsluga {v.serviceChargePct}%</span><Money value={v.serviceCharge} /></>)}
                 <span className="is-total">JAMI</span><span className="is-total"><Money value={v.total} size="xl" tone="accent" /></span>
                 {v.payments.map((p) => (

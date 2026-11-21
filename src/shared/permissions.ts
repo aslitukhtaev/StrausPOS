@@ -32,7 +32,7 @@ export interface PermissionInfo {
 export const PERMISSION_CATALOG: PermissionInfo[] = [
   { perm: 'session.open', group: 'Xonalar', label: 'Xonani ochish', description: "Xona ochish, mehmon qo'shish, bar savdosi" },
   { perm: 'session.manage', group: 'Xonalar', label: 'Sessiyani boshqarish', description: "Pauza, tugatish, +1 soat, xona almashtirish, buyurtma qo'shish, bekor qilish" },
-  { perm: 'session.pay', group: 'Xonalar', label: "To'lovni qabul qilish", description: "Hisobni yopish va to'lov (naqd, karta, terminal, qarz)" },
+  { perm: 'session.pay', group: 'Xonalar', label: "To'lovni qabul qilish", description: "Hisobni yopish va to'lov (naqd, Click, terminal, qarz)" },
   { perm: 'line.return', group: 'Xonalar', label: 'Qaytarish (X)', description: "Qo'shilgan mahsulot yoki xizmatni qaytarish" },
   { perm: 'discount.apply', group: 'Xonalar', label: 'Chegirma berish', description: 'Hisobga chegirma qo\'llash' },
   { perm: 'price.override', group: 'Xonalar', label: "Narxni o'zgartirish", description: "Sessiyada narxni qo'lda o'zgartirish" },

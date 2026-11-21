@@ -1,5 +1,5 @@
 /**
- * Xonalar paneli ma'lumoti (rooms.board()) — RoomBoard va vaqt ogohlantirishlari (useTimeAlerts) uchun umumiy.
+ * Xonalar paneli ma'lumoti (rooms.board()) — RoomBoard uchun umumiy.
  * Yuklash `RoomsScreen` da har REFRESH_MS da; sessiya oynasidagi amallar natijasi `patchSession` bilan darhol
  * shu yerga ham yoziladi (masalan "+1 soat" dan keyin eskirgan ma'lumot bilan noto'g'ri ogohlantirish chiqmasin).
  */

@@ -3,13 +3,16 @@
  * xizmat ko'rsatuvchilar, kassirlar va qaytarishlar. Tashqi kutubxonasiz.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReportRange, SalesReport } from '@shared/types'
+import type { PayMethod, ReportRange, Room, SalesFilter, SalesReport, Staff } from '@shared/types'
 import type { IconName } from '../../ui'
 import { api } from '../../api'
 import { useApp } from '../../store/app'
 import { useNav } from '../../store/nav'
+import { useCan } from '../../store/auth'
+import ProfitView from '../profit/ProfitView'
+import { fromInputDT, toInputDT } from '../history/common'
 import {
-  Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Spinner, formatDate, formatDateShort,
+  Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Select, Spinner, formatDate, formatDateShort,
   formatDateTime, formatMoney, getNow, toast, cx
 } from '../../ui'
 import './reports.css'
@@ -58,7 +61,7 @@ function rangeLabel(r: ReportRange): string {
 
 const METHODS = [
   { key: 'cash', label: 'Naqd', color: 'var(--free-fill)', icon: 'cash' },
-  { key: 'card', label: 'Karta', color: 'var(--info)', icon: 'card' },
+  { key: 'card', label: 'Click', color: 'var(--info)', icon: 'card' },
   { key: 'terminal', label: 'Terminal', color: 'var(--busy-fill)', icon: 'receipt' },
   { key: 'debt', label: 'Qarz', color: 'var(--danger)', icon: 'wallet' }
 ] as const
@@ -68,20 +71,38 @@ const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 
 export default function ReportsScreen() {
   const businessName = useApp((s) => s.businessName)
   const go = useNav((s) => s.go)
+  const canProfit = useCan('profit.view')
+  const [tab, setTab] = useState<'sales' | 'profit'>('sales')
   const [preset, setPreset] = useState<Preset>('today')
-  const [fromStr, setFromStr] = useState(() => toInput(getNow()))
-  const [toStr, setToStr] = useState(() => toInput(getNow()))
+  const [fromStr, setFromStr] = useState(() => toInputDT(startOfDay(getNow())))
+  const [toStr, setToStr] = useState(() => toInputDT(getNow()))
   const [range, setRange] = useState<ReportRange>(() => presetRange('today', getNow()))
   const [data, setData] = useState<{ sales: SalesReport; returns: ReturnRow[]} | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [roomId, setRoomId] = useState('all')
+  const [cashierId, setCashierId] = useState('all')
+  const [method, setMethod] = useState('all')
+  const [rooms, setRooms] = useState<Room[]>([])
+  const [staffList, setStaffList] = useState<Staff[]>([])
   const seq = useRef(0)
+  const filter = useMemo<SalesFilter>(() => ({
+    roomId: roomId === 'all' ? null : Number(roomId),
+    cashierId: cashierId === 'all' ? null : Number(cashierId),
+    method: method === 'all' ? null : (method as PayMethod)
+  }), [roomId, cashierId, method])
+  const filtered = roomId !== 'all' || cashierId !== 'all' || method !== 'all'
 
-  const load = useCallback((r: ReportRange) => {
+  useEffect(() => {
+    api.rooms.list().then(setRooms).catch(() => undefined)
+    api.staff.list().then(setStaffList).catch(() => undefined)
+  }, [])
+
+  const load = useCallback((r: ReportRange, f: SalesFilter) => {
     const my = ++seq.current
     setLoading(true)
     setFailed(false)
-    Promise.all([api.reports.sales(r), api.reports.returns(r)])
+    Promise.all([api.reports.sales(r, f), api.reports.returns(r)])
       .then(([sales, returns]) => {
         if (my !== seq.current) return
         setData({ sales, returns })
@@ -95,24 +116,24 @@ export default function ReportsScreen() {
       })
   }, [])
 
-  useEffect(() => load(range), [range, load])
+  useEffect(() => load(range, filter), [range, filter, load])
 
   const pickPreset = (p: Preset) => {
     setPreset(p)
     if (p !== 'custom') {
       const r = presetRange(p, getNow())
       setRange(r)
-      setFromStr(toInput(r.from))
-      setToStr(toInput(r.to - 1))
+      setFromStr(toInputDT(r.from))
+      setToStr(toInputDT(r.to - 1))
     }
   }
 
   const applyCustom = () => {
-    const f = fromInput(fromStr)
-    const t = fromInput(toStr)
-    if (f === null || t === null) return toast.warning('Ikkala sanani ham kiriting')
-    if (t < f) return toast.warning("Oxirgi sana boshlanishidan oldin bo'lishi mumkin emas")
-    setRange({ from: f, to: addDays(t, 1) })
+    const f = fromInputDT(fromStr)
+    const t = fromInputDT(toStr)
+    if (f === null || t === null) return toast.warning('Sana va vaqtni kiriting')
+    if (t < f) return toast.warning("Oxirgi vaqt boshlanishidan oldin bo'lishi mumkin emas")
+    setRange({ from: f, to: t + 60_000 })
   }
 
   const s = data?.sales
@@ -143,6 +164,17 @@ export default function ReportsScreen() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {canProfit && (
+          <Segmented
+            size="lg"
+            value={tab}
+            onChange={(v) => setTab(v as 'sales' | 'profit')}
+            options={[
+              { value: 'sales', label: 'Savdo', icon: 'reports' },
+              { value: 'profit', label: 'Sof foyda', icon: 'percent' }
+            ]}
+          />
+        )}
         <div className="rep-period">
           <Segmented
             size="lg"
@@ -159,29 +191,57 @@ export default function ReportsScreen() {
           {preset === 'custom' && (
             <div className="rep-period__custom">
               <Field label="Dan">
-                <Input type="date" value={fromStr} max={toStr || undefined} onChange={(e) => setFromStr(e.target.value)} />
+                <Input type="datetime-local" value={fromStr} max={toStr || undefined} onChange={(e) => setFromStr(e.target.value)} />
               </Field>
               <Field label="Gacha">
-                <Input type="date" value={toStr} min={fromStr || undefined} onChange={(e) => setToStr(e.target.value)} />
+                <Input type="datetime-local" value={toStr} min={fromStr || undefined} onChange={(e) => setToStr(e.target.value)} />
               </Field>
               <Button variant="primary" icon="check" onClick={applyCustom}>Ko'rsatish</Button>
             </div>
           )}
           {loading && data && <Spinner size={24} />}
         </div>
+        {tab === 'sales' && (
+          <div className="rep-filters" data-testid="rep-filters">
+            <Select size="lg" value={roomId} onChange={(e) => setRoomId(e.target.value)} aria-label="Xona" data-testid="rep-room">
+              <option value="all">Barcha xonalar</option>
+              <option value="0">Bar (xonasiz)</option>
+              {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+            <Select size="lg" value={cashierId} onChange={(e) => setCashierId(e.target.value)} aria-label="Kassir" data-testid="rep-cashier">
+              <option value="all">Barcha kassirlar</option>
+              {staffList.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+            </Select>
+            <Select size="lg" value={method} onChange={(e) => setMethod(e.target.value)} aria-label="To'lov usuli" data-testid="rep-method">
+              <option value="all">Barcha to'lovlar</option>
+              <option value="cash">Naqd</option>
+              <option value="card">Click</option>
+              <option value="terminal">Terminal</option>
+              <option value="debt">Qarz</option>
+            </Select>
+            {filtered && (
+              <>
+                <Button variant="ghost" icon="x" onClick={() => { setRoomId('all'); setCashierId('all'); setMethod('all') }}>Filtrni tozalash</Button>
+                <span className="subtle">Filtr yoqilgan: kassa hisobi va qarz undirish ko'rsatilmaydi</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {!data && loading && <div className="rep-center"><Spinner size={40} /></div>}
-      {!data && failed && (
+      {tab === 'profit' && canProfit && <ProfitView range={range} />}
+
+      {tab === 'sales' && !data && loading && <div className="rep-center"><Spinner size={40} /></div>}
+      {tab === 'sales' && !data && failed && (
         <EmptyState
           size="lg"
           icon="alert"
           title="Hisobotni yuklab bo'lmadi"
-          action={<Button variant="primary" icon="refresh" onClick={() => load(range)}>Qayta urinish</Button>}
+          action={<Button variant="primary" icon="refresh" onClick={() => load(range, filter)}>Qayta urinish</Button>}
         />
       )}
 
-      {s && empty && (
+      {tab === 'sales' && s && empty && (
         <EmptyState
           size="lg"
           icon="reports"
@@ -191,8 +251,9 @@ export default function ReportsScreen() {
         />
       )}
 
-      {s && !empty && (
+      {tab === 'sales' && s && !empty && (
         <div className={cx('rep__content', loading && 'is-loading')}>
+          {!filtered && <CashDrawer s={s} />}
           <Kpis s={s} />
 
           <div className="rep-row rep-row--pay">
@@ -294,6 +355,32 @@ export default function ReportsScreen() {
             )}
           </TableCard>
 
+          {!filtered && (
+          <TableCard
+            title="Eski qarzlardan kirim"
+            subtitle={s.debtCollections.length ? 'Bugungi savdoga KIRMAYDI — qachongi qarz ekani ko\'rsatilgan' : undefined}
+          >
+            {s.debtCollections.length === 0 ? (
+              <div className="rep-pad"><Mute>Bu davrda qarz undirilmagan</Mute></div>
+            ) : (
+              <table className="ui-table rep-table" data-testid="rep-debt-payments">
+                <thead><tr><th>Qachon to'ladi</th><th>Qarzdor</th><th>Qarz sanasi</th><th>Usul</th><th className="r">Summa</th></tr></thead>
+                <tbody>
+                  {s.debtCollections.map((d, i) => (
+                    <tr key={d.at + '-' + i}>
+                      <td className="num nowrap">{formatDateTime(d.at)}</td>
+                      <td>{d.debtorName}</td>
+                      <td className="num nowrap">{formatDateShort(d.debtDate)}</td>
+                      <td>{d.method === 'cash' ? 'Naqd' : d.method === 'card' ? 'Click' : 'Terminal'}</td>
+                      <td className="r"><Money value={d.amount} size="sm" currency={false} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </TableCard>
+          )}
+
           <TableCard
             title="Qaytarishlar"
             subtitle={data!.returns.length ? data!.returns.length + ' ta, jami ' + formatMoney(s.returnsAmount) + " so'm" : undefined}
@@ -350,12 +437,12 @@ const Mute = ({ children }: { children: React.ReactNode }) => <div className="re
 /* ───────────── KPI ───────────── */
 function Kpis({ s }: { s: SalesReport }) {
   const bar = s.barSales || { count: 0, total: 0 }
-  const tiles: { label: string; icon: IconName; value: number; tone?: 'warning' | 'danger'; sign?: boolean }[] = [
+  const tiles: { label: string; icon: IconName; value: number; tone?: 'warning' | 'danger'; sign?: boolean; note?: string }[] = [
     { label: 'Vaqt', icon: 'clock', value: s.timeRevenue },
     { label: 'Bar + oshxona', icon: 'bar', value: s.productRevenue },
     { label: 'Xizmat', icon: 'sparkles', value: s.serviceRevenue },
     { label: 'Obsluga', icon: 'tag', value: s.serviceCharge || 0 },
-    { label: 'Chegirma', icon: 'percent', value: s.discounts, tone: 'warning' },
+    { label: 'Chegirma', icon: 'percent', value: s.discounts, tone: 'warning', note: s.discountCount > 0 ? s.discountCount + ' ta chekdan' : undefined },
     { label: 'Qaytarilgan', icon: 'undo', value: s.returnsAmount, tone: 'danger' }
   ]
   return (
@@ -376,6 +463,7 @@ function Kpis({ s }: { s: SalesReport }) {
         <Card key={t.label} padding="md" className="rep-kpi">
           <div className="rep-kpi__label"><Icon name={t.icon} size={22} /> {t.label}</div>
           <Money value={t.value} size="xl" tone={t.value > 0 && t.tone ? t.tone : 'default'} />
+          {t.note && <div className="rep-kpi__note" data-testid="rep-discount-count">{t.note}</div>}
         </Card>
       ))}
       <Card padding="md" className="rep-kpi">
@@ -386,11 +474,45 @@ function Kpis({ s }: { s: SalesReport }) {
   )
 }
 
+/* ───────────── Kassadagi naqd ───────────── */
+function CashDrawer({ s }: { s: SalesReport }) {
+  const c = s.cashDrawer
+  const rows: { label: string; value: number; sign: '+' | '−' }[] = [
+    { label: 'Naqd savdo', value: c.sales, sign: '+' },
+    { label: "Eski qarzlardan naqd kirim", value: c.debtCollected, sign: '+' },
+    { label: 'Bekor qilingan hisoblar (qaytarilgan naqd)', value: c.refunds, sign: '−' },
+    { label: 'Xarajatlar', value: c.expenses, sign: '−' },
+    { label: 'Ofitsiantlarga berilgan', value: c.waiterPayouts, sign: '−' },
+    { label: 'Oshxonaga berilgan', value: c.kitchenPayouts, sign: '−' }
+  ]
+  return (
+    <Card tone="accent" padding="lg" className="rep-cash" data-testid="rep-cash">
+      <div className="rep-cash__head">
+        <div>
+          <div className="rep-kpi__label"><Icon name="cash" size={22} /> Kassada bo'lishi kerak naqd</div>
+          <Money value={c.expected} size="3xl" tone="accent" />
+        </div>
+        {s.voided.count > 0 && (
+          <div className="rep-cash__void" data-testid="rep-voided">
+            Bekor qilingan: <b className="num">{s.voided.count} ta</b> · qaytarilgan pul <b className="num">{formatMoney(s.voided.refund)}</b> so'm
+          </div>
+        )}
+      </div>
+      <div className="rep-cash__rows">
+        {rows.filter((r) => r.value !== 0).map((r) => (
+          <div key={r.label} className="rep-cash__row">
+            <span>{r.sign} {r.label}</span>
+            <Money value={r.value} size="md" currency={false} tone={r.sign === '−' ? 'muted' : 'default'} />
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 /* ───────────── To'lov turlari ───────────── */
 function PaymentShare({ s }: { s: SalesReport }) {
   const bm = { cash: s.byMethod.cash || 0, card: s.byMethod.card || 0, terminal: s.byMethod.terminal || 0, debt: s.byMethod.debt || 0 }
-  const dp = { cash: s.debtPayments.cash || 0, card: s.debtPayments.card || 0, terminal: s.debtPayments.terminal || 0 }
-  const dpSum = dp.cash + dp.card + dp.terminal
   const sum = bm.cash + bm.card + bm.terminal + bm.debt
   return (
     <Card title="To'lov turlari" subtitle="Ulushi, jami to'lovga nisbatan" padding="md" className="rep-pay">
@@ -412,22 +534,6 @@ function PaymentShare({ s }: { s: SalesReport }) {
               </div>
             ))}
           </div>
-          {dpSum > 0 && (
-            <div className="rep-pay__row rep-pay__row--debt" title="Oldingi qarzlardan shu davrda yig'ilgan pul" data-testid="rep-debt-payments">
-              <Icon name="wallet" size={22} />
-              <span className="rep-pay__name">
-                Qarzdan undirildi
-                <span className="rep-pay__sub">
-                  {[
-                    dp.cash ? 'naqd ' + formatMoney(dp.cash) : '',
-                    dp.card ? 'karta ' + formatMoney(dp.card) : '',
-                    dp.terminal ? 'terminal ' + formatMoney(dp.terminal) : ''
-                  ].filter(Boolean).join(' · ')}
-                </span>
-              </span>
-              <Money value={dpSum} size="md" currency={false} />
-            </div>
-          )}
         </>
       )}
     </Card>

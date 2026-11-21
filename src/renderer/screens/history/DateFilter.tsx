@@ -1,29 +1,29 @@
 import { useState } from 'react'
 import type { ReportRange } from '@shared/types'
 import { Button, Input, Segmented, getNow, toast } from '@/ui'
-import { addDays, fromInput, presetRange, toInput, type Preset } from './common'
+import { addDays, fromInputDT, presetRange, toInput, toInputDT, type Preset } from './common'
 
 /** Sana filtri: Bugun / Kecha / 7 kun / Bu oy / Oraliq. */
 export function DateFilter({ onChange }: { onChange: (r: ReportRange) => void }) {
   const [preset, setPreset] = useState<Preset>('today')
-  const [fromStr, setFromStr] = useState(() => toInput(getNow()))
-  const [toStr, setToStr] = useState(() => toInput(getNow()))
+  const [fromStr, setFromStr] = useState(() => toInputDT(new Date(toInput(getNow()) + 'T00:00').getTime()))
+  const [toStr, setToStr] = useState(() => toInputDT(getNow()))
 
   const pick = (p: Preset) => {
     setPreset(p)
     if (p !== 'custom') {
       const r = presetRange(p, getNow())
       onChange(r)
-      setFromStr(toInput(r.from))
-      setToStr(toInput(r.to - 1))
+      setFromStr(toInputDT(r.from))
+      setToStr(toInputDT(r.to - 1))
     }
   }
   const applyCustom = () => {
-    const f = fromInput(fromStr)
-    const t = fromInput(toStr)
-    if (f === null || t === null) return toast.warning('Ikkala sanani ham kiriting')
-    if (t < f) return toast.warning("Oxirgi sana boshlanishidan oldin bo'lishi mumkin emas")
-    onChange({ from: f, to: addDays(t, 1) })
+    const f = fromInputDT(fromStr)
+    const t = fromInputDT(toStr)
+    if (f === null || t === null) return toast.warning('Sana va vaqtni kiriting')
+    if (t < f) return toast.warning("Oxirgi vaqt boshlanishidan oldin bo'lishi mumkin emas")
+    onChange({ from: f, to: t + 60_000 })
   }
   return (
     <>
@@ -41,9 +41,9 @@ export function DateFilter({ onChange }: { onChange: (r: ReportRange) => void })
       />
       {preset === 'custom' && (
         <div className="hist-custom">
-          <Input size="lg" type="date" value={fromStr} onChange={(e) => setFromStr(e.target.value)} aria-label="Boshlanish sanasi" />
+          <Input size="lg" type="datetime-local" value={fromStr} onChange={(e) => setFromStr(e.target.value)} aria-label="Boshlanish vaqti" />
           <span>–</span>
-          <Input size="lg" type="date" value={toStr} onChange={(e) => setToStr(e.target.value)} aria-label="Oxirgi sana" />
+          <Input size="lg" type="datetime-local" value={toStr} onChange={(e) => setToStr(e.target.value)} aria-label="Oxirgi vaqt" />
           <Button size="md" variant="primary" onClick={applyCustom}>Ko'rsatish</Button>
         </div>
       )}

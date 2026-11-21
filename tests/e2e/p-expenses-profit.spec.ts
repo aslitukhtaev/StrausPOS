@@ -64,7 +64,9 @@ test('Xarajat qo\'shish → ro\'yxat; sof foyda; kassirga yo\'q; kelajak kun rad
   expect(await b.rpcError('expenses.save', { day: '2026-12-31', categoryId: 1, amount: 5000, note: '' })).toMatch(/[Kk]elajak/)
 
   // Sof foyda (qo'lda hisoblangan)
-  await pos.nav('Sof foyda')
+  await pos.nav('Hisobot')
+  await page.getByRole('radio', { name: 'Bu oy' }).click()
+  await page.getByRole('radio', { name: 'Sof foyda' }).click()
   const table = page.getByTestId('pf-table')
   await expect(table).toContainText('Tushum')
   await expect(table).toContainText('100 000')
@@ -88,7 +90,6 @@ test('Xarajat qo\'shish → ro\'yxat; sof foyda; kassirga yo\'q; kelajak kun rad
   await pos.login('cashier')
   const items = (await page.locator('.side__item').allTextContents()).map((s) => s.trim())
   expect(items).not.toContain('Xarajatlar')
-  expect(items).not.toContain('Sof foyda')
   expect(await b.rpcError('expenses.list', { from: 0, to: T_END })).toBe(DENIED)
   expect(await b.rpcError('profit.report', { from: 0, to: T_END })).toBe(DENIED)
   expect(await b.rpcError('expenses.save', { day: '2026-10-01', categoryId: 1, amount: 1000, note: '' })).toBe(DENIED)
