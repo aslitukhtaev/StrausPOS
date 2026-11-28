@@ -196,3 +196,17 @@
   50% { opacity: 0.45; }
 }
 .side__foot--viewer .ui-btn { height: auto; min-height: 56px; white-space: normal; line-height: 1.2; text-align: left; }
+
+/* Smena tugmasi (tepada) */
+.topbar__shift { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: 48px; max-width: 280px; padding: 0 var(--sp-4); border-radius: 999px; border: 1px solid var(--line); background: var(--surface-2); color: inherit; font: inherit; cursor: pointer; }
+.topbar__shift:disabled { cursor: default; }
+.topbar__shift.is-open { border-color: var(--free-fill, #2eb872); }
+.topbar__shift.is-closed { border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); }
+.topbar__shifttext { display: flex; flex-direction: column; text-align: left; min-width: 0; line-height: 1.15; }
+.topbar__shiftlabel { font-weight: 600; font-size: 0.95rem; }
+.topbar__shiftsub { font-size: 0.8rem; opacity: 0.8; }
+.shift-sum { display: flex; flex-direction: column; gap: var(--sp-4); }
+.shift-sum__main { display: flex; justify-content: space-between; align-items: center; font-size: 1.125rem; }
+.shift-sum__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-5); font-size: 1.05rem; }
+.shift-sum__grid > div { display: flex; justify-content: space-between; gap: var(--sp-3); border-bottom: 1px dashed var(--line); padding: var(--sp-1) 0; }
+.shift-sum__cash { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md, 12px); background: var(--surface-2); font-size: 1.05rem; }

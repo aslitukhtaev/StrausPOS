@@ -5,6 +5,7 @@ import { useCan } from '@/store/auth'
 import { Badge, Button, DataRow, DataTable, EmptyState, Icon, IconButton, Input, Money, PageHeader, Segmented, Spinner, Tabs, cx, confirmDialog, formatMoney, toast } from '@/ui'
 import { ProductDialog } from './ProductDialog'
 import { StockDialog } from './StockDialog'
+import { StockHistoryDialog } from './StockHistoryDialog'
 import { CategoryDialog, DEPT_LABEL } from './CategoryDialog'
 import { ServicesTab } from './ServicesTab'
 import './bar.css'
@@ -35,6 +36,7 @@ export default function BarScreen() {
   const [stockDlg, setStockDlg] = useState<{ p: Product; sign: 1 | -1 } | null>(null)
   const [catDlg, setCatDlg] = useState<Partial<ProductCategory> | null>(null)
   const [svcDlg, setSvcDlg] = useState<Partial<ServiceItem> | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -123,18 +125,23 @@ export default function BarScreen() {
     }
   }
 
-  const actions = canEdit ? (
-    tab === 'products' ? (
-      <Button variant="primary" icon="plus" onClick={() => setProdDlg({ categoryId: cat === 'all' ? (deptCats[0] || cats[0])?.id : cat })} disabled={!cats.length}>
-        Mahsulot qo'shish
-      </Button>
-    ) : (
-      <Button variant="primary" icon="plus" onClick={() => setSvcDlg({})}>
-        Xizmat qo'shish
-      </Button>
-    )
-  ) : (
-    <Badge tone="neutral" icon="eye" size="lg">Faqat ko'rish</Badge>
+  const actions = (
+    <>
+      {canEdit && <IconButton icon="clock" label="Ombor tarixi" variant="secondary" size="lg" onClick={() => setHistoryOpen(true)} data-testid="stock-history-open" />}
+      {canEdit ? (
+        tab === 'products' ? (
+          <Button variant="primary" icon="plus" onClick={() => setProdDlg({ categoryId: cat === 'all' ? (deptCats[0] || cats[0])?.id : cat })} disabled={!cats.length}>
+            Mahsulot qo'shish
+          </Button>
+        ) : (
+          <Button variant="primary" icon="plus" onClick={() => setSvcDlg({})}>
+            Xizmat qo'shish
+          </Button>
+        )
+      ) : (
+        <Badge tone="neutral" icon="eye" size="lg">Faqat ko'rish</Badge>
+      )}
+    </>
   )
 
   return (
@@ -289,6 +296,7 @@ export default function BarScreen() {
       {prodDlg && <ProductDialog product={prodDlg} cats={cats} onClose={() => setProdDlg(null)} onSaved={load} />}
       {stockDlg && <StockDialog product={stockDlg.p} sign={stockDlg.sign} onClose={() => setStockDlg(null)} onSaved={load} />}
       {catDlg && <CategoryDialog cat={catDlg} onClose={() => setCatDlg(null)} onSaved={load} />}
+      {historyOpen && <StockHistoryDialog onClose={() => setHistoryOpen(false)} />}
     </div>
   )
 }

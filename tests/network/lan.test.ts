@@ -134,7 +134,7 @@ describe('LAN server: kod, terminal tokeni, denylist, brute-force', () => {
     expect(denied.sort()).toEqual(
       [
         'auth.setupOwner', 'license.activate', 'system.backup', 'system.restore',
-        ...names.filter((n) => n.startsWith('network.') || n.startsWith('connection.'))
+        ...names.filter((n) => n.startsWith('network.') || n.startsWith('connection.') || n.startsWith('bot.'))
       ].sort()
     )
     let backups = 0
@@ -253,7 +253,7 @@ describe('Terminal kontekstlari: alohida login, ruxsatlar, sinxronlik', () => {
 
     const w = await t1.auth.login(ctx.staff.waiter.id, '5555')
     expect(w.staff.name).toBe('Sardor')
-    expect(w.permissions).toEqual(['session.open', 'session.manage', 'line.return'])
+    expect(w.permissions).toEqual(['session.open', 'session.manage', 'line.add', 'line.return'])
     await t2.auth.login(ctx.staff.cashier.id, '3333')
     await ctx.loginAs('admin')
 

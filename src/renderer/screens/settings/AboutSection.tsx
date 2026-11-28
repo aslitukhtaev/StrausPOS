@@ -2,7 +2,7 @@ import { Icon, Logo, type IconName } from '@/ui'
 import { SectionHead } from './common'
 
 /** Dastur versiyasi (package.json dan o'qilmaydi — qo'lda yangilanadi). */
-export const APP_VERSION = '2.0.3'
+export const APP_VERSION = '2.2.0'
 
 const FACTS: { icon: IconName; title: string; text: string }[] = [
   {

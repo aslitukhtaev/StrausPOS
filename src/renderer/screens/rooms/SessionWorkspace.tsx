@@ -57,6 +57,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   const canPay = useCan('session.pay') && !readOnly
   const canReturn = useCan('line.return') && !readOnly
   const canDiscount = useCan('discount.apply') && !readOnly
+  const canAddLines = useCan('line.add') && !readOnly
   const me = useStaff()
 
   const setView = useCallback((v: SessionView) => {
@@ -95,14 +96,14 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
       if (e.key === 'Escape') onBackRef.current()
-      else if ((e.key === '+' || e.key === 'Insert') && canManage) {
+      else if ((e.key === '+' || e.key === 'Insert') && canAddLines) {
         e.preventDefault()
         setDialog({ kind: 'add' })
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [canManage])
+  }, [canAddLines])
 
   const live = useLive(state ? state.view : null, state ? state.at : 0)
 
@@ -145,7 +146,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
   const room = view.room
   const roomWaiterId = view.session.waiterId ?? null
   // 'waiter' roli faqat o'ziga biriktirilgan xonaga mahsulot qo'sha oladi (server ham tekshiradi)
-  const canAdd = canManage && (me?.role !== 'waiter' || roomWaiterId === me.id)
+  const canAdd = canAddLines && (me?.role !== 'waiter' || roomWaiterId === me.id)
   const canSetWaiter = canManage && me?.role !== 'waiter' && view.session.kind !== 'bar'
   const tone = roomTone(live)
   const active = live.running + live.paused
@@ -356,24 +357,26 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
               Hisob
               {activeLines.length > 0 && <Badge size="md">{activeLines.length}</Badge>}
             </div>
-            {canManage && (
+            {(canManage || canAddLines) && (
               <div className="rooms-bill__headbtns">
-                <Button
-                  icon="receipt"
-                  onClick={() => setDialog({ kind: 'prebill' })}
-                  disabled={live.total <= 0}
-                  title="Oraliq hisob cheki (sessiya yopilmaydi)"
-                  data-testid="prebill"
-                >
-                  Chek
-                </Button>
+                {canManage && (
+                  <Button
+                    icon="receipt"
+                    onClick={() => setDialog({ kind: 'prebill' })}
+                    disabled={live.total <= 0}
+                    title="Oraliq hisob cheki (sessiya yopilmaydi)"
+                    data-testid="prebill"
+                  >
+                    Chek
+                  </Button>
+                )}
                 {canAdd ? (
                   <Button variant="primary" icon="plus" onClick={() => setDialog({ kind: 'add' })} className="rooms-bill__add">
                     Qo'shish
                   </Button>
-                ) : (
+                ) : canAddLines ? (
                   <span className="subtle" data-testid="not-your-room">Boshqa ofitsiantning xonasi</span>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -383,7 +386,7 @@ export function SessionWorkspace({ sessionId, onBack }: { sessionId: number; onB
               <EmptyState
                 icon="bar"
                 title="Hali buyurtma yo'q"
-                description={canManage ? "Ichimlik, taom yoki massaj qo'shish uchun «Qo'shish» ni bosing." : undefined}
+                description={canAdd ? "Ichimlik, taom yoki massaj qo'shish uchun «Qo'shish» ni bosing." : undefined}
               />
             ) : (
               lines.map((l) => (

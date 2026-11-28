@@ -217,6 +217,7 @@ async function setupStaff(login: keyof typeof TEST_STAFF | null): Promise<Record
     const s = await service.staff.save({ ...TEST_STAFF[key], active: true })
     ids[key] = s.id
   }
+  await service.shifts.open() // 2.1.0: to'lov uchun ochiq smena shart (sinov muhitida ega ochadi)
   await service.auth.logout()
   if (login) await service.auth.login(ids[login], TEST_STAFF[login].pin)
   return ids

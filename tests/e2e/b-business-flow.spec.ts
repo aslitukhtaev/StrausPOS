@@ -262,7 +262,7 @@ test('Asosiy oqim: pauza, tugatish, xona almashtirish, bar/xizmat, X, chegirma, 
   await expect(pos.toast("Qarz to'liq yopildi")).toBeVisible()
   await expect(pd).toHaveCount(0)
   await expect(total).toHaveText("0 so'm")
-  await page.getByRole('tab', { name: 'Barchasi' }).click()
+  await page.getByRole('radio', { name: 'Barchasi' }).click()
   await expect(row).toContainText("To'langan")
   const debts = await pos.backend.rpc<{ amount: number; paid: number; closedAt: number | null }[]>('debts.list', false)
   expect(debts).toHaveLength(1)

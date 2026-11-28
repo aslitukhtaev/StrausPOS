@@ -10,6 +10,8 @@ import { useApp } from '../../store/app'
 import { useNav } from '../../store/nav'
 import { useCan } from '../../store/auth'
 import ProfitView from '../profit/ProfitView'
+import { ShiftSelect } from '../history/ShiftSelect'
+import { ShiftsTab } from './ShiftsTab'
 import { fromInputDT, toInputDT } from '../history/common'
 import {
   Button, Card, EmptyState, Field, Icon, Input, Money, PageHeader, Segmented, Select, Spinner, formatDate, formatDateShort,
@@ -17,7 +19,7 @@ import {
 } from '../../ui'
 import './reports.css'
 
-type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom' | 'shift'
 type ReturnRow = Awaited<ReturnType<typeof api.reports.returns>>[number]
 
 const DAY = 86_400_000
@@ -40,7 +42,7 @@ const fromInput = (s: string): number | null => {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : null
 }
 
-function presetRange(p: Exclude<Preset, 'custom'>, now: number): ReportRange {
+function presetRange(p: Exclude<Preset, 'custom' | 'shift'>, now: number): ReportRange {
   const today = startOfDay(now)
   const tomorrow = addDays(today, 1)
   switch (p) {
@@ -72,7 +74,7 @@ export default function ReportsScreen() {
   const businessName = useApp((s) => s.businessName)
   const go = useNav((s) => s.go)
   const canProfit = useCan('profit.view')
-  const [tab, setTab] = useState<'sales' | 'profit'>('sales')
+  const [tab, setTab] = useState<'sales' | 'profit' | 'shifts'>('sales')
   const [preset, setPreset] = useState<Preset>('today')
   const [fromStr, setFromStr] = useState(() => toInputDT(startOfDay(getNow())))
   const [toStr, setToStr] = useState(() => toInputDT(getNow()))
@@ -120,7 +122,7 @@ export default function ReportsScreen() {
 
   const pickPreset = (p: Preset) => {
     setPreset(p)
-    if (p !== 'custom') {
+    if (p !== 'custom' && p !== 'shift') {
       const r = presetRange(p, getNow())
       setRange(r)
       setFromStr(toInputDT(r.from))
@@ -164,17 +166,17 @@ export default function ReportsScreen() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {canProfit && (
-          <Segmented
-            size="lg"
-            value={tab}
-            onChange={(v) => setTab(v as 'sales' | 'profit')}
-            options={[
-              { value: 'sales', label: 'Savdo', icon: 'reports' },
-              { value: 'profit', label: 'Sof foyda', icon: 'percent' }
-            ]}
-          />
-        )}
+        <Segmented
+          size="lg"
+          value={tab}
+          onChange={(v) => setTab(v as 'sales' | 'profit' | 'shifts')}
+          options={[
+            { value: 'sales', label: 'Savdo', icon: 'reports' },
+            { value: 'shifts', label: 'Smenalar', icon: 'clock' },
+            ...(canProfit ? [{ value: 'profit' as const, label: 'Sof foyda', icon: 'percent' as const }] : [])
+          ]}
+          data-testid="rep-tabs"
+        />
         <div className="rep-period">
           <Segmented
             size="lg"
@@ -185,9 +187,11 @@ export default function ReportsScreen() {
               { value: 'yesterday', label: 'Kecha' },
               { value: 'week', label: '7 kun' },
               { value: 'month', label: 'Bu oy' },
+              { value: 'shift', label: 'Smena', icon: 'clock' },
               { value: 'custom', label: 'Oraliq', icon: 'calendar' }
             ]}
           />
+          {preset === 'shift' && <ShiftSelect onPick={(r) => { setRange(r); setFromStr(toInputDT(r.from)); setToStr(toInputDT(r.to - 1)) }} />}
           {preset === 'custom' && (
             <div className="rep-period__custom">
               <Field label="Dan">
@@ -230,6 +234,7 @@ export default function ReportsScreen() {
       </div>
 
       {tab === 'profit' && canProfit && <ProfitView range={range} />}
+      {tab === 'shifts' && <ShiftsTab onPick={(r) => { setPreset('shift'); setRange(r); setFromStr(toInputDT(r.from)); setToStr(toInputDT(r.to - 1)); setTab('sales') }} />}
 
       {tab === 'sales' && !data && loading && <div className="rep-center"><Spinner size={40} /></div>}
       {tab === 'sales' && !data && failed && (

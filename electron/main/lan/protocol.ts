@@ -35,7 +35,7 @@ export const MSG_UNKNOWN = "Noma'lum amal"
  * Terminalda ishlamaydigan (faqat asosiy kompyuterga tegishli) metodlar. Serverda 403 bilan rad etiladi;
  * terminal proksisi ham ularni asosiyga yubormaydi.
  */
-export const TERMINAL_DENY_GROUPS: ReadonlySet<string> = new Set(['network', 'connection'])
+export const TERMINAL_DENY_GROUPS: ReadonlySet<string> = new Set(['network', 'connection', 'bot'])
 export const TERMINAL_DENY_METHODS: ReadonlySet<string> = new Set([
   'system.backup', 'system.restore', 'license.activate', 'auth.setupOwner'
 ])

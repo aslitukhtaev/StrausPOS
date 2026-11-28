@@ -1,50 +1,31 @@
 /**
- * Qarzdor tafsiloti: jami / to'langan / qoldiq, qarzlari tarixi (`debtors.debts`) va barcha to'lovlari
- * (`debts.payments` har bir qarz uchun). Ism/telefonni tuzatish (`debtors.rename`). "To'lash" — odam bo'yicha.
+ * Qarzdor tafsiloti: jami / to'langan / qoldiq, barcha qarzlari (chek, kim bergan, nima olingan) va to'lovlari
+ * (kim qabul qilgan) — `debts.journal` dan. Ism/telefonni tuzatish (`debtors.rename`). "To'lash" — odam bo'yicha.
  */
-import { useEffect, useState } from 'react'
-import type { Debt, DebtPayment, Debtor } from '@shared/types'
+import { useState } from 'react'
+import type { DebtJournalRow, Debtor } from '@shared/types'
 import { api } from '@/api'
 import {
-  Avatar, Badge, Button, EmptyState, Field, Icon, Input, Modal, Money, Spinner, formatDateShort, formatDateTime, formatPhone, toast
+  Avatar, Badge, Button, Field, Icon, Input, Modal, Money, formatDateShort, formatDateTime, formatPhone, toast
 } from '@/ui'
 import { METHOD_ICON, METHOD_LABEL, phoneDigits } from '../checkout/methods'
+import { ReceiptDialog } from '../history/ReceiptDialog'
+import { itemsText } from './model'
 
-type Pay = DebtPayment & { debtAt: number }
-
-export function DebtorDialog({ debtor, version, canManage, onClose, onPay, onChanged }: {
+export function DebtorDialog({ debtor, debts, canManage, onClose, onPay, onChanged }: {
   debtor: Debtor
-  version: number
+  /** Shu odamning qarzlari (eng yangisi birinchi) */
+  debts: DebtJournalRow[]
   canManage: boolean
   onClose: () => void
   onPay: () => void
   onChanged: () => void | Promise<unknown>
 }) {
-  const [data, setData] = useState<{ debts: Debt[]; pays: Pay[] } | null>(null)
-  const [failed, setFailed] = useState(false)
   const [edit, setEdit] = useState(false)
-
-  useEffect(() => {
-    let alive = true
-    setFailed(false)
-    api.debtors
-      .debts(debtor.id)
-      .then(async (debts) => {
-        const lists = await Promise.all(debts.map((d) => api.debts.payments(d.id)))
-        const pays: Pay[] = []
-        lists.forEach((l, i) => l.forEach((p) => pays.push({ ...p, debtAt: debts[i].createdAt })))
-        pays.sort((a, b) => b.at - a.at)
-        if (alive) setData({ debts: debts.slice().sort((a, b) => b.createdAt - a.createdAt), pays })
-      })
-      .catch((e) => {
-        if (!alive) return
-        toast.error(e)
-        setFailed(true)
-      })
-    return () => {
-      alive = false
-    }
-  }, [debtor.id, version])
+  const [receiptOf, setReceiptOf] = useState<number | null>(null)
+  const pays = debts
+    .flatMap((d) => d.payments.map((p) => ({ ...p, debtAt: d.createdAt, receiptNo: d.receiptNo })))
+    .sort((a, b) => b.at - a.at)
 
   return (
     <Modal
@@ -81,72 +62,79 @@ export function DebtorDialog({ debtor, version, canManage, onClose, onPay, onCha
         <div><div className="subtle t-xs">Qoldiq</div><Money value={debtor.balance} size="xl" tone={debtor.balance > 0 ? 'danger' : 'success'} /></div>
       </div>
 
-      {!data && !failed && <div className="debts__loading"><Spinner size={36} /></div>}
-      {failed && <EmptyState icon="alert" title="Tafsilotni yuklab bo'lmadi" />}
-      {data && (
-        <div className="debts-dlg">
-          <section className="debts-panel">
-            <div className="debts-panel__head">
-              <span className="debts-panel__title">Qarzlar</span>
-              <Badge tone="neutral" size="sm">{data.debts.length} ta</Badge>
+      <div className="debts-dlg is-stack">
+        <section className="debts-panel">
+          <div className="debts-panel__head">
+            <span className="debts-panel__title">Qarzlar</span>
+            <Badge tone="neutral" size="sm">{debts.length} ta</Badge>
+          </div>
+          {debts.length === 0 ? (
+            <div className="subtle debts-hist__empty">Qarz yo'q</div>
+          ) : (
+            <div className="debts-panel__scroll">
+              <table className="ui-table debts-mini" data-testid="debtor-debts">
+                <thead>
+                  <tr><th>Sana</th><th>Chek №</th><th>Kim bergan</th><th>Nima olingan</th><th className="r">Summa</th><th className="r">To'langan</th><th className="r">Qoldiq</th></tr>
+                </thead>
+                <tbody>
+                  {debts.map((d) => {
+                    const left = Math.max(0, d.amount - d.paid)
+                    return (
+                      <tr key={d.id}>
+                        <td className="num nowrap">{formatDateTime(d.createdAt)}</td>
+                        <td className="num nowrap">
+                          {d.receiptNo != null && d.sessionId != null ? (
+                            <button type="button" className="debts-link" title="Chekni ko'rish" onClick={() => setReceiptOf(d.sessionId)}>№{d.receiptNo}</button>
+                          ) : '—'}
+                        </td>
+                        <td className="nowrap t-bold">{d.issuedByName || '—'}</td>
+                        <td className="debts-mini__items">{d.roomName}{d.items.length ? ' · ' + itemsText(d) : ''}</td>
+                        <td className="r"><Money value={d.amount} size="sm" currency={false} /></td>
+                        <td className="r"><Money value={d.paid} size="sm" currency={false} tone={d.paid ? 'success' : 'muted'} /></td>
+                        <td className="r">
+                          {left > 0 ? <Money value={left} size="sm" currency={false} tone="danger" /> : <Badge tone="success" size="sm" icon="check">Yopilgan</Badge>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-            {data.debts.length === 0 ? (
-              <div className="subtle debts-hist__empty">Qarz yo'q</div>
-            ) : (
-              <div className="debts-panel__scroll">
-                <table className="ui-table debts-mini" data-testid="debtor-debts">
-                  <thead>
-                    <tr><th>Sana</th><th className="r">Summa</th><th className="r">To'langan</th><th className="r">Qoldiq</th></tr>
-                  </thead>
-                  <tbody>
-                    {data.debts.map((d) => {
-                      const left = Math.max(0, d.amount - d.paid)
-                      return (
-                        <tr key={d.id}>
-                          <td className="num nowrap">{formatDateTime(d.createdAt)}</td>
-                          <td className="r"><Money value={d.amount} size="sm" currency={false} /></td>
-                          <td className="r"><Money value={d.paid} size="sm" currency={false} tone={d.paid ? 'success' : 'muted'} /></td>
-                          <td className="r">
-                            {left > 0 ? <Money value={left} size="sm" currency={false} tone="danger" /> : <Badge tone="success" size="sm" icon="check">Yopilgan</Badge>}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-          <section className="debts-panel">
-            <div className="debts-panel__head">
-              <span className="debts-panel__title">To'lovlar</span>
-              <Badge tone="neutral" size="sm">{data.pays.length} ta</Badge>
+          )}
+        </section>
+        <section className="debts-panel">
+          <div className="debts-panel__head">
+            <span className="debts-panel__title">To'lovlar</span>
+            <Badge tone="neutral" size="sm">{pays.length} ta</Badge>
+          </div>
+          {pays.length === 0 ? (
+            <div className="subtle debts-hist__empty">Hali to'lov qilinmagan</div>
+          ) : (
+            <div className="debts-panel__scroll">
+              <ul className="debts-pays" data-testid="debtor-pays">
+                {pays.map((p) => (
+                  <li key={p.id} className="debts-pays__row">
+                    <div className="debts-pays__main">
+                      <span className="num">{formatDateTime(p.at)}</span>
+                      <span className="subtle t-xs">
+                        {formatDateShort(p.debtAt)} dagi qarzga{p.receiptNo != null ? ' (№' + p.receiptNo + ')' : ''} · qabul qildi: {p.byName || '—'}
+                      </span>
+                    </div>
+                    <Badge tone={p.method === 'cash' ? 'success' : 'info'} icon={METHOD_ICON[p.method]}>{METHOD_LABEL[p.method]}</Badge>
+                    <Money value={p.amount} size="md" tone="success" />
+                  </li>
+                ))}
+              </ul>
             </div>
-            {data.pays.length === 0 ? (
-              <div className="subtle debts-hist__empty">Hali to'lov qilinmagan</div>
-            ) : (
-              <div className="debts-panel__scroll">
-                <ul className="debts-pays" data-testid="debtor-pays">
-                  {data.pays.map((p) => (
-                    <li key={p.id} className="debts-pays__row">
-                      <div className="debts-pays__main">
-                        <span className="num">{formatDateTime(p.at)}</span>
-                        <span className="subtle t-xs">{formatDateShort(p.debtAt)} dagi qarzga</span>
-                      </div>
-                      <Badge tone={p.method === 'cash' ? 'success' : 'info'} icon={METHOD_ICON[p.method]}>{METHOD_LABEL[p.method]}</Badge>
-                      <Money value={p.amount} size="md" tone="success" />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
-        </div>
-      )}
+          )}
+        </section>
+      </div>
       <div className="debts-dlg__note subtle">
         <Icon name="info" size={20} />
         <span>To'lov odam bo'yicha qabul qilinadi va eng eski qarzdan boshlab yopiladi.</span>
       </div>
+
+      {receiptOf != null && <ReceiptDialog sessionId={receiptOf} onClose={() => setReceiptOf(null)} />}
 
       {edit && (
         <RenameDialog

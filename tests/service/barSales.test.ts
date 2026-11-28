@@ -373,7 +373,7 @@ async function grantWaiterBar(ctx: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe('bar savdosi: ruxsatlar va ko‘ruvchi', () => {
-  it('bar.sale: ruxsatsiz ofitsiant rad etiladi; ruxsat bilan ochadi, sotadi, naqd/Click oladi, qarzga yozolmaydi', async () => {
+  it('bar.sale: ruxsatsiz ofitsiant rad etiladi; ruxsat bilan ochadi, sotadi, naqd/Click oladi va qarzga ham yoza oladi', async () => {
     const ctx = await setup()
     const { svc } = ctx
     const pivo = await productByName(svc, 'Pivo 0.5 L')
@@ -386,9 +386,13 @@ describe('bar savdosi: ruxsatlar va ko‘ruvchi', () => {
     expect(v.session.openedBy).toBe(ctx.staff.waiter.id)
     expect(await svc.barSales.openList()).toHaveLength(1)
     await svc.lines.addProduct(v.session.id, pivo.id, 1, null)
-    await expect(svc.checkout.pay(v.session.id, [{ method: 'debt', amount: 20_000 }], { debtorId: null, name: 'A', phone: '901112233' })).rejects.toThrow(DENIED)
     await svc.checkout.pay(v.session.id, [{ method: 'card', amount: 20_000 }], null)
-    expect(await svc.barSales.history({ from: 0, to: T0 + HOUR })).toHaveLength(1)
+    // Qarzga yozish 'debt.manage' talab qilmaydi (ofitsiantda u yo'q), lekin qarzlar jurnali yopiq
+    const v2 = await svc.barSales.open()
+    await svc.lines.addProduct(v2.session.id, pivo.id, 1, null)
+    await svc.checkout.pay(v2.session.id, [{ method: 'debt', amount: 20_000 }], { debtorId: null, name: 'A', phone: '901112233' })
+    await expect(svc.debts.journal()).rejects.toThrow(DENIED)
+    expect(await svc.barSales.history({ from: 0, to: T0 + HOUR })).toHaveLength(2)
     // Xona sessiyasiga ta'sir qilmaydi: xona to'lovi hamon ruxsatsiz
     await ctx.loginAs('owner')
     const room = await svc.sessions.open(ctx.rooms.s1, 1, 60)

@@ -76,7 +76,7 @@ describe('rollar ruxsatlari', () => {
     await expect(c.svc.waiters.payout(c.staff.waiter.id, MONTH, 1000, '')).rejects.toThrow(DENIED)
     await setPerms(c, { admin: [...DEFAULT_ROLE_PERMISSIONS.admin, 'staff.manage'] })
     await c.loginAs('admin')
-    await expect(c.svc.waiters.payout(c.staff.waiter.id, MONTH, 1000, '')).resolves.toMatchObject({ amount: 1000 })
+    await expect(c.svc.waiters.payout(c.staff.waiter.id, MONTH, 1000, '')).rejects.toThrow('balansi yetarli emas') // ruxsat bor — faqat balans yo'q
   })
 
   it('terminal kontekstida ham amal qiladi (alohida login, umumiy sozlama)', async () => {

@@ -1,7 +1,7 @@
 {
   "name": "delfin-sauna",
   "productName": "Delfin Sauna",
-  "version": "2.0.3",
+  "version": "2.2.0",
   "description": "Delfin Sauna — sauna va dam olish maskanlari uchun offline kassa (POS) dasturi",
   "main": "out/main/index.cjs",
   "author": "Delfin Sauna",

@@ -1,3 +1,4 @@
+import type { Permission } from '../../src/shared/types'
 import { describe, expect, it } from 'vitest'
 import { HOUR, T0, kitchenSetup, productByName, serviceByName, setup } from './helpers'
 import type { Ctx } from './helpers'
@@ -237,13 +238,16 @@ describe('oylik hisob-kitob', () => {
     const { svc, staff, clock } = await scenario()
     const p1 = await svc.waiters.payout(staff.waiter.id, '2026-01', 4_000, '  avans ')
     expect(p1).toMatchObject({ staffId: staff.waiter.id, month: '2026-01', amount: 4_000, note: 'avans', at: clock.t, by: staff.owner.id })
-    await svc.waiters.payout(staff.waiter.id, '2026-01', 2_500, '')
+    await svc.waiters.payout(staff.waiter.id, '2026-01', 2_000, '')
     const jan = (await svc.waiters.monthly('2026-01')).find((x) => x.staffId === staff.waiter.id)!
-    expect(jan).toMatchObject({ commission: 6_000, paid: 6_500, balance: -500 })
+    expect(jan).toMatchObject({ commission: 6_000, paid: 6_000, balance: 0 })
     expect((await svc.waiters.monthly('2026-02')).find((x) => x.staffId === staff.waiter.id)).toMatchObject({ paid: 0, balance: 6_000 })
-    expect((await svc.waiters.payouts(staff.waiter.id, '2026-01')).map((p) => p.amount)).toEqual([4_000, 2_500])
+    expect((await svc.waiters.payouts(staff.waiter.id, '2026-01')).map((p) => p.amount)).toEqual([4_000, 2_000])
     expect(await svc.waiters.payouts(staff.waiter.id, '2026-02')).toEqual([])
 
+    // balansdan ortiq berib bo'lmaydi (qoldiq 0)
+    await expect(svc.waiters.payout(staff.waiter.id, '2026-01', 1, '')).rejects.toThrow('balansi yetarli emas')
+    await expect(svc.waiters.payout(staff.waiter.id, '2026-02', 6_001, '')).rejects.toThrow('balansi yetarli emas')
     await expect(svc.waiters.payout(staff.waiter.id, '2026-1', 1000, '')).rejects.toThrow('Oy noto')
     await expect(svc.waiters.payout(staff.waiter.id, '2026-13', 1000, '')).rejects.toThrow('Oy noto')
     await expect(svc.waiters.monthly('yanvar')).rejects.toThrow('Oy noto')
@@ -289,7 +293,7 @@ describe('ruxsatlar: ofitsiant roli', () => {
   it('ofitsiant: xona ochadi, mahsulot qo‘shadi, vaqt qo‘shadi; to‘lov/chegirma/hisobot — yo‘q (qaytarish mumkin)', async () => {
     const { svc, rooms, staff, clock, loginAs } = await setup()
     const login = await svc.auth.login(staff.waiter.id, '5555')
-    expect(login.permissions).toEqual(['session.open', 'session.manage', 'line.return'])
+    expect(login.permissions).toEqual(['session.open', 'session.manage', 'line.add', 'line.return'])
     await loginAs('waiter')
     expect((await svc.waiters.list()).length).toBe(2)
     const v0 = await svc.sessions.open(rooms.s1, 2, 60)
@@ -377,5 +381,33 @@ describe('xonaga ofitsiant biriktirish (2.0.3)', () => {
     const month = await svc.waiters.monthly('2026-01')
     const row = month.find((r) => r.staffId === staff.waiter.id)!
     expect(row).toMatchObject({ sessions: 1, productSales: 100_000, commission: 10_000 })
+  })
+
+  it('line.add alohida: session.manage bor-u line.add yo‘q rol mahsulot qo‘sha olmaydi; line.add bor-u session.manage yo‘q rol qo‘shadi; migratsiya v10', async () => {
+    const { svc, rooms, staff, loginAs } = await setup()
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const setWaiter = async (perms: Permission[]) => {
+      await loginAs('owner')
+      const st = await svc.settings.get()
+      await svc.settings.save({ ...st, rolePermissions: { ...st.rolePermissions, cashier: perms } })
+    }
+    await loginAs('owner')
+    const r = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
+    await setWaiter(['session.open', 'session.manage'])
+    await loginAs('cashier')
+    await expect(svc.lines.addProduct(r.session.id, beer.id, 1, null)).rejects.toThrow("ruxsatingiz yo'q")
+    await expect(svc.sessions.extendAll(r.session.id, 60)).resolves.toBeTruthy()
+    await setWaiter(['session.open', 'line.add'])
+    await loginAs('cashier')
+    await expect(svc.lines.addProduct(r.session.id, beer.id, 1, null)).resolves.toBeTruthy()
+    await expect(svc.sessions.extendAll(r.session.id, 60)).rejects.toThrow("ruxsatingiz yo'q")
+
+    const { MIGRATION_DATA, migrationDb } = await import('../../electron/main/db/schema')
+    const sql = (await import('sql.js')).default
+    const db = new (await sql()).Database()
+    db.run('CREATE TABLE kv(key TEXT PRIMARY KEY, value TEXT)')
+    db.run('INSERT INTO kv VALUES(?,?)', ['settings', JSON.stringify({ rolePermissions: { cashier: ['session.manage'], waiter: ['session.open'] } })])
+    MIGRATION_DATA[10](migrationDb(db))
+    expect(JSON.parse(String(db.exec('SELECT value FROM kv')[0].values[0][0])).rolePermissions).toEqual({ cashier: ['session.manage', 'line.add'], waiter: ['session.open'] })
   })
 })

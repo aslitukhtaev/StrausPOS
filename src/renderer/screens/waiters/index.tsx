@@ -418,18 +418,7 @@ function PayoutDialog({ row, month, onClose, onDone }: { row: WaiterMonthRow; mo
   const submit = async () => {
     if (busy) return
     if (!(amount > 0)) return toast.warning('Summani kiriting')
-    if (amount > rest) {
-      const ok = await confirmDialog({
-        title: 'Qoldiqdan ko\'p berilmoqda',
-        message:
-          formatMoney(amount) + " so'm berilmoqda, qoldiq esa " + formatMoney(rest) + " so'm. Ortiqcha " +
-          formatMoney(amount - rest) + " so'm keyingi hisobda manfiy qoldiq bo'lib ko'rinadi. Davom etasizmi?",
-        confirmText: 'Baribir berish',
-        danger: true,
-        icon: 'alert'
-      })
-      if (!ok) return
-    }
+    if (amount > rest) return toast.warning("Balans yetarli emas: ko'pi bilan " + formatMoney(rest) + " so'm berish mumkin")
     setBusy(true)
     try {
       await api.waiters.payout(row.staffId, month, amount, note.trim())

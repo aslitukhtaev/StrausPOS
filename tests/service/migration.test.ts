@@ -62,7 +62,7 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     fs.writeFileSync(file, await buildV1())
     const svc = await PosService.create({ file, clock: new FakeClock().now })
     expect(svc.db.version).toBe(SCHEMA_VERSION)
-    expect(SCHEMA_VERSION).toBe(9)
+    expect(SCHEMA_VERSION).toBe(11)
     // FK yoqilgan va buzilmagan
     expect(svc.db.get<{ foreign_keys: number }>('PRAGMA foreign_keys')!.foreign_keys).toBe(1)
     expect(svc.db.all('PRAGMA foreign_key_check')).toEqual([])
@@ -104,6 +104,7 @@ describe('migratsiya v1 → oxirgi (Delfin Sauna)', () => {
     expect(open.serviceChargePct).toBe(10)
     expect(open.serviceCharge).toBe(Math.round((open.timeTotal + open.linesTotal - open.discount) * 0.1))
     expect(open.total).toBe(open.timeTotal + open.linesTotal - open.discount + open.serviceCharge)
+    await svc.shifts.open() // 2.1.0: to'lov uchun smena shart
     const r = await svc.checkout.pay(2, [{ method: 'card', amount: open.total }], null)
     expect(r.receiptNo).toBe(2)
     expect(r.serviceCharge).toEqual({ pct: 10, amount: open.serviceCharge })
@@ -233,6 +234,7 @@ describe('migratsiya v2 → v3 (xonasiz bar savdosi)', () => {
     expect(bar.session.id).toBe(11)
     expect(bar.session).toMatchObject({ kind: 'bar', roomId: 0 })
     await svc.lines.addProduct(bar.session.id, 1, 2, null)
+    await svc.shifts.open() // 2.1.0: to'lov uchun smena shart
     const r = await svc.checkout.pay(bar.session.id, [{ method: 'cash', amount: 40_000 }], null)
     expect(r.receiptNo).toBe(8)
     const v3 = await svc.checkout.pay(3, [{ method: 'card', amount: (await svc.sessions.get(3)).total }], null)
@@ -370,6 +372,7 @@ describe('migratsiya v3 → v4 (terminal, qarzdorlar, oshxona, qatorga ofitsiant
     expect(openV).toMatchObject({ serviceChargePct: 10, serviceCharge: 10_000, total: 110_000 })
 
     // Terminal bilan to'lov; payments hisoblagichi saqlangan (21 dan davom)
+    await svc.shifts.open() // 2.1.0: to'lov uchun smena shart
     const r = await svc.checkout.pay(3, [{ method: 'terminal', amount: 110_000 }], null)
     expect(r.receiptNo).toBe(2)
     expect((await svc.sessions.get(3)).payments[0]).toMatchObject({ id: 21, method: 'terminal' })

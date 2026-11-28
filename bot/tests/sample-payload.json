@@ -1,0 +1,225 @@
+{
+  "v": 1,
+  "sentAt": 1768457100000,
+  "snapshot": {
+    "at": 1768457100000,
+    "business": "Delfin Sauna",
+    "shift": {
+      "shift": {
+        "id": 2,
+        "openedAt": 1768457100000,
+        "openedBy": 3,
+        "openedByName": "Kassir",
+        "closedAt": null,
+        "closedBy": null,
+        "closedByName": null,
+        "autoClosed": false
+      },
+      "summary": {
+        "total": 0,
+        "byMethod": {
+          "cash": 0,
+          "card": 0,
+          "terminal": 0,
+          "debt": 0
+        },
+        "discounts": 0,
+        "discountCount": 0,
+        "sessionsCount": 0,
+        "barSalesCount": 0,
+        "expenses": 0,
+        "waiterPayouts": 0,
+        "kitchenPayouts": 0,
+        "debtCollected": 0,
+        "voidedCount": 0,
+        "refunds": 0,
+        "expectedCash": 0
+      }
+    },
+    "shifts": [
+      {
+        "shift": {
+          "id": 2,
+          "openedAt": 1768457100000,
+          "openedBy": 3,
+          "openedByName": "Kassir",
+          "closedAt": null,
+          "closedBy": null,
+          "closedByName": null,
+          "autoClosed": false
+        },
+        "summary": {
+          "total": 0,
+          "byMethod": {
+            "cash": 0,
+            "card": 0,
+            "terminal": 0,
+            "debt": 0
+          },
+          "discounts": 0,
+          "discountCount": 0,
+          "sessionsCount": 0,
+          "barSalesCount": 0,
+          "expenses": 0,
+          "waiterPayouts": 0,
+          "kitchenPayouts": 0,
+          "debtCollected": 0,
+          "voidedCount": 0,
+          "refunds": 0,
+          "expectedCash": 0
+        }
+      },
+      {
+        "shift": {
+          "id": 1,
+          "openedAt": 1768453200000,
+          "openedBy": 1,
+          "openedByName": "Ega",
+          "closedAt": 1768457100000,
+          "closedBy": 3,
+          "closedByName": "Kassir",
+          "autoClosed": true
+        },
+        "summary": {
+          "total": 140000,
+          "byMethod": {
+            "cash": 50000,
+            "card": 90000,
+            "terminal": 0,
+            "debt": 0
+          },
+          "discounts": 0,
+          "discountCount": 0,
+          "sessionsCount": 1,
+          "barSalesCount": 0,
+          "expenses": 0,
+          "waiterPayouts": 0,
+          "kitchenPayouts": 0,
+          "debtCollected": 0,
+          "voidedCount": 0,
+          "refunds": 0,
+          "expectedCash": 50000
+        }
+      }
+    ],
+    "today": {
+      "total": 140000,
+      "byMethod": {
+        "cash": 50000,
+        "card": 90000,
+        "terminal": 0,
+        "debt": 0
+      },
+      "discounts": 0,
+      "sessions": 1
+    },
+    "rooms": [
+      {
+        "name": "Sauna 1",
+        "open": false,
+        "guests": 0,
+        "openedAt": null,
+        "waiter": null,
+        "total": 0
+      },
+      {
+        "name": "Sauna 2",
+        "open": false,
+        "guests": 0,
+        "openedAt": null,
+        "waiter": null,
+        "total": 0
+      },
+      {
+        "name": "VIP xona",
+        "open": true,
+        "guests": 3,
+        "openedAt": 1768456800000,
+        "waiter": null,
+        "total": 600000
+      }
+    ],
+    "stock": [
+      {
+        "name": "Pista",
+        "category": "Gazaklar",
+        "stock": 10,
+        "low": false
+      },
+      {
+        "name": "Sharbat 1 L",
+        "category": "Ichimliklar",
+        "stock": 12,
+        "low": false
+      },
+      {
+        "name": "Chips",
+        "category": "Gazaklar",
+        "stock": 20,
+        "low": false
+      },
+      {
+        "name": "Yong‘oq",
+        "category": "Gazaklar",
+        "stock": 20,
+        "low": false
+      },
+      {
+        "name": "Pivo 0.5 L",
+        "category": "Ichimliklar",
+        "stock": 22,
+        "low": false
+      },
+      {
+        "name": "Coca-Cola 1 L",
+        "category": "Ichimliklar",
+        "stock": 24,
+        "low": false
+      },
+      {
+        "name": "Suv 0.5 L",
+        "category": "Ichimliklar",
+        "stock": 48,
+        "low": false
+      }
+    ]
+  },
+  "events": [
+    {
+      "type": "shift_closed",
+      "at": 1768457100000,
+      "row": {
+        "shift": {
+          "id": 1,
+          "openedAt": 1768453200000,
+          "openedBy": 1,
+          "openedByName": "Ega",
+          "closedAt": 1768457100000,
+          "closedBy": 3,
+          "closedByName": "Kassir",
+          "autoClosed": true
+        },
+        "summary": {
+          "total": 140000,
+          "byMethod": {
+            "cash": 50000,
+            "card": 90000,
+            "terminal": 0,
+            "debt": 0
+          },
+          "discounts": 0,
+          "discountCount": 0,
+          "sessionsCount": 1,
+          "barSalesCount": 0,
+          "expenses": 0,
+          "waiterPayouts": 0,
+          "kitchenPayouts": 0,
+          "debtCollected": 0,
+          "voidedCount": 0,
+          "refunds": 0,
+          "expectedCash": 50000
+        }
+      }
+    }
+  ]
+}

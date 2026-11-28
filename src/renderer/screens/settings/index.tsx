@@ -16,6 +16,7 @@ import { BillingSection } from './BillingSection'
 import { AppearanceSection } from './AppearanceSection'
 import { BackupSection } from './BackupSection'
 import { NetworkSection } from './NetworkSection'
+import { BotSection } from './BotSection'
 import { AboutSection, APP_VERSION } from './AboutSection'
 import { LicenseSection } from './LicenseSection'
 import { KitchenSection } from './KitchenSection'
@@ -23,7 +24,7 @@ import { InstagramSection } from './InstagramSection'
 import { RolesSection } from './RolesSection'
 import './settings.css'
 
-type SectionId = 'rooms' | 'kitchen' | 'receipt' | 'security' | 'roles' | 'billing' | 'appearance' | 'network' | 'instagram' | 'backup' | 'license' | 'about'
+type SectionId = 'rooms' | 'kitchen' | 'receipt' | 'security' | 'roles' | 'billing' | 'appearance' | 'network' | 'bot' | 'instagram' | 'backup' | 'license' | 'about'
 
 const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'rooms', label: 'Xonalar', desc: 'Narx, sig\'im, tartib', icon: 'rooms' },
@@ -34,6 +35,7 @@ const NAV: { id: SectionId; label: string; desc: string; icon: IconName }[] = [
   { id: 'billing', label: 'Hisob-kitob', desc: 'Soat, blok, yaxlitlash', icon: 'percent' },
   { id: 'appearance', label: "Ko'rinish", desc: 'Kunduzgi / tungi', icon: 'sun' },
   { id: 'instagram', label: 'Instagram', desc: 'QR kod va handle', icon: 'inbox' },
+  { id: 'bot', label: 'Telegram bot', desc: 'Hisobotlar Telegramda', icon: 'inbox' },
   { id: 'network', label: 'Tarmoq', desc: "Boshqa kompyuterdan ko'rish", icon: 'eye' },
   { id: 'backup', label: 'Zaxira', desc: 'Nusxa, tiklash', icon: 'database' },
   { id: 'license', label: 'Litsenziya', desc: 'Aktivatsiya kaliti', icon: 'key' },
@@ -128,6 +130,7 @@ export default function SettingsScreen() {
   let body
   if (tab === 'rooms') body = <RoomsSection />
   else if (tab === 'network') body = <NetworkSection />
+  else if (tab === 'bot') body = <BotSection />
   else if (tab === 'backup') body = <BackupSection />
   else if (tab === 'license') body = <LicenseSection />
   else if (tab === 'about') body = <AboutSection />

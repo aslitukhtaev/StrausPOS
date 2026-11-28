@@ -104,3 +104,6 @@
 .kt-range { display: flex; flex-direction: column; gap: var(--sp-4); }
 .kt-range__bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
 .kt-range__custom { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+
+.kt-hist-sum { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-5); font-size: 1.125rem; }
+.kt-table tr.is-returned td { opacity: 0.55; text-decoration: line-through; }

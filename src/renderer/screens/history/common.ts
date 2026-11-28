@@ -1,6 +1,8 @@
 import type { ReportRange } from '@shared/types'
 
-export type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+export type Preset = 'today' | 'yesterday' | 'week' | 'month' | 'custom' | 'shift' | 'all'
+/** "Hammasi" — butun davr (faqat mijoz tomonida filtrlashda ishlatiladi) */
+export const ALL_TIME: ReportRange = { from: 0, to: Number.MAX_SAFE_INTEGER }
 
 export const startOfDay = (ts: number) => {
   const d = new Date(ts)
@@ -28,7 +30,7 @@ export const fromInputDT = (s: string): number | null => {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(s)
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5])).getTime() : null
 }
-export function presetRange(p: Exclude<Preset, 'custom'>, now: number): ReportRange {
+export function presetRange(p: Exclude<Preset, 'custom' | 'shift' | 'all'>, now: number): ReportRange {
   const today = startOfDay(now)
   const tomorrow = addDays(today, 1)
   if (p === 'today') return { from: today, to: tomorrow }

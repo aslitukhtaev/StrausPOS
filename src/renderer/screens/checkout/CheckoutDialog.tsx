@@ -53,7 +53,6 @@ interface Plan {
 
 export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogProps) {
   const canPay = useCan('session.pay') || useCan('bar.sale')
-  const canDebt = useCan('debt.manage')
   const roundTo = useApp((s) => (s.settings ? s.settings.roundTo : null))
   const blockMinutes = useApp((s) => (s.settings ? s.settings.blockMinutes : 1))
   const graceMinutes = useApp((s) => (s.settings ? s.settings.graceMinutes : 0))
@@ -295,10 +294,10 @@ export function CheckoutDialog({ sessionId, onClose, onPaid }: CheckoutDialogPro
     { value: 'cash', label: 'Naqd', icon: METHOD_ICON.cash },
     { value: 'card', label: 'Click', icon: METHOD_ICON.card },
     { value: 'terminal', label: 'Terminal', icon: METHOD_ICON.terminal },
-    { value: 'debt', label: 'Qarz', icon: METHOD_ICON.debt, disabled: !canDebt },
+    { value: 'debt', label: 'Qarz', icon: METHOD_ICON.debt },
     { value: 'mixed', label: 'Aralash', icon: 'swap' }
   ]
-  const mixRows = PAY_METHODS.filter((m) => m !== 'debt' || canDebt)
+  const mixRows = PAY_METHODS
   const lines = view.lines.filter((l) => l.activeQty > 0)
   const guests = live ? live.guests : view.guests
   const isBar = view.session.kind === 'bar'

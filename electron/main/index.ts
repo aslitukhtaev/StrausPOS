@@ -11,6 +11,7 @@ import { registerIpc } from './ipc'
 import { listPrinters, printHtml } from './print'
 import { writeFileAtomic } from './db'
 import { NetworkManager } from './lan/network'
+import { BotSync } from './sync/botSync'
 import { setClientVersion } from './lan/client'
 import { createConnectionController, createTerminalMode, loadConnectionConfig } from './lan/terminal'
 import { LicenseManager } from './license/manager'
@@ -217,6 +218,9 @@ async function startMode(): Promise<void> {
     version: app.getVersion()
   })
   host.network = net
+  const bot = new BotSync({ svc, store: { load: () => svc.readKv('botSync'), save: (j) => svc.writeKv('botSync', j) } })
+  host.bot = bot
+  bot.start()
   host.connection = createConnectionController({ file: connFile, onChange: () => switchMode() })
   // Litsenziya: ochiq kalit FAQAT publicKey.ts dan (env orqali almashtirib bo'lmaydi — prod xavfsizligi)
   license = new LicenseManager({
@@ -237,6 +241,7 @@ async function startMode(): Promise<void> {
   disposeMode = async () => {
     unregister()
     lic.stop()
+    bot.stop()
     await net.shutdown()
     svc.db.close()
     if (service === svc) service = null

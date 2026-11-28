@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Department, GuestView, Id, Product, ProductCategory, ServiceItem, SessionView } from '@shared/types'
 import { api } from '@/api'
-import { useStaff } from '@/store/auth'
+import { useCan, useStaff } from '@/store/auth'
 import {
   Button, EmptyState, Icon, Modal, Money, Segmented, Select, Spinner, Tabs, confirmDialog, cx, formatMoney, toast
 } from '@/ui'
@@ -29,6 +29,7 @@ export function AddItemsDialog({
   sessionId, guests, roomWaiterId = null, onClose, onUpdate
 }: { sessionId: number; guests: GuestView[]; roomWaiterId?: number | null; onClose: () => void; onUpdate: (v: SessionView) => void }) {
   const me = useStaff()
+  const canServices = useCan('session.manage')
   const iAmWaiter = isWaiterStaff(me)
   const staff = useStaffList()
   const [tab, setTab] = useState<Tab>('bar')
@@ -281,7 +282,7 @@ export function AddItemsDialog({
               items={[
                 { id: 'bar', label: 'Bar', icon: 'bar', badge: deptQty('bar') || undefined },
                 { id: 'kitchen', label: 'Oshxona', icon: 'flame', badge: deptQty('kitchen') || undefined },
-                { id: 'services', label: 'Xizmatlar', icon: 'sparkles' }
+                ...(canServices ? [{ id: 'services' as const, label: 'Xizmatlar', icon: 'sparkles' as const }] : [])
               ]}
             />
             {dept && waiterPicker}

@@ -8,7 +8,7 @@
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, Id, OrderLine, PaymentInput, Product, ProductCategory,
   ReceiptData, ReportRange, Role, Room, RoomCard, SalesReport, ServiceItem, SessionView, Staff,
-  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenRangeReport, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, VoidedSessionRow, SalesFilter, SoldItemRow, Expense, ExpenseCategory, ProfitReport
+  WaiterMonthRow, WaiterPayout, WaiterSessionRow, BarSaleRow, LicenseStatus, Debtor, DebtPayMethod, KitchenDayRow, KitchenRangeReport, KitchenSaleRow, KitchenPayout, NetworkStatus, DiscoveredServer, ConnectionInfo, SessionHistoryRow, SessionDetail, VoidedSessionRow, SalesFilter, Shift, ShiftRow, ShiftSummary, BotStatus, SoldItemRow, Expense, ExpenseCategory, ProfitReport, DebtJournalRow, StockHistoryRow
 } from './types'
 import type { Permission } from './types'
 
@@ -156,6 +156,8 @@ export interface PosApi {
     saveProduct(p: Partial<Product> & Pick<Product, 'name' | 'categoryId' | 'price'>): Promise<Product>
     removeProduct(id: Id): Promise<void>
     adjustStock(productId: Id, delta: number, reason: string): Promise<Product>
+    /** Ombor tarixi (kirim, chiqim, sotuv, qaytarish) oraliqda, eng yangisi birinchi. Ruxsat: stock.manage */
+    stockHistory(range: ReportRange): Promise<StockHistoryRow[]>
     services(includeInactive?: boolean): Promise<ServiceItem[]>
     saveService(s: Partial<ServiceItem> & Pick<ServiceItem, 'name' | 'price'>): Promise<ServiceItem>
     removeService(id: Id): Promise<void>
@@ -166,11 +168,13 @@ export interface PosApi {
     list(onlyOpen: boolean): Promise<Debt[]>
     pay(debtId: Id, method: DebtPayMethod, amount: number): Promise<Debt>
     payments(debtId: Id): Promise<DebtPayment[]>
+    /** Barcha qarzlar to'liq ma'lumot bilan (chek, kim bergan, mahsulotlar, to'lovlar), eng yangisi birinchi. Ruxsat: debt.manage */
+    journal(): Promise<DebtJournalRow[]>
   }
 
   /** Qarzdorlar (bir odam — bitta yozuv). Qarz yozishda avval qidiriladi, topilsa shu odamga qo'shiladi */
   debtors: {
-    /** Ism yoki telefon bo'yicha qidiruv (to'lov oynasidagi avtomatik taklif). Ruxsat: debt.manage */
+    /** Ism yoki telefon bo'yicha qidiruv (to'lov oynasidagi avtomatik taklif). Ruxsat: debt.manage, session.pay yoki bar.sale (debt.manage bo'lmasa summalarsiz) */
     search(query: string): Promise<Debtor[]>
     list(onlyOpen: boolean): Promise<Debtor[]>
     /** Odamning barcha qarzlari (eng yangisi birinchi) */
@@ -187,10 +191,33 @@ export interface PosApi {
     daily(month: string): Promise<KitchenDayRow[]>
     /** Ixtiyoriy vaqt oralig'i (soat:daqiqagacha) bo'yicha jami va kunlar. Ruxsat: kitchen.view */
     range(range: ReportRange): Promise<KitchenRangeReport>
+    /** Oshxona tarixi: oraliqda qo'shilgan oshxona mahsulotlari (qaysi sessiyada, kim qo'shgan). Ruxsat: kitchen.view */
+    history(range: ReportRange): Promise<KitchenSaleRow[]>
     payout(day: string, amount: number, note: string): Promise<KitchenPayout>
     payouts(month: string): Promise<KitchenPayout[]>
     /** Oshxona chekini qayta chop etish (sessiyadagi barcha faol oshxona qatorlari) */
     reprint(sessionId: Id): Promise<void>
+  }
+
+  // ── Telegram bot (serverdagi PHP) bilan sinxronizatsiya. Ruxsat: settings.manage. Faqat asosiy kompyuterda ──
+  bot: {
+    status(): Promise<BotStatus>
+    /** secret berilmasa eskisi qoladi. url http(s):// bilan boshlanishi shart */
+    save(input: { enabled: boolean; url: string; secret?: string }): Promise<BotStatus>
+    /** Hozir bir marta yuborib ko'rish (server javobi tekshiriladi) */
+    test(): Promise<{ ok: boolean; error?: string }>
+  }
+
+  // ── Smena (kassir sessiyasi) ──
+  shifts: {
+    /** Ochiq smena (yo'q bo'lsa null). Login talab qiladi */
+    current(): Promise<ShiftRow | null>
+    /** Smena ochish. Ochiq smena bo'lsa u AVTOMATIK yopiladi (closed). Ruxsat: session.pay */
+    open(): Promise<{ shift: ShiftRow; closed: ShiftRow | null }>
+    /** Joriy smenani yopish (xulosa bilan). Ruxsat: session.pay */
+    close(): Promise<ShiftRow>
+    /** Oxirgi smenalar (yangisi birinchi), xulosa bilan. Ruxsat: reports.view */
+    list(limit?: number): Promise<ShiftRow[]>
   }
 
   // ── Xodimlar ──

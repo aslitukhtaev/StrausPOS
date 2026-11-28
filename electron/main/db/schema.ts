@@ -388,7 +388,21 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE order_lines ADD COLUMN print_ticket INTEGER NOT NULL DEFAULT 0;
   `,
   // v9 — 2.0.1: 'bar.sale' ruxsati (rollar ruxsatlari sozlamada). Sxema o'zgarmaydi; ma'lumot qismi — MIGRATION_DATA[9].
-  `SELECT 1;`
+  `SELECT 1;`,
+  // v10 — 2.0.4: 'line.add' ruxsati (xonaga mahsulot qo'shish alohida). Sxema o'zgarmaydi; ma'lumot qismi — MIGRATION_DATA[10].
+  `SELECT 1;`,
+  // v11 — 2.1.0: smenalar (kassir sessiyalari). Hisob vaqt oralig'i bo'yicha: [opened_at, closed_at).
+  `
+  CREATE TABLE shifts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    opened_at INTEGER NOT NULL,
+    opened_by INTEGER NOT NULL REFERENCES staff(id),
+    closed_at INTEGER,
+    closed_by INTEGER REFERENCES staff(id),
+    auto_closed INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX idx_shifts_opened ON shifts(opened_at);
+  `
 ]
 
 /** Ma'lumot migratsiyasi uchun minimal interfeys (sql.js Database ustida). */
@@ -511,12 +525,31 @@ function migrateV9Data(db: MigrationDb): void {
   }
 }
 
+/** v10 ma'lumot qismi (2.0.4): avval mahsulot qo'shish session.manage ichida edi — shu ruxsati bor rollarga 'line.add' beriladi. */
+function migrateV10Data(db: MigrationDb): void {
+  const row = db.all("SELECT value FROM kv WHERE key='settings'")[0]
+  if (!row) return
+  try {
+    const s = JSON.parse(String(row.value)) as Record<string, unknown>
+    const rp = s && typeof s === 'object' ? (s.rolePermissions as Record<string, unknown> | undefined) : undefined
+    if (!rp || typeof rp !== 'object') return
+    for (const role of Object.keys(rp)) {
+      const list = rp[role]
+      if (Array.isArray(list) && list.includes('session.manage') && !list.includes('line.add')) rp[role] = [...list, 'line.add']
+    }
+    db.run("UPDATE kv SET value=? WHERE key='settings'", [JSON.stringify(s)])
+  } catch {
+    /* buzilgan sozlama — PosService standartga qaytaradi */
+  }
+}
+
 /** Versiya → ma'lumot migratsiyasi (shu versiyaning SQL qismidan keyin bajariladi). */
 export const MIGRATION_DATA: Record<number, (db: MigrationDb) => void> = {
   4: migrateV4Data,
   5: migrateV5Data,
   7: migrateV7Data,
-  9: migrateV9Data
+  9: migrateV9Data,
+  10: migrateV10Data
 }
 
 export const SCHEMA_VERSION = MIGRATIONS.length

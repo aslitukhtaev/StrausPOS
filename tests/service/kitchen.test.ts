@@ -336,3 +336,44 @@ describe('oshxona hisobi: vaqt oralig‘i (soat:daqiqa)', () => {
     await expect(svc.kitchen.range({ from: 5, to: 1 })).rejects.toThrow("noto'g'ri")
   })
 })
+
+describe('oshxona: tarix va pul berish chegarasi', () => {
+  it('kitchen.history: nima sotildi, qaysi sessiyada, kim qo‘shdi; faqat oshxona mahsulotlari', async () => {
+    const { svc, rooms, k, staff, clock, loginAs } = await kitchenCtx()
+    const beer = await productByName(svc, 'Pivo 0.5 L')
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60, staff.waiter.id)
+    await loginAs('cashier')
+    await svc.lines.addProducts(v0.session.id, [{ productId: k.osh.id, qty: 2 }, { productId: beer.id, qty: 1 }], null)
+    await loginAs('owner')
+    const range = { from: clock.t - 1000, to: clock.t + 60_000 }
+    let h = await svc.kitchen.history(range)
+    expect(h).toHaveLength(1)
+    expect(h[0]).toMatchObject({ sessionId: v0.session.id, name: 'Osh', qty: 2, unitPrice: 40_000, amount: 80_000, addedBy: 'Kassir', waiterName: 'Sardor', status: 'open', receiptNo: null, roomName: 'Sauna 1' })
+    await svc.lines.returnLine((await svc.sessions.get(v0.session.id)).lines.find((l) => l.name === 'Osh')!.id, 1, '')
+    h = await svc.kitchen.history(range)
+    expect(h[0]).toMatchObject({ returnedQty: 1, amount: 40_000 })
+    clock.advanceMin(60)
+    const total = (await svc.sessions.get(v0.session.id)).total
+    await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: total }], null)
+    h = await svc.kitchen.history({ from: range.from, to: clock.t + 1000 })
+    expect(h[0]).toMatchObject({ status: 'closed', receiptNo: 1 })
+    expect(await svc.kitchen.history({ from: clock.t + 5000, to: clock.t + 9000 })).toEqual([])
+  })
+
+  it('oshxonaga balansdan ortiq pul berib bo‘lmaydi', async () => {
+    const { svc, rooms, k, clock, loginAs } = await kitchenCtx()
+    const v0 = await svc.sessions.open(rooms.s1, 1, 60)
+    await svc.lines.addProduct(v0.session.id, k.osh.id, 1, null) // 40 000 × 100%
+    clock.advanceMin(60)
+    const total = (await svc.sessions.get(v0.session.id)).total
+    await svc.checkout.pay(v0.session.id, [{ method: 'cash', amount: total }], null)
+    await loginAs('owner')
+    const day = new Date(clock.t)
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+    await expect(svc.kitchen.payout(key, 40_001, '')).rejects.toThrow('balansi yetarli emas')
+    await svc.kitchen.payout(key, 25_000, '')
+    await expect(svc.kitchen.payout(key, 15_001, '')).rejects.toThrow('berilishi mumkin: 15000')
+    await svc.kitchen.payout(key, 15_000, '')
+    await expect(svc.kitchen.payout(key, 1, '')).rejects.toThrow('balansi yetarli emas')
+  })
+})

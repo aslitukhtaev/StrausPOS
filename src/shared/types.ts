@@ -24,7 +24,8 @@ export interface Staff {
 
 export type Permission =
   | 'session.open'
-  | 'session.manage' // vaqtni pauza/tugatish, xona almashtirish, mahsulot qo'shish
+  | 'session.manage' // vaqtni pauza/tugatish, mehmon qo'shish, xona/ofitsiant almashtirish, bekor qilish
+  | 'line.add' // xonaga bar/oshxona mahsulotini qo'shish (alohida ruxsat)
   | 'session.pay'
   | 'line.return' // X tugmasi: qaytarish
   | 'bar.sale' // Xonasiz bar savdosi: ochish, mahsulot qo'shish, to'lov (qarz — debt.manage)
@@ -243,6 +244,55 @@ export interface DebtPayment {
   amount: number
   at: number
   by: Id
+}
+
+/** Qarz olingan hisobdagi mahsulot/xizmat (qaytarilganlari ayirilgan) */
+export interface DebtItem {
+  name: string
+  qty: number
+  unitPrice: number
+  amount: number
+}
+
+export interface DebtJournalPayment extends DebtPayment {
+  /** To'lovni qabul qilgan xodim */
+  byName: string
+}
+
+/** Qarzlar jurnali qatori: qarz + qaysi chekdan, kim bergan, nima olingan, to'lovlari */
+export interface DebtJournalRow extends Debt {
+  receiptNo: number | null
+  source: 'room' | 'bar'
+  /** Xona nomi yoki "Bar" */
+  roomName: string
+  /** Shu chekning umumiy summasi (qarz qismi — amount) */
+  sessionTotal: number
+  /** Qarzga bergan xodim */
+  issuedById: Id | null
+  issuedByName: string
+  items: DebtItem[]
+  payments: DebtJournalPayment[]
+}
+
+/** Ombor harakati: in — kirim, out — hisobdan chiqarish/kamaytirish, sale — sotuv, return — qaytarish */
+export type StockMoveKind = 'in' | 'out' | 'sale' | 'return'
+
+export interface StockHistoryRow {
+  id: Id
+  at: number
+  productId: Id
+  productName: string
+  categoryId: Id
+  categoryName: string
+  department: Department
+  delta: number
+  reason: string
+  kind: StockMoveKind
+  staffId: Id | null
+  staffName: string
+  /** Sotuv/qaytarish bo'lsa — chek raqami (yopilmagan bo'lsa null) va xona */
+  receiptNo: number | null
+  roomName: string
 }
 
 // ───────────── Sozlamalar ─────────────
@@ -601,6 +651,27 @@ export interface KitchenRangeReport {
   payouts: KitchenPayout[]
 }
 
+/** Oshxona tarixi: oshxonaga AYNAN nima sotilgan, qaysi sessiyada va kim qo'shgan */
+export interface KitchenSaleRow {
+  lineId: Id
+  sessionId: Id
+  /** Chek raqami (sessiya hali yopilmagan bo'lsa null) */
+  receiptNo: number | null
+  /** 'Bar' — xonasiz savdo */
+  roomName: string
+  status: 'open' | 'closed'
+  /** Qator qo'shilgan vaqt */
+  at: number
+  name: string
+  qty: number
+  returnedQty: number
+  unitPrice: number
+  /** (qty − returnedQty) × unitPrice */
+  amount: number
+  addedBy: string
+  waiterName: string | null
+}
+
 export interface KitchenPayout {
   id: Id
   day: string
@@ -620,6 +691,68 @@ export interface SalesFilter {
   cashierId?: Id | null
   /** Shu usul bilan to'lov bor hisoblar; byMethod faqat shu usul summasini ko'rsatadi */
   method?: PayMethod | null
+}
+
+// ───────────── Smena (kassir sessiyasi) ─────────────
+/** Smena: kassir ishga kelib ochadi; keyingi kassir ochsa oldingisi avtomatik yopiladi. Hisob vaqt oralig'i bo'yicha: [openedAt, closedAt) */
+export interface Shift {
+  id: Id
+  openedAt: number
+  openedBy: Id
+  openedByName: string
+  closedAt: number | null
+  closedBy: Id | null
+  closedByName: string | null
+  /** Keyingi smena ochilishi bilan avtomatik yopilgan */
+  autoClosed: boolean
+}
+
+export interface ShiftSummary {
+  /** Jami tushum (obsluga bilan; qarzga yozilganlari ham) */
+  total: number
+  byMethod: { cash: number; card: number; terminal: number; debt: number }
+  discounts: number
+  discountCount: number
+  sessionsCount: number
+  barSalesCount: number
+  expenses: number
+  waiterPayouts: number
+  kitchenPayouts: number
+  /** Eski qarzlardan naqd undirilgan */
+  debtCollected: number
+  voidedCount: number
+  refunds: number
+  /** Kassada bo'lishi kerak naqd = topshirilishi kerak (naqd savdo + naqd qarz undirish − qaytarilgan naqd − xarajat − berilgan pullar) */
+  expectedCash: number
+}
+
+export interface ShiftRow {
+  shift: Shift
+  /** Ruxsat bo'lmasa (faqat kassa/hisobot ruxsati bor xodimlarga) null */
+  summary: ShiftSummary | null
+}
+
+// ───────────── Telegram bot (PHP, cron) bilan sinxronizatsiya ─────────────
+export interface BotStatus {
+  enabled: boolean
+  url: string
+  /** Maxfiy kalit saqlanganmi (qiymati hech qachon qaytarilmaydi) */
+  secretSet: boolean
+  lastOkAt: number | null
+  lastError: string | null
+  /** Yuborilmay turgan voqealar soni (aloqa bo'lmaganda) */
+  pending: number
+}
+
+/** Serverdagi PHP botga yuboriladigan holat nusxasi (JSON) */
+export interface BotSnapshot {
+  at: number
+  business: string
+  shift: ShiftRow | null
+  shifts: ShiftRow[]
+  today: { total: number; byMethod: { cash: number; card: number; terminal: number; debt: number }; discounts: number; sessions: number }
+  rooms: { name: string; open: boolean; guests: number; openedAt: number | null; waiter: string | null; total: number }[]
+  stock: { name: string; category: string; stock: number; low: boolean }[]
 }
 
 export interface VoidedSessionRow {

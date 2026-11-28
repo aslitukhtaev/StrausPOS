@@ -7,12 +7,13 @@
  *  - Mutatsiyalar `db.tx()` ichida — atomik, muvaffaqiyatdan keyin darhol faylga yoziladi.
  *  - Xato matnlari o'zbekcha (UI to'g'ridan-to'g'ri ko'rsatadi).
  */
+import { EventEmitter } from 'events'
 import type { PosApi, StaffInput } from '../../src/shared/api'
 import type {
   AppSettings, Debt, DebtPayment, DebtorInput, Guest, GuestState, Id, OrderLine, Payment, PaymentInput, PayMethod,
   Permission, Product, ProductCategory, ReceiptData, ReceiptSettings, ReportRange, ReturnRecord, Role, Room, RoomCard,
   SalesReport, ServiceItem, Session, SessionKind, SessionView, Staff, TimeInterval, WaiterMonthRow, WaiterPayout, WaiterSessionRow,
-  BarSaleRow, Debtor, DebtPayMethod, Department, KitchenDayRow, KitchenRangeReport, KitchenPayout, SessionHistoryRow, SoldItemRow, VoidedSessionRow, SalesFilter,
+  BarSaleRow, DebtItem, DebtJournalPayment, DebtJournalRow, StockHistoryRow, Debtor,DebtPayMethod, Department, KitchenDayRow, KitchenRangeReport, KitchenSaleRow, Shift, ShiftRow, ShiftSummary, BotSnapshot, KitchenPayout, SessionHistoryRow, SoldItemRow, VoidedSessionRow, SalesFilter,
   Expense, ExpenseCategory, ProfitReport
 } from '../../src/shared/types'
 import { DEFAULT_ROLE_PERMISSIONS, EDITABLE_ROLES, ALL_PERMISSIONS, ROLE_LABELS, can, effectivePermissions } from '../../src/shared/permissions'
@@ -38,6 +39,8 @@ export interface PosHost {
   openBackup?(): Promise<Uint8Array | null>
   /** LAN server boshqaruvi (asosiy kompyuter). Yo'q bo'lsa network.* xato beradi. */
   network?: PosApi['network']
+  /** Telegram bot sinxronizatsiyasi (asosiy kompyuter). Yo'q bo'lsa bot.* xato beradi. */
+  bot?: PosApi['bot']
   /** Ulanish rejimi (lokal konfiguratsiya). Yo'q bo'lsa: asosiy rejim, ulanish o'zgartirib bo'lmaydi. */
   connection?: PosApi['connection']
   /** Litsenziya (electron/main/license). Yo'q bo'lsa (testlar, dev-server standart) — holat doim 'active'. */
@@ -120,6 +123,7 @@ const BAR_NO_GUESTS = "Bar savdosida mehmonlar yo'q — bu amal faqat xona uchun
 const BAR_NO_TIME = "Bar savdosida vaqt hisoblanmaydi — bu amal faqat xona uchun"
 
 // ───────────── Qator turlari (DB) ─────────────
+interface ShiftDbRow { id: number; opened_at: number; opened_by: number; closed_at: number | null; closed_by: number | null; auto_closed: number }
 interface StaffRow {
   id: number; name: string; role: Role; pin_hash: string; active: number; is_provider: number; is_waiter: number; commission_pct: number
 }
@@ -265,6 +269,11 @@ function dayStart(day: unknown): { day: string; from: number } {
   if (d.getDate() !== Number(m[3])) fail("Kun noto'g'ri (YYYY-MM-DD ko'rinishida bo'lishi kerak)")
   return { day: m[0], from: d.getTime() }
 }
+/** Kalendar kun qo'shish (DST xavfsiz) */
+function addDaysMs(ts: number, n: number): number {
+  const d = new Date(ts)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n).getTime()
+}
 const PAY_METHODS: readonly PayMethod[] = ['cash', 'card', 'terminal', 'debt']
 const DEBT_PAY_METHODS: readonly DebtPayMethod[] = ['cash', 'card', 'terminal']
 const PHONE_RE = /^[+\d][\d\s()-]{4,}$/
@@ -391,6 +400,8 @@ export class PosService implements PosApi {
   private loginFails = new Map<Id, { count: number; until: number }>()
   /** true → ko'ruvchi konteksti (forViewer): login yo'q, faqat o'qish */
   private readonly viewer: boolean = false
+  /** Voqealar (hamma kontekstlar uchun umumiy): 'shiftOpened' | 'shiftClosed' — ShiftRow bilan */
+  events: EventEmitter = new EventEmitter()
 
   constructor(db: Db, opts: PosServiceOptions = {}) {
     this.db = db
@@ -406,6 +417,7 @@ export class PosService implements PosApi {
    */
   forViewer(): PosService {
     const v = new PosService(this.db, { clock: () => this.clock(), host: {} })
+    v.events = this.events
     ;(v as unknown as { viewer: boolean }).viewer = true
     return v
   }
@@ -423,6 +435,7 @@ export class PosService implements PosApi {
   forTerminal(): PosService {
     const t = new PosService(this.db, { clock: () => this.clock(), host: this.host })
     t.loginFails = this.loginFails
+    t.events = this.events
     t.terminal = true
     return t
   }
@@ -1340,7 +1353,7 @@ export class PosService implements PosApi {
    * Bar savdosida ofitsiant yo'q. Oshxona mahsulotlari bo'lsa — bitta oshxona cheki (autoPrint yoqilgan bo'lsa).
    */
   private addItems(sessionId: Id, rawItems: unknown, guestId: Id | null, waiterId: Id | null | undefined): SessionView {
-    const me = this.needForId(sessionId, 'session.manage')
+    const me = this.needForId(sessionId, 'line.add')
     const s = this.openSessionRow(sessionId)
     if (!Array.isArray(rawItems) || rawItems.length === 0) fail('Hech qanday mahsulot tanlanmagan')
     if (rawItems.length > MAX_ADD_ITEMS) fail(`Bir martada ko'pi bilan ${MAX_ADD_ITEMS} xil mahsulot qo'shish mumkin`)
@@ -1529,6 +1542,7 @@ export class PosService implements PosApi {
   checkout: PosApi['checkout'] = {
     pay: async (sessionId, payments, debtor) => {
       const me = this.needForId(sessionId, 'session.pay')
+      this.requireShift()
       const s = this.openSessionRow(sessionId)
       const now = this.now()
       const v = this.view(s.id, now)
@@ -1546,7 +1560,7 @@ export class PosService implements PosApi {
       const debtAmount = merged.get('debt') ?? 0
       let debtorInput: { debtorId: Id | null; name: string; phone: string; key: string } | null = null
       if (debtAmount > 0) {
-        if (!this.can(me.role, 'debt.manage')) fail(PERMISSION_DENIED)
+        // Qarzga yozish uchun to'lov ruxsati (yuqorida tekshirilgan) yetarli; 'debt.manage' — faqat Qarzlar sahifasi bilan ishlash
         if (!debtor || typeof debtor !== 'object') fail('Qarzdorning ismi va telefoni majburiy')
         if (debtor.debtorId != null) {
           const d = this.debtorRow(debtor.debtorId)
@@ -1766,6 +1780,47 @@ export class PosService implements PosApi {
       return toProduct(this.db.get<ProductRow>('SELECT * FROM products WHERE id=?', [cur.id])!)
     },
 
+    stockHistory: async (range) => {
+      this.needRead('stock.manage')
+      const { from, to } = this.checkRange(range)
+      return this.db
+        .all<{
+          id: number; at: number; product_id: number; delta: number; reason: string; line_id: number | null; by: number | null
+          product_name: string; category_id: number; category_name: string | null; department: string | null
+          staff_name: string | null; receipt_no: number | null; kind: string | null; room_name: string | null
+        }>(
+          `SELECT m.id, m.at, m.product_id, m.delta, m.reason, m.line_id, m.by, p.name AS product_name, p.category_id,
+             c.name AS category_name, c.department, st.name AS staff_name, s.receipt_no, s.kind, r.name AS room_name
+           FROM stock_moves m
+           JOIN products p ON p.id=m.product_id
+           LEFT JOIN categories c ON c.id=p.category_id
+           LEFT JOIN staff st ON st.id=m.by
+           LEFT JOIN order_lines l ON l.id=m.line_id
+           LEFT JOIN sessions s ON s.id=l.session_id
+           LEFT JOIN rooms r ON r.id=s.room_id
+           WHERE m.at>=? AND m.at<?
+           ORDER BY m.at DESC, m.id DESC`,
+          [from, to]
+        )
+        .map((m): StockHistoryRow => ({
+          id: m.id,
+          at: m.at,
+          productId: m.product_id,
+          productName: m.product_name,
+          categoryId: m.category_id,
+          categoryName: m.category_name ?? '',
+          department: m.department === 'kitchen' ? 'kitchen' : 'bar',
+          delta: m.delta,
+          reason: m.reason,
+          // line_id bor — sotuv yoki qaytarish; yo'q — qo'lda kirim / hisobdan chiqarish
+          kind: m.line_id != null ? (m.delta < 0 ? 'sale' : 'return') : m.delta > 0 ? 'in' : 'out',
+          staffId: m.by,
+          staffName: m.staff_name ?? '',
+          receiptNo: m.receipt_no ?? null,
+          roomName: m.kind === 'bar' ? 'Bar' : m.room_name ?? ''
+        }))
+    },
+
     services: async (includeInactive) => {
       this.requireLogin()
       return this.db
@@ -1827,6 +1882,7 @@ export class PosService implements PosApi {
 
     pay: async (debtId, method, amount) => {
       const me = this.need('debt.manage')
+      this.requireShift()
       const d = this.db.get<DebtRow>('SELECT * FROM debts WHERE id=?', [debtId])
       if (!d) fail('Qarz topilmadi')
       if (d.closed_at != null) fail('Qarz allaqachon to‘langan')
@@ -1841,13 +1897,70 @@ export class PosService implements PosApi {
     payments: async (debtId) => {
       this.needRead('debt.manage')
       return this.db.all<DebtPaymentRow>('SELECT * FROM debt_payments WHERE debt_id=? ORDER BY at, id', [debtId]).map(toDebtPayment)
+    },
+
+    journal: async () => {
+      this.needRead('debt.manage')
+      // Kim bergan: qarzga yozilgan to'lovni qabul qilgan xodim (bo'lmasa — hisobni yopgan)
+      const rows = this.db.all<DebtRow & {
+        receipt_no: number | null; kind: string | null; room_name: string | null; session_total: number | null
+        issued_by: number | null; issued_name: string | null
+      }>(
+        `SELECT x.*, st.name AS issued_name FROM (
+           SELECT d.*, dr.name AS debtor_name, dr.phone AS debtor_phone, s.receipt_no, s.kind, r.name AS room_name, s.total AS session_total,
+             COALESCE((SELECT p.by FROM payments p WHERE p.session_id=d.session_id AND p.method='debt' ORDER BY p.id LIMIT 1), s.closed_by) AS issued_by
+           FROM debts d
+           LEFT JOIN debtors dr ON dr.id=d.debtor_id
+           LEFT JOIN sessions s ON s.id=d.session_id
+           LEFT JOIN rooms r ON r.id=s.room_id
+         ) x LEFT JOIN staff st ON st.id=x.issued_by
+         ORDER BY x.created_at DESC, x.id DESC`
+      )
+      const items = new Map<number, DebtItem[]>()
+      for (const l of this.db.all<{ session_id: number; name: string; qty: number; unit_price: number }>(
+        `SELECT l.session_id, l.name, l.qty - l.returned_qty AS qty, l.unit_price FROM order_lines l
+         WHERE l.session_id IN (SELECT session_id FROM debts) AND l.qty > l.returned_qty ORDER BY l.id`
+      )) {
+        const list = items.get(l.session_id) ?? []
+        const same = list.find((i) => i.name === l.name && i.unitPrice === l.unit_price)
+        if (same) {
+          same.qty += l.qty
+          same.amount += l.qty * l.unit_price
+        } else list.push({ name: l.name, qty: l.qty, unitPrice: l.unit_price, amount: l.qty * l.unit_price })
+        items.set(l.session_id, list)
+      }
+      const pays = new Map<number, DebtJournalPayment[]>()
+      for (const p of this.db.all<DebtPaymentRow & { by_name: string | null }>(
+        'SELECT dp.*, st.name AS by_name FROM debt_payments dp LEFT JOIN staff st ON st.id=dp.by ORDER BY dp.at, dp.id'
+      )) {
+        const list = pays.get(p.debt_id) ?? []
+        list.push({ ...toDebtPayment(p), byName: p.by_name ?? '' })
+        pays.set(p.debt_id, list)
+      }
+      return rows.map((r): DebtJournalRow => ({
+        ...toDebt(r),
+        receiptNo: r.receipt_no ?? null,
+        source: r.kind === 'bar' ? 'bar' : 'room',
+        roomName: r.kind === 'bar' ? 'Bar' : r.room_name ?? '',
+        sessionTotal: r.session_total ?? r.amount,
+        issuedById: r.issued_by ?? null,
+        issuedByName: r.issued_name ?? '',
+        items: r.session_id != null ? items.get(r.session_id) ?? [] : [],
+        payments: pays.get(r.id) ?? []
+      }))
     }
   }
 
   // ═════════════ QARZDORLAR ═════════════
   debtors: PosApi['debtors'] = {
     search: async (query) => {
-      this.needRead('debt.manage')
+      // To'lov oynasidagi taklif: qarz yozayotgan (to'lov qabul qiluvchi) xodimga ham ochiq, lekin summalarsiz
+      const me = this.requireLogin()
+      const manage = !!this.viewer || this.can(me.role, 'debt.manage')
+      if (!manage) {
+        if (this.can(me.role, 'bar.sale')) this.need('bar.sale')
+        else this.need('session.pay')
+      }
       const q = typeof query === 'string' ? query.trim().slice(0, 60) : ''
       if (!q) return []
       const digits = q.replace(/\D/g, '')
@@ -1861,6 +1974,7 @@ export class PosService implements PosApi {
       return this.db
         .all<DebtorRow>(`${DEBTOR_SELECT} WHERE ${where} GROUP BY dr.id ORDER BY COALESCE(MAX(d.created_at), dr.created_at) DESC, dr.id DESC LIMIT 20`, params)
         .map(toDebtor)
+        .map((d) => (manage ? d : { ...d, total: 0, paid: 0, balance: 0, debtsCount: 0, lastAt: 0 }))
     },
 
     list: async (onlyOpen) => {
@@ -1881,6 +1995,7 @@ export class PosService implements PosApi {
 
     pay: async (debtorId, method, amount) => {
       const me = this.need('debt.manage')
+      this.requireShift()
       const dr = this.debtorRow(debtorId)
       if (!DEBT_PAY_METHODS.includes(method)) fail("To'lov usuli noto'g'ri")
       const open = this.db.all<DebtRow>('SELECT * FROM debts WHERE debtor_id=? AND closed_at IS NULL ORDER BY created_at, id', [dr.id])
@@ -1911,6 +2026,96 @@ export class PosService implements PosApi {
       if (other) fail(`Bu telefon raqami boshqa qarzdorga tegishli (${other.name})`)
       this.db.tx(() => this.db.run('UPDATE debtors SET name=?, phone=?, phone_key=? WHERE id=?', [n, ph.phone, ph.key, dr.id]))
       return this.debtorById(dr.id)
+    }
+  }
+
+  // ═════════════ SMENA ═════════════
+  private currentShiftRaw(): ShiftDbRow | undefined {
+    return this.db.get<ShiftDbRow>('SELECT * FROM shifts WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1')
+  }
+
+  /** To'lov/qarz undirish uchun ochiq smena shart */
+  private requireShift(): void {
+    if (!this.currentShiftRaw()) fail("Avval smenani oching (yuqoridagi «Smenani ochish» tugmasi) — smenasiz to'lov qabul qilinmaydi")
+  }
+
+  private toShiftRow(r: ShiftDbRow, names: Map<Id, string>, withSummary: boolean): ShiftRow {
+    const shift: Shift = {
+      id: r.id, openedAt: r.opened_at, openedBy: r.opened_by, openedByName: names.get(r.opened_by) ?? '',
+      closedAt: r.closed_at, closedBy: r.closed_by, closedByName: r.closed_by != null ? names.get(r.closed_by) ?? '' : null, autoClosed: !!r.auto_closed
+    }
+    return { shift, summary: withSummary ? this.shiftSummary(r) : null }
+  }
+
+  private shiftSummary(r: ShiftDbRow): ShiftSummary {
+    const to = r.closed_at ?? this.now() + 1
+    const x = this.salesCore({ from: r.opened_at, to: Math.max(to, r.opened_at) })
+    return {
+      total: x.total,
+      byMethod: { ...x.byMethod },
+      discounts: x.discounts,
+      discountCount: x.discountCount,
+      sessionsCount: x.sessionsCount,
+      barSalesCount: x.barSales.count,
+      expenses: x.cashDrawer.expenses,
+      waiterPayouts: x.cashDrawer.waiterPayouts,
+      kitchenPayouts: x.cashDrawer.kitchenPayouts,
+      debtCollected: x.cashDrawer.debtCollected,
+      voidedCount: x.voided.count,
+      refunds: x.voided.refund,
+      expectedCash: x.cashDrawer.expected
+    }
+  }
+
+  /** Ichki: oxirgi smenalar (ruxsatsiz) — Telegram sinxronizatsiyasi uchun. */
+  shiftRowsInternal(limit: number): ShiftRow[] {
+    const names = this.staffNames()
+    return this.db.all<ShiftDbRow>('SELECT * FROM shifts ORDER BY id DESC LIMIT ?', [limit]).map((r) => this.toShiftRow(r, names, true))
+  }
+
+  shifts: PosApi['shifts'] = {
+    current: async () => {
+      const me = this.requireLogin()
+      const r = this.currentShiftRaw()
+      if (!r) return null
+      const allow = this.viewer || this.can(me.role, 'session.pay') || this.can(me.role, 'reports.view')
+      return this.toShiftRow(r, this.staffNames(), allow)
+    },
+
+    open: async () => {
+      const me = this.need('session.pay')
+      const now = this.now()
+      let prevId: number | null = null
+      const id = this.db.tx(() => {
+        const prev = this.currentShiftRaw()
+        if (prev) {
+          prevId = prev.id
+          this.db.run('UPDATE shifts SET closed_at=?, closed_by=?, auto_closed=1 WHERE id=?', [now, me.id, prev.id])
+        }
+        return this.db.insert('INSERT INTO shifts(opened_at, opened_by) VALUES(?,?)', [now, me.id])
+      })
+      const names = this.staffNames()
+      const closed = prevId != null ? this.toShiftRow(this.db.get<ShiftDbRow>('SELECT * FROM shifts WHERE id=?', [prevId])!, names, true) : null
+      const shift = this.toShiftRow(this.db.get<ShiftDbRow>('SELECT * FROM shifts WHERE id=?', [id])!, names, true)
+      if (closed) this.events.emit('shiftClosed', closed)
+      this.events.emit('shiftOpened', shift)
+      return { shift, closed }
+    },
+
+    close: async () => {
+      const me = this.need('session.pay')
+      const cur = this.currentShiftRaw()
+      if (!cur) fail("Ochiq smena yo'q")
+      this.db.tx(() => this.db.run('UPDATE shifts SET closed_at=?, closed_by=?, auto_closed=0 WHERE id=?', [this.now(), me.id, cur.id]))
+      const row = this.toShiftRow(this.db.get<ShiftDbRow>('SELECT * FROM shifts WHERE id=?', [cur.id])!, this.staffNames(), true)
+      this.events.emit('shiftClosed', row)
+      return row
+    },
+
+    list: async (limit) => {
+      this.needRead('reports.view')
+      const n = isInt(limit) ? Math.min(Math.max(limit, 1), 200) : 30
+      return this.shiftRowsInternal(n)
     }
   }
 
@@ -1987,11 +2192,52 @@ export class PosService implements PosApi {
       return out
     },
 
+    history: async (range) => {
+      this.needRead('kitchen.view')
+      const { from, to } = this.checkRange(range)
+      return this.db
+        .all<{
+          id: number; session_id: number; skind: SessionKind; status: 'open' | 'closed'; receipt_no: number | null; room_name: string | null
+          created_at: number; name: string; qty: number; returned_qty: number; unit_price: number; by_name: string | null; waiter_name: string | null
+        }>(
+          `SELECT l.id, l.session_id, s.kind AS skind, s.status, s.receipt_no, rm.name AS room_name, l.created_at, l.name, l.qty, l.returned_qty,
+             l.unit_price, cb.name AS by_name, w.name AS waiter_name
+           FROM order_lines l JOIN sessions s ON s.id=l.session_id LEFT JOIN rooms rm ON rm.id=s.room_id
+           LEFT JOIN staff cb ON cb.id=l.created_by LEFT JOIN staff w ON w.id=l.waiter_id
+           WHERE l.kind='product' AND l.department='kitchen' AND s.cancelled=0 AND l.created_at>=? AND l.created_at<?
+           ORDER BY l.created_at DESC, l.id DESC LIMIT 5000`,
+          [from, to]
+        )
+        .map((r): KitchenSaleRow => ({
+          lineId: r.id,
+          sessionId: r.session_id,
+          receiptNo: r.receipt_no ?? null,
+          roomName: r.skind === 'bar' ? BAR_ROOM.name : r.room_name ?? '',
+          status: r.status,
+          at: r.created_at,
+          name: r.name,
+          qty: r.qty,
+          returnedQty: r.returned_qty,
+          unitPrice: r.unit_price,
+          amount: (r.qty - r.returned_qty) * r.unit_price,
+          addedBy: r.by_name ?? '',
+          waiterName: r.waiter_name ?? null
+        }))
+    },
+
     payout: async (day, amount, note) => {
       const me = this.need('staff.manage')
       const d = dayStart(day)
       if (d.from > this.now()) fail("Kelajak kun uchun pul berib bo'lmaydi")
       reqInt(amount, "Summa musbat butun son bo'lishi kerak", 1, 1_000_000_000)
+      // Kunlik balansdan ortiq pul berib bo'lmaydi
+      let due = 0
+      for (const s of this.db.all<{ kitchen_sales: number; kitchen_share_pct: number | null }>(
+        `SELECT kitchen_sales, kitchen_share_pct FROM sessions WHERE status='closed' AND cancelled=0 AND kitchen_sales > 0 AND closed_at>=? AND closed_at<?`,
+        [d.from, addDaysMs(d.from, 1)]
+      )) due += waiterCommission(s.kitchen_sales, s.kitchen_share_pct ?? 100)
+      const given = this.db.get<{ a: number | null }>('SELECT SUM(amount) AS a FROM kitchen_payouts WHERE day=?', [d.day])?.a ?? 0
+      if (amount > due - given) fail(`Oshxonaning balansi yetarli emas (berilishi mumkin: ${Math.max(0, due - given)} so'm)`)
       const id = this.db.tx(() =>
         this.db.insert('INSERT INTO kitchen_payouts(day, amount, note, at, by) VALUES(?,?,?,?,?)', [d.day, amount, optText(note, 200), this.now(), me.id])
       )
@@ -2382,6 +2628,10 @@ export class PosService implements PosApi {
         )?.n ?? 0) > 0
       if (!st.is_waiter && !hasSessions) fail('Xodim ofitsiant emas')
       reqInt(amount, "Summa musbat butun son bo'lishi kerak", 1, 1_000_000_000)
+      // Balansdan ortiq pul berib bo'lmaydi (manfiy qoldiq bo'lmasin)
+      const earned = this.waiterAgg(r.from, r.to).get(st.id)?.commission ?? 0
+      const given = this.db.get<{ a: number | null }>('SELECT SUM(amount) AS a FROM waiter_payouts WHERE staff_id=? AND month=?', [st.id, r.month])?.a ?? 0
+      if (amount > earned - given) fail(`Ofitsiantning balansi yetarli emas (berilishi mumkin: ${Math.max(0, earned - given)} so'm)`)
       const id = this.db.tx(() =>
         this.db.insert('INSERT INTO waiter_payouts(staff_id, month, amount, note, at, by) VALUES(?,?,?,?,?,?)', [
           st.id, r.month, amount, optText(note, 200), this.now(), me.id
@@ -2424,155 +2674,7 @@ export class PosService implements PosApi {
   reports: PosApi['reports'] = {
     sales: async (range: ReportRange, filter?: SalesFilter): Promise<SalesReport> => {
       this.needRead('reports.view')
-      const { from, to } = this.checkRange(range)
-      const allSessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
-        `SELECT s.*, r.name AS room_name, st.name AS staff_name FROM sessions s
-         LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.closed_by
-         WHERE s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<? ORDER BY s.closed_at`,
-        [from, to]
-      )
-      const allPays = this.db.all<PaymentRow>(
-        `SELECT * FROM payments WHERE session_id IN (${allSessions.length ? allSessions.map((s) => s.id).join(',') : '-1'})`
-      )
-      const fMethod = filter && filter.method ? filter.method : null
-      if (fMethod && !PAY_METHODS.includes(fMethod)) fail("To'lov usuli noto'g'ri")
-      const sessions = allSessions.filter((s) => {
-        if (filter && isInt(filter.roomId) && (s.kind === 'bar' ? BAR_ROOM.id : s.room_id ?? 0) !== filter.roomId) return false
-        if (filter && isInt(filter.cashierId) && (s.closed_by ?? s.opened_by) !== filter.cashierId) return false
-        if (fMethod && !allPays.some((p) => p.session_id === s.id && p.method === fMethod)) return false
-        return true
-      })
-      const ids = sessions.map((s) => s.id)
-      const inList = ids.length ? ids.join(',') : '-1'
-      const lines = this.db.all<LineRow & { provider_name: string | null }>(
-        `SELECT l.*, st.name AS provider_name FROM order_lines l LEFT JOIN staff st ON st.id=l.provider_id
-         WHERE l.session_id IN (${inList})`
-      )
-      const pays = allPays.filter((p) => ids.includes(p.session_id) && (!fMethod || p.method === fMethod))
-
-      const report: SalesReport = {
-        range: { from, to },
-        // Faqat xona seanslari; xonasiz bar savdolari alohida — barSales.count
-        sessionsCount: sessions.filter((s) => s.kind !== 'bar').length,
-        timeRevenue: 0,
-        productRevenue: 0,
-        serviceRevenue: 0,
-        discounts: 0,
-        discountCount: 0,
-        serviceCharge: 0,
-        total: 0,
-        byMethod: { cash: 0, card: 0, terminal: 0, debt: 0 },
-        debtPayments: { cash: 0, card: 0, terminal: 0 },
-        debtCollections: [],
-        voided: { count: 0, refund: 0, cashRefund: 0 },
-        cashDrawer: { sales: 0, debtCollected: 0, refunds: 0, expenses: 0, waiterPayouts: 0, kitchenPayouts: 0, expected: 0 },
-        returnsAmount: 0,
-        byDay: [],
-        byRoom: [],
-        byProduct: [],
-        byProvider: [],
-        byStaff: [],
-        byWaiter: [],
-        barSales: { count: 0, total: 0 }
-      }
-      const byDay = new Map<string, number>()
-      const byRoom = new Map<Id, { roomId: Id; roomName: string; sessions: number; total: number }>()
-      const byStaff = new Map<Id, { staffId: Id; name: string; sessions: number; total: number }>()
-      const names = this.staffNames()
-      // Ofitsiantlar: qatorlar bo'yicha (eski sessiyalar — muzlatilgan sessiya haqi); xonasiz bar savdosi kirmaydi
-      const byWaiter: SalesReport['byWaiter'] = Array.from(this.waiterAgg(from, to), ([staffId, a]) => ({
-        staffId, name: names.get(staffId) ?? '', sessions: a.sessions.size, productSales: a.productSales, commission: a.commission
-      }))
-      for (const s of sessions) {
-        const isBar = s.kind === 'bar'
-        const total = s.total ?? 0
-        report.timeRevenue += s.time_total ?? 0
-        report.discounts += s.discount_applied ?? 0
-        if ((s.discount_applied ?? 0) > 0) report.discountCount += 1
-        report.serviceCharge += s.service_charge ?? 0
-        report.total += total
-        const day = localDay(s.closed_at ?? s.opened_at)
-        byDay.set(day, (byDay.get(day) ?? 0) + total)
-        if (isBar) {
-          report.barSales.count++
-          report.barSales.total += total
-        }
-        const roomId = isBar ? BAR_ROOM.id : s.room_id ?? 0
-        const r = byRoom.get(roomId) ?? { roomId, roomName: isBar ? BAR_REPORT_ROOM_NAME : s.room_name ?? '', sessions: 0, total: 0 }
-        r.sessions++
-        r.total += total
-        byRoom.set(roomId, r)
-        const staffId = s.closed_by ?? s.opened_by
-        const st = byStaff.get(staffId) ?? { staffId, name: s.staff_name ?? '', sessions: 0, total: 0 }
-        st.sessions++
-        st.total += total
-        byStaff.set(staffId, st)
-      }
-      const byProduct = new Map<string, { name: string; qty: number; amount: number }>()
-      const byProvider = new Map<Id, { staffId: Id; name: string; count: number; amount: number }>()
-      for (const l of lines) {
-        const q = l.qty - l.returned_qty
-        if (q <= 0) continue
-        const amount = q * l.unit_price
-        if (l.kind === 'product') {
-          report.productRevenue += amount
-          const p = byProduct.get(l.name) ?? { name: l.name, qty: 0, amount: 0 }
-          p.qty += q
-          p.amount += amount
-          byProduct.set(l.name, p)
-        } else {
-          report.serviceRevenue += amount
-          if (l.provider_id != null) {
-            const p = byProvider.get(l.provider_id) ?? { staffId: l.provider_id, name: l.provider_name ?? '', count: 0, amount: 0 }
-            p.count += q
-            p.amount += amount
-            byProvider.set(l.provider_id, p)
-          }
-        }
-      }
-      for (const p of pays) if (p.method in report.byMethod) report.byMethod[p.method] += p.amount
-      for (const d of this.db.all<{ method: DebtPayMethod; a: number }>(
-        'SELECT method, SUM(amount) AS a FROM debt_payments WHERE at>=? AND at<? GROUP BY method',
-        [from, to]
-      )) if (d.method in report.debtPayments) report.debtPayments[d.method] += d.a ?? 0
-      report.debtCollections = this.db
-        .all<{ at: number; method: DebtPayMethod; amount: number; created_at: number; name: string | null; customer_name: string }>(
-          `SELECT dp.at, dp.method, dp.amount, d.created_at, dr.name AS name, d.customer_name
-           FROM debt_payments dp JOIN debts d ON d.id=dp.debt_id LEFT JOIN debtors dr ON dr.id=d.debtor_id
-           WHERE dp.at>=? AND dp.at<? ORDER BY dp.at DESC, dp.id DESC`,
-          [from, to]
-        )
-        .map((r) => ({ at: r.at, debtorName: r.name ?? r.customer_name, debtDate: r.created_at, method: r.method, amount: r.amount }))
-      const vs = this.db.all<{ id: number; void_refund: number }>('SELECT id, void_refund FROM sessions WHERE voided_at>=? AND voided_at<?', [from, to])
-      report.voided.count = vs.length
-      report.voided.refund = vs.reduce((a, r) => a + r.void_refund, 0)
-      report.voided.cashRefund = vs.length
-        ? this.db.get<{ a: number | null }>(
-            `SELECT SUM(amount) AS a FROM payments WHERE method='cash' AND session_id IN (${vs.map((r) => r.id).join(',')})`
-          )?.a ?? 0
-        : 0
-      const sum1 = (sql: string): number => this.db.get<{ a: number | null }>(sql, [from, to])?.a ?? 0
-      const cd = report.cashDrawer
-      cd.sales = report.byMethod.cash
-      cd.debtCollected = report.debtPayments.cash
-      cd.refunds = report.voided.cashRefund
-      cd.expenses = sum1('SELECT SUM(amount) AS a FROM expenses WHERE created_at>=? AND created_at<?')
-      cd.waiterPayouts = sum1('SELECT SUM(amount) AS a FROM waiter_payouts WHERE at>=? AND at<?')
-      cd.kitchenPayouts = sum1('SELECT SUM(amount) AS a FROM kitchen_payouts WHERE at>=? AND at<?')
-      cd.expected = cd.sales + cd.debtCollected - cd.refunds - cd.expenses - cd.waiterPayouts - cd.kitchenPayouts
-      const ret = this.db.get<{ a: number | null }>(
-        `SELECT SUM(r.qty * l.unit_price) AS a FROM returns r JOIN order_lines l ON l.id=r.line_id
-         JOIN sessions s ON s.id=r.session_id WHERE s.cancelled=0 AND r.at>=? AND r.at<?`,
-        [from, to]
-      )
-      report.returnsAmount = ret?.a ?? 0
-      report.byDay = Array.from(byDay, ([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day))
-      report.byRoom = Array.from(byRoom.values()).sort((a, b) => b.total - a.total)
-      report.byProduct = Array.from(byProduct.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
-      report.byProvider = Array.from(byProvider.values()).sort((a, b) => b.amount - a.amount)
-      report.byStaff = Array.from(byStaff.values()).sort((a, b) => b.total - a.total)
-      report.byWaiter = byWaiter.sort((a, b) => b.commission - a.commission || a.name.localeCompare(b.name))
-      return report
+      return this.salesCore(range, filter)
     },
 
     returns: async (range) => {
@@ -2680,6 +2782,159 @@ export class PosService implements PosApi {
     }
   }
 
+  /** Savdo hisoboti (ruxsat tekshiruvisiz — ichki: smena xulosasi, Telegram sinxronizatsiyasi). */
+  private salesCore(range: ReportRange, filter?: SalesFilter): SalesReport {
+    const { from, to } = this.checkRange(range)
+    const allSessions = this.db.all<SessionRow & { room_name: string; staff_name: string | null }>(
+      `SELECT s.*, r.name AS room_name, st.name AS staff_name FROM sessions s
+       LEFT JOIN rooms r ON r.id=s.room_id LEFT JOIN staff st ON st.id=s.closed_by
+       WHERE s.status='closed' AND s.cancelled=0 AND s.closed_at>=? AND s.closed_at<? ORDER BY s.closed_at`,
+      [from, to]
+    )
+    const allPays = this.db.all<PaymentRow>(
+      `SELECT * FROM payments WHERE session_id IN (${allSessions.length ? allSessions.map((s) => s.id).join(',') : '-1'})`
+    )
+    const fMethod = filter && filter.method ? filter.method : null
+    if (fMethod && !PAY_METHODS.includes(fMethod)) fail("To'lov usuli noto'g'ri")
+    const sessions = allSessions.filter((s) => {
+      if (filter && isInt(filter.roomId) && (s.kind === 'bar' ? BAR_ROOM.id : s.room_id ?? 0) !== filter.roomId) return false
+      if (filter && isInt(filter.cashierId) && (s.closed_by ?? s.opened_by) !== filter.cashierId) return false
+      if (fMethod && !allPays.some((p) => p.session_id === s.id && p.method === fMethod)) return false
+      return true
+    })
+    const ids = sessions.map((s) => s.id)
+    const inList = ids.length ? ids.join(',') : '-1'
+    const lines = this.db.all<LineRow & { provider_name: string | null }>(
+      `SELECT l.*, st.name AS provider_name FROM order_lines l LEFT JOIN staff st ON st.id=l.provider_id
+       WHERE l.session_id IN (${inList})`
+    )
+    const pays = allPays.filter((p) => ids.includes(p.session_id) && (!fMethod || p.method === fMethod))
+
+    const report: SalesReport = {
+      range: { from, to },
+      // Faqat xona seanslari; xonasiz bar savdolari alohida — barSales.count
+      sessionsCount: sessions.filter((s) => s.kind !== 'bar').length,
+      timeRevenue: 0,
+      productRevenue: 0,
+      serviceRevenue: 0,
+      discounts: 0,
+      discountCount: 0,
+      serviceCharge: 0,
+      total: 0,
+      byMethod: { cash: 0, card: 0, terminal: 0, debt: 0 },
+      debtPayments: { cash: 0, card: 0, terminal: 0 },
+      debtCollections: [],
+      voided: { count: 0, refund: 0, cashRefund: 0 },
+      cashDrawer: { sales: 0, debtCollected: 0, refunds: 0, expenses: 0, waiterPayouts: 0, kitchenPayouts: 0, expected: 0 },
+      returnsAmount: 0,
+      byDay: [],
+      byRoom: [],
+      byProduct: [],
+      byProvider: [],
+      byStaff: [],
+      byWaiter: [],
+      barSales: { count: 0, total: 0 }
+    }
+    const byDay = new Map<string, number>()
+    const byRoom = new Map<Id, { roomId: Id; roomName: string; sessions: number; total: number }>()
+    const byStaff = new Map<Id, { staffId: Id; name: string; sessions: number; total: number }>()
+    const names = this.staffNames()
+    // Ofitsiantlar: qatorlar bo'yicha (eski sessiyalar — muzlatilgan sessiya haqi); xonasiz bar savdosi kirmaydi
+    const byWaiter: SalesReport['byWaiter'] = Array.from(this.waiterAgg(from, to), ([staffId, a]) => ({
+      staffId, name: names.get(staffId) ?? '', sessions: a.sessions.size, productSales: a.productSales, commission: a.commission
+    }))
+    for (const s of sessions) {
+      const isBar = s.kind === 'bar'
+      const total = s.total ?? 0
+      report.timeRevenue += s.time_total ?? 0
+      report.discounts += s.discount_applied ?? 0
+      if ((s.discount_applied ?? 0) > 0) report.discountCount += 1
+      report.serviceCharge += s.service_charge ?? 0
+      report.total += total
+      const day = localDay(s.closed_at ?? s.opened_at)
+      byDay.set(day, (byDay.get(day) ?? 0) + total)
+      if (isBar) {
+        report.barSales.count++
+        report.barSales.total += total
+      }
+      const roomId = isBar ? BAR_ROOM.id : s.room_id ?? 0
+      const r = byRoom.get(roomId) ?? { roomId, roomName: isBar ? BAR_REPORT_ROOM_NAME : s.room_name ?? '', sessions: 0, total: 0 }
+      r.sessions++
+      r.total += total
+      byRoom.set(roomId, r)
+      const staffId = s.closed_by ?? s.opened_by
+      const st = byStaff.get(staffId) ?? { staffId, name: s.staff_name ?? '', sessions: 0, total: 0 }
+      st.sessions++
+      st.total += total
+      byStaff.set(staffId, st)
+    }
+    const byProduct = new Map<string, { name: string; qty: number; amount: number }>()
+    const byProvider = new Map<Id, { staffId: Id; name: string; count: number; amount: number }>()
+    for (const l of lines) {
+      const q = l.qty - l.returned_qty
+      if (q <= 0) continue
+      const amount = q * l.unit_price
+      if (l.kind === 'product') {
+        report.productRevenue += amount
+        const p = byProduct.get(l.name) ?? { name: l.name, qty: 0, amount: 0 }
+        p.qty += q
+        p.amount += amount
+        byProduct.set(l.name, p)
+      } else {
+        report.serviceRevenue += amount
+        if (l.provider_id != null) {
+          const p = byProvider.get(l.provider_id) ?? { staffId: l.provider_id, name: l.provider_name ?? '', count: 0, amount: 0 }
+          p.count += q
+          p.amount += amount
+          byProvider.set(l.provider_id, p)
+        }
+      }
+    }
+    for (const p of pays) if (p.method in report.byMethod) report.byMethod[p.method] += p.amount
+    for (const d of this.db.all<{ method: DebtPayMethod; a: number }>(
+      'SELECT method, SUM(amount) AS a FROM debt_payments WHERE at>=? AND at<? GROUP BY method',
+      [from, to]
+    )) if (d.method in report.debtPayments) report.debtPayments[d.method] += d.a ?? 0
+    report.debtCollections = this.db
+      .all<{ at: number; method: DebtPayMethod; amount: number; created_at: number; name: string | null; customer_name: string }>(
+        `SELECT dp.at, dp.method, dp.amount, d.created_at, dr.name AS name, d.customer_name
+         FROM debt_payments dp JOIN debts d ON d.id=dp.debt_id LEFT JOIN debtors dr ON dr.id=d.debtor_id
+         WHERE dp.at>=? AND dp.at<? ORDER BY dp.at DESC, dp.id DESC`,
+        [from, to]
+      )
+      .map((r) => ({ at: r.at, debtorName: r.name ?? r.customer_name, debtDate: r.created_at, method: r.method, amount: r.amount }))
+    const vs = this.db.all<{ id: number; void_refund: number }>('SELECT id, void_refund FROM sessions WHERE voided_at>=? AND voided_at<?', [from, to])
+    report.voided.count = vs.length
+    report.voided.refund = vs.reduce((a, r) => a + r.void_refund, 0)
+    report.voided.cashRefund = vs.length
+      ? this.db.get<{ a: number | null }>(
+          `SELECT SUM(amount) AS a FROM payments WHERE method='cash' AND session_id IN (${vs.map((r) => r.id).join(',')})`
+        )?.a ?? 0
+      : 0
+    const sum1 = (sql: string): number => this.db.get<{ a: number | null }>(sql, [from, to])?.a ?? 0
+    const cd = report.cashDrawer
+    cd.sales = report.byMethod.cash
+    cd.debtCollected = report.debtPayments.cash
+    cd.refunds = report.voided.cashRefund
+    cd.expenses = sum1('SELECT SUM(amount) AS a FROM expenses WHERE created_at>=? AND created_at<?')
+    cd.waiterPayouts = sum1('SELECT SUM(amount) AS a FROM waiter_payouts WHERE at>=? AND at<?')
+    cd.kitchenPayouts = sum1('SELECT SUM(amount) AS a FROM kitchen_payouts WHERE at>=? AND at<?')
+    cd.expected = cd.sales + cd.debtCollected - cd.refunds - cd.expenses - cd.waiterPayouts - cd.kitchenPayouts
+    const ret = this.db.get<{ a: number | null }>(
+      `SELECT SUM(r.qty * l.unit_price) AS a FROM returns r JOIN order_lines l ON l.id=r.line_id
+       JOIN sessions s ON s.id=r.session_id WHERE s.cancelled=0 AND r.at>=? AND r.at<?`,
+      [from, to]
+    )
+    report.returnsAmount = ret?.a ?? 0
+    report.byDay = Array.from(byDay, ([day, total]) => ({ day, total })).sort((a, b) => a.day.localeCompare(b.day))
+    report.byRoom = Array.from(byRoom.values()).sort((a, b) => b.total - a.total)
+    report.byProduct = Array.from(byProduct.values()).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name))
+    report.byProvider = Array.from(byProvider.values()).sort((a, b) => b.amount - a.amount)
+    report.byStaff = Array.from(byStaff.values()).sort((a, b) => b.total - a.total)
+    report.byWaiter = byWaiter.sort((a, b) => b.commission - a.commission || a.name.localeCompare(b.name))
+    return report
+  }
+
   private checkRange(range: ReportRange): ReportRange {
     if (!range || !isInt(range.from) || !isInt(range.to) || range.to < range.from) fail("Hisobot oralig'i noto'g'ri")
     return { from: range.from, to: range.to }
@@ -2729,6 +2984,61 @@ export class PosService implements PosApi {
   }
 
   // ═════════════ NETWORK (asosiy kompyuter LAN serveri; amalga oshirish host.network da) ═════════════
+  /** Telegram bot (PHP) uchun holat nusxasi. Ruxsat tekshiruvisiz (faqat ishonchli ichki chaqiruv: BotSync). */
+  botSnapshot(): BotSnapshot {
+    const now = this.now()
+    const d = new Date(now)
+    const dayFrom = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    const t = this.salesCore({ from: dayFrom, to: now + 1 })
+    const names = this.staffNames()
+    const rooms = this.db.all<RoomRow>('SELECT * FROM rooms WHERE deleted=0 AND active=1 ORDER BY sort_order, id').map((r) => {
+      const s = this.openSessionForRoom(r.id)
+      if (!s) return { name: r.name, open: false, guests: 0, openedAt: null, waiter: null, total: 0 }
+      const v = this.view(s.id, now)
+      return {
+        name: r.name, open: true, guests: v.guests.filter((g) => g.state !== 'finished').length, openedAt: s.opened_at,
+        waiter: v.session.waiterId != null ? names.get(v.session.waiterId) ?? null : null, total: v.total
+      }
+    })
+    const stock = this.db
+      .all<{ name: string; cat: string | null; stock: number; low_stock_at: number }>(
+        `SELECT p.name, c.name AS cat, p.stock, p.low_stock_at FROM products p LEFT JOIN categories c ON c.id=p.category_id
+         WHERE p.deleted=0 AND p.active=1 AND p.track_stock=1 ORDER BY (p.stock <= p.low_stock_at) DESC, p.stock ASC, p.name`
+      )
+      .map((p) => ({ name: p.name, category: p.cat ?? '', stock: p.stock, low: p.stock <= p.low_stock_at }))
+    const shifts = this.shiftRowsInternal(6)
+    return {
+      at: now,
+      business: this.businessName(),
+      shift: shifts.find((x) => x.shift.closedAt == null) ?? null,
+      shifts,
+      today: { total: t.total, byMethod: { ...t.byMethod }, discounts: t.discounts, sessions: t.sessionsCount + t.barSales.count },
+      rooms,
+      stock
+    }
+  }
+
+  bot: PosApi['bot'] = {
+    status: async () => {
+      this.noViewer()
+      this.need('settings.manage')
+      if (!this.host.bot) fail('Telegram bot bu muhitda mavjud emas')
+      return this.host.bot.status()
+    },
+    save: async (input) => {
+      this.noViewer()
+      this.need('settings.manage')
+      if (!this.host.bot) fail('Telegram bot bu muhitda mavjud emas')
+      return this.host.bot.save(input)
+    },
+    test: async () => {
+      this.noViewer()
+      this.need('settings.manage')
+      if (!this.host.bot) fail('Telegram bot bu muhitda mavjud emas')
+      return this.host.bot.test()
+    }
+  }
+
   network: PosApi['network'] = {
     status: async () => {
       this.noViewer()

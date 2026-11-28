@@ -44,6 +44,7 @@ export async function setup(opts: { file?: string | null; host?: PosHost; servic
   const owner = (await svc.auth.current())!.staff
   // Mavjud testlar obslugasiz summalar bilan yozilgan; obsluga testlari serviceChargePct beradi (service-charge.test.ts)
   await svc.settings.save({ ...(await svc.settings.get()), serviceChargePct: opts.serviceChargePct ?? 0 })
+  await svc.shifts.open() // 2.1.0: to'lov uchun ochiq smena shart
   const mk = (name: string, role: Role, pin: string, isProvider = false, isWaiter = false, commissionPct = 0) =>
     svc.staff.save({ name, role, pin, isProvider, isWaiter, commissionPct, active: true })
   const admin = await mk('Admin', 'admin', '2222')

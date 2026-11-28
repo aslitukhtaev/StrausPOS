@@ -11,6 +11,7 @@ import { useNow } from '../store/clock'
 import { api, apiKind } from '../api'
 import { Avatar, Button, ErrorBoundary, Icon, IconButton, Logo, confirmDialog, errorMessage, formatClock, formatDate, cx, toast } from '../ui'
 import { SCREENS, screenAllowed } from './routes'
+import { ShiftChip } from './ShiftChip'
 import { useAutoLock } from './useAutoLock'
 import { changeConnection, useTerminalLink } from './useViewerLink'
 import { formatLeft, useLicense } from '../store/license'
@@ -143,7 +144,7 @@ export function AppShell() {
             </Button>
           </div>
         ) : (
-          <div className="side__foot">v2.0.3 · offline</div>
+          <div className="side__foot">v2.2.0 · offline</div>
         )}
       </aside>
 
@@ -156,6 +157,7 @@ export function AppShell() {
         <div className="spacer" />
         {trialEndsAt != null && <TrialBadge endsAt={trialEndsAt} />}
         <Clock />
+        <ShiftChip />
         <ThemeToggle />
         <div className="topbar__sep" />
         {staff && (

@@ -14,6 +14,7 @@ import {
   confirmDialog, cx, formatClock, formatDateTime, formatMoney, getNow, MONTHS, WEEKDAYS, toast
 } from '@/ui'
 import { RangeReport } from './RangeReport'
+import { KitchenHistory } from './KitchenHistory'
 import './kitchen.css'
 
 const p2 = (n: number) => (n < 10 ? '0' + n : '' + n)
@@ -56,7 +57,7 @@ export default function KitchenScreen() {
   const sharePct = useApp((s) => (s.settings && s.settings.kitchen ? s.settings.kitchen.sharePct : null))
   const canPay = useCan('staff.manage') && !readOnly
   const nowMonth = todayKey().slice(0, 7)
-  const [mode, setMode] = useState<'month' | 'range'>('month')
+  const [mode, setMode] = useState<'month' | 'range' | 'history'>('month')
   const [month, setMonth] = useState(nowMonth)
   const [rows, setRows] = useState<KitchenDayRow[] | null>(null)
   const [today, setToday] = useState<KitchenDayRow | null>(null)
@@ -173,12 +174,13 @@ export default function KitchenScreen() {
       <Segmented
         size="lg"
         value={mode}
-        onChange={(v) => setMode(v as 'month' | 'range')}
-        options={[{ value: 'month', label: "Oy bo'yicha", icon: 'calendar' }, { value: 'range', label: "Vaqt oralig'i (soat bilan)", icon: 'clock' }]}
+        onChange={(v) => setMode(v as 'month' | 'range' | 'history')}
+        options={[{ value: 'month', label: "Oy bo'yicha", icon: 'calendar' }, { value: 'range', label: "Vaqt oralig'i (soat bilan)", icon: 'clock' }, { value: 'history', label: 'Tarix (nima sotildi)', icon: 'receipt' }]}
         data-testid="kt-mode"
       />
 
       {mode === 'range' && <RangeReport />}
+      {mode === 'history' && <KitchenHistory />}
 
       {mode === 'month' && (<>
       <div className="kt-bar">
@@ -409,18 +411,7 @@ function PayoutDialog({ row, onClose, onDone }: { row: KitchenDayRow; onClose: (
   const submit = async () => {
     if (busy) return
     if (!(amount > 0)) return toast.warning('Summani kiriting')
-    if (amount > rest) {
-      const ok = await confirmDialog({
-        title: "Qoldiqdan ko'p berilmoqda",
-        message:
-          formatMoney(amount) + " so'm berilmoqda, qoldiq esa " + formatMoney(rest) + " so'm. Ortiqcha " +
-          formatMoney(amount - rest) + " so'm shu kunda manfiy qoldiq bo'lib ko'rinadi. Davom etasizmi?",
-        confirmText: 'Baribir berish',
-        danger: true,
-        icon: 'alert'
-      })
-      if (!ok) return
-    }
+    if (amount > rest) return toast.warning("Balans yetarli emas: ko'pi bilan " + formatMoney(rest) + " so'm berish mumkin")
     setBusy(true)
     try {
       await api.kitchen.payout(row.day, amount, note.trim())

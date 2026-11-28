@@ -22,11 +22,13 @@ const MAP: MethodMap = {
   license: { status: true, activate: true },
   catalog: {
     categories: true, saveCategory: true, removeCategory: true, products: true, saveProduct: true,
-    removeProduct: true, adjustStock: true, services: true, saveService: true, removeService: true
+    removeProduct: true, adjustStock: true, stockHistory: true,services: true, saveService: true, removeService: true
   },
-  debts: { list: true, pay: true, payments: true },
+  debts: { list: true, pay: true, payments: true, journal: true },
   debtors: { search: true, list: true, debts: true, pay: true, rename: true },
-  kitchen: { daily: true, range: true, payout: true, payouts: true, reprint: true },
+  kitchen: { daily: true, range: true, history: true, payout: true, payouts: true, reprint: true },
+  bot: { status: true, save: true, test: true },
+  shifts: { current: true, open: true, close: true, list: true },
   staff: { list: true, save: true, changePin: true },
   waiters: { list: true, monthly: true, sessions: true, payout: true, payouts: true },
   expenses: { list: true, save: true, remove: true, categories: true, saveCategory: true },

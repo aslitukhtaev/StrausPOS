@@ -7,6 +7,7 @@ import type { Debtor } from '@shared/types'
 import { api } from '@/api'
 import { Avatar, Badge, Field, Icon, IconButton, Input, Money, Spinner, cx, formatPhone, toast } from '@/ui'
 import { phoneDigits } from './methods'
+import { useCan } from '@/store/auth'
 
 export interface DebtorPickerProps {
   name: string
@@ -27,6 +28,8 @@ function phoneTyping(d: string): string {
 }
 
 export function DebtorPicker({ name, phone, selected, onName, onPhone, onSelect, showErrors, autoFocus }: DebtorPickerProps) {
+  // Qarzlar ruxsati yo'q xodim qarzga yoza oladi, lekin qarzdorning summalarini ko'rmaydi
+  const showBalance = useCan('debt.manage')
   const [last, setLast] = useState<'name' | 'phone'>('name')
   const [results, setResults] = useState<Debtor[]>([])
   const [loading, setLoading] = useState(false)
@@ -89,7 +92,7 @@ export function DebtorPicker({ name, phone, selected, onName, onPhone, onSelect,
           <div className="checkout-debtor-sel__label">Mavjud qarzdor</div>
           <div className="checkout-debtor-sel__name ellipsis">{selected.name}</div>
           <div className="checkout-debtor-sel__meta num">{selected.phone}</div>
-          <div className="checkout-debtor-sel__meta">
+          {showBalance && <div className="checkout-debtor-sel__meta">
             {selected.balance > 0 ? (
               <span className="checkout-debtor-sel__bal">
                 Hozirgi qarzi: <Money value={selected.balance} tone="danger" />
@@ -97,7 +100,7 @@ export function DebtorPicker({ name, phone, selected, onName, onPhone, onSelect,
             ) : (
               <span className="t-success">Hozir qarzi yo'q</span>
             )}
-          </div>
+          </div>}
         </div>
         <IconButton
           icon="x"
@@ -184,7 +187,7 @@ export function DebtorPicker({ name, phone, selected, onName, onPhone, onSelect,
                 <span className="checkout-sugg__phone num">{d.phone}</span>
               </span>
               <span className="checkout-sugg__bal">
-                {d.balance > 0 ? <Money value={d.balance} tone="danger" currency={false} /> : <span className="subtle">qarzi yo'q</span>}
+                {!showBalance ? null : d.balance > 0 ? <Money value={d.balance} tone="danger" currency={false} /> : <span className="subtle">qarzi yo'q</span>}
               </span>
               <Icon name="chevronRight" size={20} />
             </button>

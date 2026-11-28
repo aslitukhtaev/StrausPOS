@@ -10,3 +10,9 @@ test-results
 playwright-report
 screenshots
 dev-data
+
+# Telegram bot: maxfiy sozlama va ish ma'lumotlari
+bot/config.php
+bot/data/*.json
+bot/data/*.lck
+bot/data/*.tmp

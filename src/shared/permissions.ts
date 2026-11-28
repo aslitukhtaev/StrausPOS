@@ -1,7 +1,7 @@
 import type { Permission, Role } from './types'
 
 export const ALL_PERMISSIONS: Permission[] = [
-  'session.open', 'session.manage', 'session.pay', 'line.return', 'bar.sale',
+  'session.open', 'session.manage', 'line.add', 'session.pay', 'line.return', 'bar.sale',
   'discount.apply', 'debt.manage', 'stock.manage', 'reports.view', 'expense.view', 'expense.manage',
   'profit.view', 'history.view', 'kitchen.view', 'waiters.view',
   'settings.manage', 'staff.manage', 'backup.manage'
@@ -11,8 +11,8 @@ export const ALL_PERMISSIONS: Permission[] = [
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: ALL_PERMISSIONS,
   admin: ALL_PERMISSIONS.filter((p) => p !== 'staff.manage' && p !== 'settings.manage' && p !== 'backup.manage'),
-  cashier: ['session.open', 'session.manage', 'session.pay', 'line.return', 'bar.sale', 'discount.apply', 'debt.manage'],
-  waiter: ['session.open', 'session.manage', 'line.return']
+  cashier: ['session.open', 'session.manage', 'line.add', 'session.pay', 'line.return', 'bar.sale', 'discount.apply', 'debt.manage'],
+  waiter: ['session.open', 'session.manage', 'line.add', 'line.return']
 }
 /** Eski nom (standart jadval) */
 export const ROLE_PERMISSIONS = DEFAULT_ROLE_PERMISSIONS
@@ -30,13 +30,14 @@ export interface PermissionInfo {
 
 /** Ruxsatlar katalogi (UI matritsasi tartibi shu) */
 export const PERMISSION_CATALOG: PermissionInfo[] = [
-  { perm: 'session.open', group: 'Xonalar', label: 'Xonani ochish', description: "Xona ochish, mehmon qo'shish, bar savdosi" },
-  { perm: 'session.manage', group: 'Xonalar', label: 'Sessiyani boshqarish', description: "Pauza, tugatish, +1 soat, xona almashtirish, buyurtma qo'shish, bekor qilish" },
-  { perm: 'session.pay', group: 'Xonalar', label: "To'lovni qabul qilish", description: "Hisobni yopish va to'lov (naqd, Click, terminal, qarz)" },
+  { perm: 'session.open', group: 'Xonalar', label: 'Xonani ochish', description: "Xonani ochish: mehmonlar soni, vaqt, ofitsiant tanlash" },
+  { perm: 'session.manage', group: 'Xonalar', label: 'Sessiyani boshqarish', description: "Pauza, tugatish, +1 soat, mehmon qo'shish, xona va ofitsiantni almashtirish, bekor qilish" },
+  { perm: 'line.add', group: 'Xonalar', label: "Xonaga mahsulot qo'shish", description: "Xonaga bar va oshxona mahsulotini qo'shish (ofitsiant faqat o'ziga biriktirilgan xonaga)" },
+  { perm: 'session.pay', group: 'Xonalar', label: "To'lovni qabul qilish", description: "Hisobni yopish va to'lov (naqd, Click, terminal), hisobni qarzga yozish" },
   { perm: 'line.return', group: 'Xonalar', label: 'Qaytarish (X)', description: "Qo'shilgan mahsulot yoki xizmatni qaytarish" },
   { perm: 'discount.apply', group: 'Xonalar', label: 'Chegirma berish', description: 'Hisobga chegirma qo\'llash' },
-  { perm: 'bar.sale', group: 'Xonalar', label: 'Bar savdosi (xonasiz)', description: "Xonasiz bar savdosi: ochish, mahsulot qo'shish, to'lov qabul qilish (qarzga yozish — Qarzlar ruxsati bilan)" },
-  { perm: 'debt.manage', group: 'Qarzlar', label: 'Qarzlar bilan ishlash', description: "Qarzdorlar ro'yxati, qarz to'lovini qabul qilish" },
+  { perm: 'bar.sale', group: 'Xonalar', label: 'Bar savdosi (xonasiz)', description: "Xonasiz bar savdosi: ochish, mahsulot qo'shish, to'lov qabul qilish yoki qarzga yozish" },
+  { perm: 'debt.manage', group: 'Qarzlar', label: 'Qarzlar bilan ishlash', description: "Qarzlar sahifasi: qarzdorlar, jurnal, hisobot, qarz to'lovini qabul qilish (qarzga berish bu ruxsatsiz ham mumkin)" },
   { perm: 'stock.manage', group: 'Bar va ombor', label: 'Bar va ombor', description: "Mahsulot, kategoriya, xizmatlar, ombor qoldig'i, tannarx" },
   { perm: 'reports.view', group: 'Hisobotlar', label: 'Savdo hisoboti', description: 'Hisobot bo\'limi' },
   { perm: 'history.view', group: 'Hisobotlar', label: 'Tarix', description: 'Sessiyalar tarixi va sotuvlar (kim sotgani)' },

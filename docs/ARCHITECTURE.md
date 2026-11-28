@@ -39,6 +39,7 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - Qator qaytarish (X): `returnedQty` oshadi, mahsulot omborga qaytadi, `ReturnRecord` yoziladi.
 - To'lov: naqd/Click/aralash/qarz. Σ to'lov = total. Qarz: ism+telefon majburiy.
 - Xizmat (massaj): qat'iy narx, provider yoziladi, ulush YO'Q.
+- **Ruxsat 'line.add'** (2.0.4): xonaga bar/oshxona mahsulotini qo'shish — 'session.manage'dan ALOHIDA ruxsat. 'bar.sale' bar savdosi sessiyasida ham qo'shishga yetadi.
 - **Ruxsat 'bar.sale'** (2.0.1): xonasiz bar savdosi (ochish, mahsulot, to'lov) alohida ruxsat; qarzga yozish — debt.manage. Kassir va admin — standart bor, ofitsiant — yo'q (ega beradi).
 - **Ofitsiant**: xonaga BIRIKTIRILMAYDI (qarang: "2026-10 o'zgarishlari"). Haqi = o'zi qo'shgan bar va oshxona
   mahsulotlari qatorlari (qaytarishlar ayirilgan; xizmatlar va vaqt KIRMAYDI) × qatorda muzlatilgan `waiterPct`%.
@@ -83,6 +84,17 @@ Agar shartnoma yetarli bo'lmasa — o'zgartirmang; hisobotingizda "SHARTNOMA TAK
 - Haq: xonada ofitsiant bor bo'lsa — SESSIYA bo'yicha (bar + oshxona savdosi × waiter_pct); qatorlarga ko'rsatish uchun shu ofitsiant yoziladi,
   lekin qator haqi ikkinchi marta hisoblanmaydi (`s.waiter_id IS NULL` shartli so'rovlar). Ofitsiantsiz xonada eski qator bo'yicha hisob qoladi.
 
+## 2.1.0 — smena, pul berish chegarasi, oshxona tarixi, Telegram bot
+- **Smena** (`shifts.*`, jadval `shifts`): kassir ishga kelib «Smenani ochish» bosadi; ochiq smena bo'lsa u AVTOMATIK yopiladi (`auto_closed`).
+  Smenasiz `checkout.pay`, `debts.pay`, `debtors.pay` rad etiladi (`requireShift`). Hisob VAQT oralig'i bo'yicha: `[opened_at, closed_at)` →
+  `salesCore(range)` (kassa hisobi, usullar, chegirma). Kassada bo'lishi kerak naqd = topshirilishi kerak (haqiqiy sanash yo'q — mijoz qarori).
+  Hisobot/Tarixda «Smena» tanlovi, Hisobotda «Smenalar» tabi. Voqealar: `svc.events` ('shiftOpened' | 'shiftClosed').
+- **Pul berish chegarasi:** ofitsiantga (oy balansi) va oshxonaga (kun balansi) balansdan ortiq pul berib bo'lmaydi — «balansi yetarli emas».
+- **Oshxona tarixi** (`kitchen.history`): nima sotildi, qaysi sessiyada (chek №/xona), kim qo'shdi, ofitsiant. `kitchen.range` — soat bilan oraliq.
+- **Telegram bot** — serverdagi oddiy PHP (`bot/`, cron). Dastur (`electron/main/sync/botSync.ts`) har daqiqada va smena voqeasida serverga
+  HTTPS POST yuboradi (`X-Bot-Secret`); bot Telegramdan buyruq oladi (getUpdates) va snapshot asosida javob beradi, smena yopilganda xabar yuboradi.
+  Bot tokeni FAQAT serverdagi `config.php` da; dasturda faqat server manzili va maxfiy kalit (kv `botSync`, UI ga qaytmaydi). Terminallarga `bot.*` yopiq.
+
 ## Dizayn tamoyillari
 Brend: **Delfin Sauna**, logotip — delfin. Ranglar rasmdagi suvdan: yorqin moviy-feruza (aqua/cyan), oq ko'pik,
 chuqur dengiz ko'ki. **Ikki rejim**: kunduzgi (yorug', oq-moviy) va tungi (chuqur dengiz). `data-theme` = light|dark,
@@ -95,3 +107,8 @@ band=moviy/feruza, vaqt tugayapti/oshdi=qizil. Tokenlar: `src/renderer/styles/to
 - ui-architect: `src/renderer/{main.tsx,App.tsx,styles/**,ui/**,api/**,store/**,layout/**,screens/Lock*,screens/Setup*}`, `index.html`
 - screen agents: faqat o'zlariga berilgan `src/renderer/screens/<nom>/**`
 - qa-tester: `tests/**`, `playwright.config.ts` (kod xatosini topsa, fayl egasiga xabar beradi yoki minimal tuzatadi va hisobotda yozadi)
+
+## Qarzlar va ombor tarixi (2.1.0 dan keyin)
+- Hisobni qarzga yozish uchun `session.pay` / `bar.sale` yetarli. `debt.manage` — faqat Qarzlar sahifasi (ro'yxat, jurnal, hisobot, to'lov, tahrirlash). Ruxsati yo'q xodimga `debtors.search` summalarsiz javob beradi.
+- `debts.journal()` — barcha qarzlar: chek, kim bergan (`payments.by`, method='debt'), mahsulotlar, to'lovlar. Filtr va hisobot mijozda: `src/renderer/screens/debts/model.ts`.
+- `catalog.stockHistory(range)` — `stock_moves` jadvalidan (kirim / chiqim / sotuv / qaytarish). Ruxsat: `stock.manage`.

@@ -30,6 +30,6 @@ describe('QA tuzatishlari', () => {
     const m = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
     await expect(svc.waiters.payout(staff.waiter.id, m, 1000, '')).rejects.toThrow('Kelajak oy')
     const cur = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    await expect(svc.waiters.payout(staff.waiter.id, cur, 1000, '')).resolves.toMatchObject({ amount: 1000 })
+    await expect(svc.waiters.payout(staff.waiter.id, cur, 1000, '')).rejects.toThrow('balansi yetarli emas')
   })
 })
